@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v2026.09.1)'
+        description: 'Version tag (e.g. v2026.09.4)'
         required: true
-        default: 'v2026.09.1'
+        default: 'v2026.09.4'
 permissions:
   contents: read
 jobs:
@@ -30,10 +30,12 @@ jobs:
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            RAW="${{ github.event.inputs.version }}"
           else
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            RAW="${GITHUB_REF#refs/tags/}"
           fi
+          echo "VERSION=${RAW}" >> $GITHUB_OUTPUT
+          echo "PIP_VERSION=${RAW#v}" >> $GITHUB_OUTPUT
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -44,4 +46,4 @@ jobs:
             maksimtech/cookieradar:latest
             maksimtech/cookieradar:${{ steps.version.outputs.VERSION }}
           build-args: |
-            COOKIERADAR_VERSION=${{ steps.version.outputs.VERSION }}
+            COOKIERADAR_VERSION=${{ steps.version.outputs.PIP_VERSION }}
