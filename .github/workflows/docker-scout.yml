@@ -1,0 +1,34 @@
+name: Docker Scout CVE Scan
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '30 4 * * 1'
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  scout:
+    name: Docker Scout
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Docker Scout CVE scan
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: maksimtech/cookieradar:latest
+          only-severities: critical,high
+          exit-code: false
+          sarif-file: scout-results.sarif
+      - name: Upload Scout results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: scout-results.sarif
