@@ -105,6 +105,7 @@ async def _run_session(
 
     try:
         await page.goto(url, wait_until="networkidle", timeout=30000)
+        await page.wait_for_timeout(3000)
 
         # Check for cookie banner
         banner_selectors = [
@@ -122,13 +123,18 @@ async def _run_session(
             except:
                 pass
 
-        # Interact with banner if needed
+        # Accept all
         if accept is True:
             accept_selectors = [
-                "button[id*='accept']", "button[class*='accept']",
-                "button[id*='agree']", "button[class*='agree']",
-                "button:has-text('Accetta')", "button:has-text('Accept')",
-                "button:has-text('Accetto')", "button:has-text('OK')",
+                "#onetrust-accept-btn-handler",
+                "button[id*='accept-all']",
+                "button[class*='accept-all']",
+                "button[id*='agree']",
+                "button:has-text('Accetta tutto')",
+                "button:has-text('Accept All')",
+                "button:has-text('Accetta')",
+                "button:has-text('Accept')",
+                "button:has-text('OK')",
             ]
             for selector in accept_selectors:
                 try:
@@ -140,13 +146,20 @@ async def _run_session(
                 except:
                     pass
 
+        # Reject all
         elif accept is False:
+            rejected = False
+
+            # Step 1 — prova rifiuto diretto
             reject_selectors = [
-                "button[id*='reject']", "button[class*='reject']",
-                "button[id*='decline']", "button[class*='decline']",
-                "button:has-text('Rifiuta')", "button:has-text('Reject')",
-                "button:has-text('Rifiuto')", "button:has-text('Decline')",
-                "button:has-text('Non accetto')",
+                "#onetrust-reject-all-handler",
+                ".ot-pc-refuse-all-handler",
+                "button[id*='reject-all']",
+                "button[class*='refuse-all']",
+                "button:has-text('Rifiuta tutto')",
+                "button:has-text('Reject All')",
+                "button:has-text('Rifiuta')",
+                "button:has-text('Decline')",
             ]
             for selector in reject_selectors:
                 try:
@@ -154,18 +167,29 @@ async def _run_session(
                     if btn and await btn.is_visible():
                         await btn.click()
                         await page.wait_for_timeout(2000)
-                        # Reload after reject
-                        await page.reload(wait_until="networkidle")
-                        await page.wait_for_timeout(2000)
+                        rejected = True
                         break
                 except:
                     pass
 
-        # Collect cookies
-        result.cookies = await context.cookies()
+            # Step 2 — OneTrust a due step: apri preferenze poi rifiuta
+            if not rejected:
+                try:
+                    pc_btn = await page.query_selector("#onetrust-pc-btn-handler")
+                    if pc_btn and await pc_btn.is_visible():
+                        await pc_btn.click()
+                        await page.wait_for_timeout(2000)
+                        refuse_btn = await page.query_selector(".ot-pc-refuse-all-handler")
+                        if refuse_btn and await refuse_btn.is_visible():
+                            await refuse_btn.click()
+                            await page.wait_for_timeout(2000)
+                            rejected = True
+                except:
+                    pass
 
-    except Exception as e:
-        result.error = str(e)
+            if rejected:
+                await page.reload(wait_until="networkidle")
+                await page.wait_for_timeout(2000)
     finally:
         await page.close()
 
