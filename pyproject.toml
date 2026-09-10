@@ -32,3 +32,13 @@ cookieradar = "cookieradar.cli:app"
 
 [tool.hatch.version]
 path = "cookieradar/__init__.py"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

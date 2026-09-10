@@ -133,3 +133,66 @@ def test_tracker_domains_contains_facebook():
 
 def test_tracker_domains_contains_adform():
     assert "adform.net" in TRACKER_DOMAINS
+
+
+# ─── _run_session mock ───────────────────────────────────────────────────────
+
+import pytest
+
+@pytest.mark.asyncio
+async def test_run_session_pre_consent():
+    from cookieradar.scanner import _run_session, SessionResult
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_context = AsyncMock()
+    mock_page = AsyncMock()
+    mock_context.new_page = AsyncMock(return_value=mock_page)
+    mock_page.goto = AsyncMock()
+    mock_page.wait_for_timeout = AsyncMock()
+    mock_page.query_selector = AsyncMock(return_value=None)
+    mock_context.cookies = AsyncMock(return_value=[])
+    mock_page.close = AsyncMock()
+    mock_page.on = MagicMock()
+
+    result = await _run_session(mock_context, "https://example.com", "pre-consent", accept=None)
+    assert result.session == "pre-consent"
+    assert isinstance(result, SessionResult)
+
+
+@pytest.mark.asyncio
+async def test_run_session_post_accept():
+    from cookieradar.scanner import _run_session, SessionResult
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_context = AsyncMock()
+    mock_page = AsyncMock()
+    mock_context.new_page = AsyncMock(return_value=mock_page)
+    mock_page.goto = AsyncMock()
+    mock_page.wait_for_timeout = AsyncMock()
+    mock_page.query_selector = AsyncMock(return_value=None)
+    mock_context.cookies = AsyncMock(return_value=[])
+    mock_page.close = AsyncMock()
+    mock_page.on = MagicMock()
+
+    result = await _run_session(mock_context, "https://example.com", "post-accept", accept=True)
+    assert result.session == "post-accept"
+
+
+@pytest.mark.asyncio
+async def test_run_session_post_reject():
+    from cookieradar.scanner import _run_session, SessionResult
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_context = AsyncMock()
+    mock_page = AsyncMock()
+    mock_context.new_page = AsyncMock(return_value=mock_page)
+    mock_page.goto = AsyncMock()
+    mock_page.wait_for_timeout = AsyncMock()
+    mock_page.query_selector = AsyncMock(return_value=None)
+    mock_context.cookies = AsyncMock(return_value=[])
+    mock_page.close = AsyncMock()
+    mock_page.on = MagicMock()
+    mock_page.reload = AsyncMock()
+
+    result = await _run_session(mock_context, "https://example.com", "post-reject", accept=False)
+    assert result.session == "post-reject"
