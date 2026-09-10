@@ -24,7 +24,7 @@ jobs:
           pip install pytest pytest-cov
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=cookieradar --cov-report=xml --cov-report=term-missing
+          pytest tests/ --ignore=tests/benchmarks --cov=cookieradar --cov-report=xml --cov-report=term-missing
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
