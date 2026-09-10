@@ -20,8 +20,6 @@ jobs:
         run: |
           pip install -e .  # NOSONAR
           pip install pytest pytest-cov
-          playwright install chromium
-          playwright install-deps chromium
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
           pytest tests/ --ignore=tests/benchmarks --cov=cookieradar --cov-report=xml --cov-report=term-missing
