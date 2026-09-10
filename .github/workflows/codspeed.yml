@@ -1,0 +1,33 @@
+name: CodSpeed
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'cookieradar/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  benchmarks:
+    name: Run benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -e .  # NOSONAR
+          pip install pytest-codspeed --only-binary :all:
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v3
+        with:
+          mode: simulation
+          run: pytest tests/benchmarks/ --codspeed

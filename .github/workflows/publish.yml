@@ -1,0 +1,42 @@
+name: Publish to PyPI
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+jobs:
+  build-and-publish:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cookieradar
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build dependencies
+        run: pip install --upgrade build hatchling  # NOSONAR
+      - name: Build package
+        run: python -m build
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" > /tmp/gpg_key.asc
+          gpg --batch --import /tmp/gpg_key.asc
+          rm /tmp/gpg_key.asc
+          echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --passphrase-fd 0 --pinentry-mode loopback --list-secret-keys
+      - name: Sign packages
+        run: |
+          for f in dist/*; do
+            echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --passphrase-fd 0 \
+              --pinentry-mode loopback \
+              --armor --detach-sign "$f"
+          done
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verify-metadata: false
