@@ -29,6 +29,7 @@ class SessionResult:
     cookies: list[dict] = field(default_factory=list)
     banner_found: bool = False
     error: Optional[str] = None
+    consent_clicked: bool = False  # accept/reject button found and clicked
 
 
 @dataclass
@@ -94,10 +95,22 @@ TRACKER_DOMAINS = [
 ]
 
 
+def tracker_domain(url: str) -> Optional[str]:
+    """
+    Registrable domain of a tracker URL, or None if the host is not a tracker.
+    TRACKER_DOMAINS entries are registrable domains, so the matching entry is
+    the eTLD+1: region1.google-analytics.com → google-analytics.com.
+    """
+    host = (urlparse(url).hostname or "").rstrip(".")
+    for domain in TRACKER_DOMAINS:
+        if host == domain or host.endswith("." + domain):
+            return domain
+    return None
+
+
 def is_tracker(url: str) -> bool:
     """Check if the URL host is a known tracker domain or one of its subdomains."""
-    host = (urlparse(url).hostname or "").rstrip(".")
-    return any(host == domain or host.endswith("." + domain) for domain in TRACKER_DOMAINS)
+    return tracker_domain(url) is not None
 
 
 ACCEPT_SELECTORS = [
@@ -127,12 +140,20 @@ REJECT_LABELS = [
 ]
 
 
+async def _first_visible(page: Page, selector: str):
+    """First visible element matching selector (the first match may be hidden)."""
+    for element in await page.query_selector_all(selector):
+        if await element.is_visible():
+            return element
+    return None
+
+
 async def _click_consent_button(page: Page, selectors: list[str], labels: list[re.Pattern]) -> bool:
     """Click the first visible match: CSS selectors first, then buttons by accessible name."""
     for selector in selectors:
         try:
-            btn = await page.query_selector(selector)
-            if btn and await btn.is_visible():
+            btn = await _first_visible(page, selector)
+            if btn:
                 await btn.click()
                 return True
         except PlaywrightError:
@@ -172,8 +193,8 @@ async def _run_session(
 
     # Intercept requests
     def handle_request(request):
-        if is_tracker(request.url):
-            domain = urlparse(request.url).netloc
+        domain = tracker_domain(request.url)
+        if domain:
             result.trackers.append(TrackerRequest(
                 url=request.url,
                 domain=domain,
@@ -199,16 +220,16 @@ async def _run_session(
         ]
         for selector in banner_selectors:
             try:
-                element = await page.query_selector(selector)
-                if element and await element.is_visible():
+                if await _first_visible(page, selector):
                     result.banner_found = True
                     break
-            except:
+            except PlaywrightError:
                 pass
 
         # Accept all
         if accept is True:
             if await _click_consent_button(page, ACCEPT_SELECTORS, ACCEPT_LABELS):
+                result.consent_clicked = True
                 await page.wait_for_timeout(2000)
 
         # Reject all
@@ -221,19 +242,20 @@ async def _run_session(
             # Step 2 — OneTrust a due step: apri preferenze poi rifiuta
             if not rejected:
                 try:
-                    pc_btn = await page.query_selector("#onetrust-pc-btn-handler")
-                    if pc_btn and await pc_btn.is_visible():
+                    pc_btn = await _first_visible(page, "#onetrust-pc-btn-handler")
+                    if pc_btn:
                         await pc_btn.click()
                         await page.wait_for_timeout(2000)
-                        refuse_btn = await page.query_selector(".ot-pc-refuse-all-handler")
-                        if refuse_btn and await refuse_btn.is_visible():
+                        refuse_btn = await _first_visible(page, ".ot-pc-refuse-all-handler")
+                        if refuse_btn:
                             await refuse_btn.click()
                             await page.wait_for_timeout(2000)
                             rejected = True
-                except:
+                except PlaywrightError:
                     pass
 
             if rejected:
+                result.consent_clicked = True
                 # Only requests made after the rejection count for this session
                 result.trackers.clear()
                 try:
@@ -244,6 +266,10 @@ async def _run_session(
     except PlaywrightError as e:
         _add_error(result, e)
     finally:
+        try:
+            result.cookies = await context.cookies()
+        except PlaywrightError as e:
+            _add_error(result, e)
         await page.close()
 
     return result

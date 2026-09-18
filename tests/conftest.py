@@ -24,7 +24,7 @@ def make_mock_context(page=None):
     page = page or AsyncMock()
     page.handlers = {}
     page.on = MagicMock(side_effect=lambda ev, fn: page.handlers.setdefault(ev, fn))
-    page.query_selector = AsyncMock(return_value=None)
+    page.query_selector_all = AsyncMock(return_value=[])
     no_buttons = MagicMock()
     no_buttons.count = AsyncMock(return_value=0)
     page.get_by_role = MagicMock(return_value=no_buttons)

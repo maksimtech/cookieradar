@@ -22,6 +22,9 @@ def _tracker(domain, url=None):
 def _fake_scan(build):
     async def fake(url, **kwargs):
         r = ScanResult(url=url)
+        # By default the consent buttons were found and clicked
+        r.post_accept.consent_clicked = True
+        r.post_reject.consent_clicked = True
         build(r)
         return r
     return fake
@@ -161,3 +164,140 @@ def test_batch_shows_session_errors(tmp_path):
 
     assert res.exit_code == 0, res.output
     assert "pre-consent: Timeout 30000ms exceeded." in res.output
+
+
+# ─── L3: failed accept/reject must be reported, not presented as done ───────
+
+def test_audit_reject_not_applied_gives_no_verdict():
+    def build(r):
+        r.pre_consent.trackers = [_tracker("doubleclick.net")]
+        r.post_reject.trackers = [_tracker("doubleclick.net")]
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 0, res.output
+    assert "VIOLATION" not in res.output
+    assert "No trackers loaded after rejection" not in res.output
+    assert "Session 3 — Post-reject NOT APPLIED" in res.output
+    assert "reject button not found" in res.output
+
+
+def test_audit_accept_not_applied_is_reported():
+    def build(r):
+        r.post_accept.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 0, res.output
+    assert "Session 2 — Post-accept NOT APPLIED" in res.output
+    assert "accept button not found" in res.output
+
+
+def test_batch_reject_not_applied_is_unverified(tmp_path):
+    f = tmp_path / "urls.txt"
+    f.write_text("example.com\n")
+
+    def build(r):
+        r.post_reject.trackers = [_tracker("doubleclick.net")]
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["batch", str(f)], build)
+
+    assert res.exit_code == 0, res.output
+    assert "UNVERIFIED" in res.output
+    assert "VIOLATION" not in res.output
+    assert "reject button not found" in res.output
+
+
+# ─── L4: real cookies shown in the report ───────────────────────────────────
+
+def test_audit_shows_cookies():
+    def build(r):
+        r.pre_consent.cookies = [
+            {"name": "_ga", "domain": ".example.com", "expires": 1893456000},
+            {"name": "sess[/b]", "domain": "www.example.com", "expires": -1},
+        ]
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 0, res.output
+    assert "Cookies: 2" in res.output
+    assert "_ga" in res.output and ".example.com" in res.output and "2030-01-01" in res.output
+    assert "sess[/b]" in res.output and "session" in res.output
+
+
+# ─── L7: scheme added when missing, only http(s) accepted ───────────────────
+
+@pytest.mark.parametrize("raw,expected", [
+    ("httpbin.org", "https://httpbin.org"),
+    ("http-foo.it", "https://http-foo.it"),
+    ("example.com/path?q=1", "https://example.com/path?q=1"),
+    ("  example.com  ", "https://example.com"),
+    ("localhost:8080", "https://localhost:8080"),
+    ("http://example.com", "http://example.com"),
+    ("HTTPS://Example.com/", "HTTPS://Example.com/"),
+])
+def test_normalize_url(raw, expected):
+    from cookieradar.cli import normalize_url
+    assert normalize_url(raw) == expected
+
+
+@pytest.mark.parametrize("raw", [
+    "file:///etc/passwd", "ftp://example.com", "chrome://settings",
+    "about:blank", "javascript:alert(1)", "data:text/html,x", "", "   ",
+])
+def test_normalize_url_rejects_other_schemes(raw):
+    from cookieradar.cli import normalize_url
+    with pytest.raises(ValueError):
+        normalize_url(raw)
+
+
+def _recording_scan(seen):
+    async def scan(url, **kwargs):
+        seen.append(url)
+        return ScanResult(url=url)
+    return scan
+
+
+def test_audit_adds_scheme_to_http_prefixed_host():
+    seen = []
+    res = _invoke(["audit", "httpbin.org"], scan=_recording_scan(seen))
+
+    assert res.exit_code == 0, res.output
+    assert seen == ["https://httpbin.org"]
+
+
+def test_audit_rejects_file_url():
+    seen = []
+    res = _invoke(["audit", "file:///etc/passwd"], scan=_recording_scan(seen))
+
+    assert res.exit_code != 0
+    assert seen == []
+    assert "Unsupported URL scheme" in res.output
+
+
+def test_batch_skips_invalid_url_and_continues(tmp_path):
+    f = tmp_path / "urls.txt"
+    f.write_text("httpbin.org\nfile:///etc/passwd\nexample.com\n")
+    seen = []
+
+    res = _invoke(["batch", str(f)], scan=_recording_scan(seen))
+
+    assert res.exit_code == 0, res.output
+    assert seen == ["https://httpbin.org", "https://example.com"]
+    assert "Unsupported URL scheme" in res.output
+
+
+# ─── L8: comments and blank lines in batch files ────────────────────────────
+
+def test_batch_ignores_indented_comments_and_blank_lines(tmp_path):
+    f = tmp_path / "urls.txt"
+    f.write_text("# header\n  # commento indentato\n\t# tab\n\n   \nexample.com\n")
+    seen = []
+
+    res = _invoke(["batch", str(f)], scan=_recording_scan(seen))
+
+    assert res.exit_code == 0, res.output
+    assert seen == ["https://example.com"]
+    assert "Loaded 1 URLs" in res.output

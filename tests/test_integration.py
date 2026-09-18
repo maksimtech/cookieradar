@@ -33,7 +33,7 @@ async def test_non_compliant_site_reports_trackers_after_reject(browser, site_ur
     result = await _run_session(ctx, f"{site_url}/persist.html", "post-reject", accept=False)
     await ctx.close()
 
-    assert {t.domain for t in result.trackers} == {"stats.doubleclick.net", "www.facebook.com"}
+    assert {t.domain for t in result.trackers} == {"doubleclick.net", "facebook.com"}
 
 
 @pytest.mark.integration
@@ -43,7 +43,7 @@ async def test_never_idle_page_times_out_without_raising(browser, site_url):
     await ctx.close()
 
     assert "Timeout" in result.error
-    assert {t.domain for t in result.trackers} == {"stats.doubleclick.net"}
+    assert {t.domain for t in result.trackers} == {"doubleclick.net"}
     assert result.banner_found is True
 
 
@@ -69,3 +69,23 @@ async def test_reject_clicks_first_visible_exact_match(browser, site_url):
     await ctx.close()
 
     assert clicked == "reject"
+
+
+@pytest.mark.integration
+async def test_cookies_are_collected_from_the_browser(browser, site_url):
+    ctx = await _context(browser)
+    result = await _run_session(ctx, f"{site_url}/reject.html", "post-reject", accept=False)
+    await ctx.close()
+
+    assert {c["name"]: c["value"] for c in result.cookies} == {"consent": "no"}
+
+
+@pytest.mark.integration
+async def test_banner_and_button_first_visible_match(browser, site_url):
+    ctx = await _context(browser)
+    result = await _run_session(ctx, f"{site_url}/banner.html", "post-accept", accept=True)
+    clicked = await _clicked(ctx)
+    await ctx.close()
+
+    assert result.banner_found is True
+    assert clicked == "visible"
