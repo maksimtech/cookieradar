@@ -6,9 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
+
+## [2026.09.7] - 2026-09-18
 ### Added
-- `--version` option: `cookieradar --version` prints `CookieRadar <version>`,
-  read from `cookieradar.__version__`
+- --version command: cookieradar --version prints
+  CookieRadar <version> read from __version__
 
 ## [2026.09.6] - 2026-09-18
 ### Fixed
@@ -121,7 +123,8 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.09.6...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.09.7...HEAD
+[2026.09.7]: https://github.com/maksimtech/cookieradar/compare/v2026.09.6...v2026.09.7
 [2026.09.6]: https://github.com/maksimtech/cookieradar/compare/v2026.09.5...v2026.09.6
 [2026.09.5]: https://github.com/maksimtech/cookieradar/compare/v2026.09.4...v2026.09.5
 [2026.09.4]: https://github.com/maksimtech/cookieradar/compare/v2026.09.3...v2026.09.4
