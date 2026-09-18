@@ -9,6 +9,7 @@ import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 
+import cookieradar
 import cookieradar.cli as cli
 import cookieradar.scanner as scanner
 from cookieradar.cli import app, normalize_url
@@ -479,6 +480,7 @@ _SHUTDOWN_SCRIPT = """
 import sys
 from unittest.mock import patch
 from rich.console import Console
+import cookieradar
 import cookieradar.cli as cli
 import cookieradar.scanner as scanner
 from cookieradar.scanner import ScanResult
@@ -504,3 +506,19 @@ def test_audit_flushes_console_before_shutdown():
     assert "sys.meta_path is None" not in proc.stderr
     assert "Exception ignored" not in proc.stderr
     assert "partial-output" in proc.stdout
+
+
+# ─── --version ──────────────────────────────────────────────────────────────
+
+def test_version_option():
+    res = runner.invoke(app, ["--version"])
+
+    assert res.exit_code == 0, res.output
+    assert res.output == f"CookieRadar {cookieradar.__version__}\n"
+
+
+def test_version_is_read_from_dunder_version():
+    with patch.object(cookieradar, "__version__", "1999.01.1"):
+        res = runner.invoke(app, ["--version"])
+
+    assert res.output == "CookieRadar 1999.01.1\n"

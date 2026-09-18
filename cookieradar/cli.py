@@ -27,6 +27,23 @@ app = typer.Typer(
 
 console = Console()
 
+
+def _version_callback(value: bool):
+    if value:
+        import cookieradar  # read at call time, never a hardcoded copy
+
+        typer.echo(f"CookieRadar {cookieradar.__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False, "--version", callback=_version_callback, is_eager=True, help="Show the version and exit",
+    ),
+):
+    pass
+
 _SCHEME_URL = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*)://")
 # "about:blank", "javascript:…" — but not "localhost:8080" (colon + port)
 _SCHEME_ONLY = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):(?!\d)")
