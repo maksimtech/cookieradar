@@ -5,6 +5,8 @@ GDPR art.5/6/7 — pre-consent, post-reject, GTM analysis
 import asyncio
 import io
 import re
+import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,6 +43,24 @@ def normalize_url(url: str) -> str:
     if match.group(1).lower() not in ("http", "https"):
         raise ValueError(f"Unsupported URL scheme: {match.group(1)}")
     return url
+
+
+@contextmanager
+def _status(message: str):
+    """console.status() that flushes output before the spinner stops.
+
+    While the spinner runs Rich wraps sys.stdout/sys.stderr in a FileProxy and
+    does not flush it when restoring them: a partial line left in its buffer
+    is printed only when the proxy is garbage-collected, possibly during
+    interpreter shutdown ("ImportError: sys.meta_path is None").
+    """
+    with console.status(message):
+        try:
+            yield
+        finally:
+            sys.stdout.flush()
+            sys.stderr.flush()
+    console.file.flush()
 
 
 def _read_urls(path: str) -> list[str]:
@@ -202,7 +222,7 @@ def audit(
     console.print(f"\n[dim]Auditing [bold]{escape(url)}[/bold]...[/dim]")
 
     try:
-        with console.status("[cyan]Running 3 browser sessions: pre-consent, post-accept, post-reject...[/cyan]"):
+        with _status("[cyan]Running 3 browser sessions: pre-consent, post-accept, post-reject...[/cyan]"):
             result = asyncio.run(scan(url, headless=headless))
     except Exception as e:
         console.print(f"[red]❌ Error: {escape(str(e))}[/red]")

@@ -471,3 +471,36 @@ def test_batch_output_names_do_not_collide(tmp_path):
 
     assert res.exit_code == 0, res.output
     assert sorted(p.name for p in out_dir.iterdir()) == ["example.com_a-2.txt", "example.com_a.txt"]
+
+
+# ─── Shutdown: Rich FileProxy must be flushed before interpreter teardown ───
+
+_SHUTDOWN_SCRIPT = """
+import sys
+from unittest.mock import patch
+from rich.console import Console
+import cookieradar.cli as cli
+import cookieradar.scanner as scanner
+from cookieradar.scanner import ScanResult
+
+async def fake(url, **kwargs):
+    # A library keeping a reference to sys.stdout keeps Rich's FileProxy
+    # alive until module teardown; a partial line stays in its buffer.
+    global held_stdout
+    held_stdout = sys.stdout
+    sys.stdout.write("partial-output")
+    return ScanResult(url=url)
+
+with patch.object(scanner, "scan", fake), \\
+     patch.object(cli, "console", Console(force_terminal=True, width=250)):
+    cli.app(["audit", "example.com"], standalone_mode=False)
+"""
+
+
+def test_audit_flushes_console_before_shutdown():
+    proc = subprocess.run([sys.executable, "-c", _SHUTDOWN_SCRIPT], capture_output=True, text=True, timeout=60)
+
+    assert proc.returncode == 0, proc.stderr
+    assert "sys.meta_path is None" not in proc.stderr
+    assert "Exception ignored" not in proc.stderr
+    assert "partial-output" in proc.stdout
