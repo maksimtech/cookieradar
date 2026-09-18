@@ -20,12 +20,18 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: |
-          pip install -e .  # NOSONAR
-          pip install pytest pytest-cov pytest-asyncio pyyaml
+          pip install -e ".[test]"  # NOSONAR
+      - name: Install Chromium for integration tests
+        run: playwright install --with-deps chromium
       - name: Run tests with coverage
         run: |
           pytest tests/ --ignore=tests/benchmarks --cov=cookieradar --cov-report=xml --cov-report=term-missing
+      - name: Read package version
+        id: version
+        run: echo "version=$(python -c 'from cookieradar import __version__; print(__version__)')" >> "$GITHUB_OUTPUT"
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: -Dsonar.projectVersion=${{ steps.version.outputs.version }}

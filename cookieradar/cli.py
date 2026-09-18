@@ -3,8 +3,10 @@ CookieRadar — Cookie compliance auditor.
 GDPR art.5/6/7 — pre-consent, post-reject, GTM analysis
 """
 import asyncio
+import io
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -48,7 +50,7 @@ def _read_urls(path: str) -> list[str]:
     return [line for line in lines if line and not line.startswith("#")]
 
 
-def _print_session(title: str, session, console: Console):
+def _print_session(out: Console, title: str, session):
     """Print session results."""
     table = Table(
         title=title,
@@ -69,14 +71,14 @@ def _print_session(title: str, session, console: Console):
     if not session.trackers:
         table.add_row("[green]✅ No trackers detected[/green]", "", "")
 
-    console.print(table)
-    console.print(f"[dim]Banner found: {'✅' if session.banner_found else '❌'}[/dim]")
-    console.print(f"[dim]Cookies: {len(session.cookies)}[/dim]")
+    out.print(table)
+    out.print(f"[dim]Banner found: {'✅' if session.banner_found else '❌'}[/dim]")
+    out.print(f"[dim]Cookies: {len(session.cookies)}[/dim]")
     if session.cookies:
-        _print_cookies(session.cookies)
+        _print_cookies(out, session.cookies)
     if session.error:
-        console.print(f"[yellow]⚠️  Error: {escape(session.error)}[/yellow]")
-    console.print()
+        out.print(f"[yellow]⚠️  Error: {escape(session.error)}[/yellow]")
+    out.print()
 
 
 def _cookie_expiry(cookie: dict) -> str:
@@ -86,14 +88,14 @@ def _cookie_expiry(cookie: dict) -> str:
     return datetime.fromtimestamp(expires, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
-def _print_cookies(cookies: list[dict]):
+def _print_cookies(out: Console, cookies: list[dict]):
     table = Table(box=box.SIMPLE, show_header=True, header_style="dim")
     table.add_column("Cookie")
     table.add_column("Domain", style="dim")
     table.add_column("Expires", style="dim")
     for c in sorted(cookies, key=lambda c: (c.get("domain", ""), c.get("name", ""))):
         table.add_row(Text(c.get("name", "")), Text(c.get("domain", "")), Text(_cookie_expiry(c)))
-    console.print(table)
+    out.print(table)
 
 
 def _session_errors(result) -> list:
@@ -105,27 +107,85 @@ ACCEPT_NOT_APPLIED = "accept button not found: this session shows the page witho
 REJECT_NOT_APPLIED = "reject button not found: this session is equivalent to pre-consent"
 
 
-def _print_consent_header(label: str, style: str, session, not_applied: str):
-    unique = len(set(t.domain for t in session.trackers))
+def _unique_domains(session) -> set[str]:
+    return {t.domain for t in session.trackers}
+
+
+def _print_consent_header(out: Console, label: str, style: str, session, not_applied: str):
+    unique = len(_unique_domains(session))
     status = "" if session.consent_clicked else " NOT APPLIED"
-    console.print(f"[bold {style}]{label}{status} ({unique} unique trackers)[/bold {style}]")
+    out.print(f"[bold {style}]{label}{status} ({unique} unique trackers)[/bold {style}]")
     if not session.consent_clicked:
-        console.print(f"[yellow]⚠️  {not_applied}[/yellow]")
+        out.print(f"[yellow]⚠️  {not_applied}[/yellow]")
 
 
-def _print_violations(violations: Violations, indent: str):
+def _print_violations(out: Console, violations: Violations, indent: str):
     for d in sorted(violations.persistent):
-        console.print(f"{indent}[red]→ {escape(d)}[/red] [dim](persists from pre-consent)[/dim]")
+        out.print(f"{indent}[red]→ {escape(d)}[/red] [dim](persists from pre-consent)[/dim]")
     for d in sorted(violations.new):
-        console.print(f"{indent}[red]→ {escape(d)}[/red] [dim](new after rejection)[/dim]")
+        out.print(f"{indent}[red]→ {escape(d)}[/red] [dim](new after rejection)[/dim]")
+
+
+def _render_report(out: Console, url: str, result):
+    """Full report of the three sessions and the verdict."""
+    out.print(f"\n[bold]📊 CookieRadar Report — {escape(url)}[/bold]\n")
+
+    # Pre-consent
+    pre = result.pre_consent
+    out.print(f"[bold red]🔴 Session 1 — Pre-consent ({len(_unique_domains(pre))} unique trackers)[/bold red]")
+    _print_session(out, "Pre-consent trackers", pre)
+
+    # Post-accept
+    post_acc = result.post_accept
+    _print_consent_header(out, "🟡 Session 2 — Post-accept", "yellow", post_acc, ACCEPT_NOT_APPLIED)
+    _print_session(out, "Post-accept trackers", post_acc)
+
+    # Post-reject
+    post_rej = result.post_reject
+    _print_consent_header(out, "🟢 Session 3 — Post-reject", "green", post_rej, REJECT_NOT_APPLIED)
+    _print_session(out, "Post-reject trackers", post_rej)
+
+    # Summary
+    violations = find_violations(result)
+
+    if not post_rej.consent_clicked:
+        out.print("[bold yellow]⚠️  UNVERIFIED — could not reject cookies, no verdict on post-reject trackers[/bold yellow]")
+    elif violations.all:
+        out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after rejection:[/bold red]")
+        _print_violations(out, violations, "  ")
+    else:
+        out.print("[bold green]✅ No trackers loaded after rejection[/bold green]")
+
+    if _session_errors(result):
+        out.print("[yellow]⚠️  Result may be incomplete: some sessions reported errors[/yellow]")
+
+
+def _save_report(url: str, result, path: Path):
+    """Write the report as HTML (.html/.htm) or plain text; raises OSError."""
+    recorder = Console(file=io.StringIO(), record=True, width=120, force_terminal=True)
+    _render_report(recorder, url, result)
+    if path.suffix.lower() in (".html", ".htm"):
+        recorder.save_html(str(path))
+    else:
+        recorder.save_text(str(path))
+
+
+def _report_filename(url: str, used: set[str]) -> str:
+    """Filesystem-safe, unique report name for a URL: https://a.com/b?x=1 → a.com_b_x_1.txt"""
+    base = _SCHEME_URL.sub("", url)
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("._")[:100] or "report"
+    name, n = base, 2
+    while name in used:
+        name, n = f"{base}-{n}", n + 1
+    used.add(name)
+    return f"{name}.txt"
 
 
 @app.command()
 def audit(
     url: str = typer.Argument(..., help="URL to audit (e.g. https://tim.it)"),
-    lang: str = typer.Option("it", "--lang", "-l", help="Report language (it/en)"),
     headless: bool = typer.Option(True, "--headless/--no-headless", help="Run browser headless"),
-    output: str = typer.Option(None, "--output", "-o", help="Save report to file"),
+    output: Path = typer.Option(None, "--output", "-o", help="Save report to file (.html for HTML, text otherwise)"),
 ):
     """
     Audit a website for cookie compliance.
@@ -142,49 +202,27 @@ def audit(
     console.print(f"\n[dim]Auditing [bold]{escape(url)}[/bold]...[/dim]")
 
     try:
-        with console.status("[cyan]Running pre-consent session...[/cyan]"):
+        with console.status("[cyan]Running 3 browser sessions: pre-consent, post-accept, post-reject...[/cyan]"):
             result = asyncio.run(scan(url, headless=headless))
     except Exception as e:
         console.print(f"[red]❌ Error: {escape(str(e))}[/red]")
         raise typer.Exit(1)
 
-    console.print(f"\n[bold]📊 CookieRadar Report — {escape(url)}[/bold]\n")
+    _render_report(console, url, result)
 
-    # Pre-consent
-    pre = result.pre_consent
-    console.print(f"[bold red]🔴 Session 1 — Pre-consent ({len(set(t.domain for t in pre.trackers))} unique trackers)[/bold red]")
-    _print_session("Pre-consent trackers", pre, console)
-
-    # Post-accept
-    post_acc = result.post_accept
-    _print_consent_header("🟡 Session 2 — Post-accept", "yellow", post_acc, ACCEPT_NOT_APPLIED)
-    _print_session("Post-accept trackers", post_acc, console)
-
-    # Post-reject
-    post_rej = result.post_reject
-    _print_consent_header("🟢 Session 3 — Post-reject", "green", post_rej, REJECT_NOT_APPLIED)
-    _print_session("Post-reject trackers", post_rej, console)
-
-    # Summary
-    violations = find_violations(result)
-
-    if not post_rej.consent_clicked:
-        console.print("[bold yellow]⚠️  UNVERIFIED — could not reject cookies, no verdict on post-reject trackers[/bold yellow]")
-    elif violations.all:
-        console.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after rejection:[/bold red]")
-        _print_violations(violations, "  ")
-    else:
-        console.print("[bold green]✅ No trackers loaded after rejection[/bold green]")
-
-    if _session_errors(result):
-        console.print("[yellow]⚠️  Result may be incomplete: some sessions reported errors[/yellow]")
+    if output:
+        try:
+            _save_report(url, result, output)
+        except OSError as e:
+            console.print(f"[red]❌ Cannot write report {escape(str(output))}: {escape(e.strerror or str(e))}[/red]")
+            raise typer.Exit(1)
+        console.print(f"\n[dim]Report saved to {escape(str(output))}[/dim]")
 
 
 @app.command()
 def batch(
     file: str = typer.Argument(..., help="File with URLs to audit (one per line)"),
-    lang: str = typer.Option("it", "--lang", "-l", help="Report language (it/en)"),
-    output: str = typer.Option(None, "--output", "-o", help="Save reports to directory"),
+    output: Path = typer.Option(None, "--output", "-o", help="Save one text report per URL in this directory"),
 ):
     """
     Audit multiple URLs from a file.
@@ -200,6 +238,14 @@ def batch(
         console.print(f"[red]❌ Cannot read {escape(file)}: {escape(e.strerror or str(e))}[/red]")
         raise typer.Exit(2)
 
+    if output:
+        try:
+            output.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            console.print(f"[red]❌ Cannot create {escape(str(output))}: {escape(e.strerror or str(e))}[/red]")
+            raise typer.Exit(2)
+    used_names: set[str] = set()
+
     console.print(f"\n[dim]Loaded {len(urls)} URLs from {escape(file)}[/dim]\n")
 
     for url in urls:
@@ -211,8 +257,8 @@ def batch(
         console.print(f"[cyan]Auditing {escape(url)}...[/cyan]")
         try:
             result = asyncio.run(scan(url))
-            pre = set(t.domain for t in result.pre_consent.trackers)
-            rej = set(t.domain for t in result.post_reject.trackers)
+            pre = _unique_domains(result.pre_consent)
+            rej = _unique_domains(result.post_reject)
             violations = find_violations(result)
             if not result.post_reject.consent_clicked:
                 status = "⚠️  UNVERIFIED"
@@ -220,15 +266,15 @@ def batch(
                 status = "🔴 VIOLATION" if violations.all else "✅ OK"
             console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
             if result.post_reject.consent_clicked:
-                _print_violations(violations, "    ")
+                _print_violations(console, violations, "    ")
             else:
                 console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
             for s in _session_errors(result):
                 console.print(f"    [yellow]⚠️  {s.session}: {escape(s.error)}[/yellow]")
+            if output:
+                path = output / _report_filename(url, used_names)
+                _save_report(url, result, path)
+                console.print(f"    [dim]report: {escape(str(path))}[/dim]")
         except Exception as e:
             console.print(f"  [red]❌ Error: {escape(str(e))}[/red]")
         console.print()
-
-
-if __name__ == "__main__":
-    app()

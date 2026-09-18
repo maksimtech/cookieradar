@@ -2,8 +2,8 @@
 CookieRadar — Playwright scanner.
 Three clean sessions: pre-consent, post-accept, post-reject+reload.
 """
-import asyncio
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 from urllib.parse import urlparse
@@ -19,7 +19,7 @@ class TrackerRequest:
     url: str
     domain: str
     resource_type: str
-    timestamp: float
+    timestamp: float  # epoch seconds when the request was captured
 
 
 @dataclass
@@ -199,7 +199,7 @@ async def _run_session(
                 url=request.url,
                 domain=domain,
                 resource_type=request.resource_type,
-                timestamp=0.0,
+                timestamp=time.time(),
             ))
 
     page.on("request", handle_request)

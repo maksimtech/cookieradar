@@ -1,40 +1,68 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-if [ -z "$1" ]; then
-    echo "❌ Uso: ./release.sh <versione>"
-    echo "   Esempio: ./release.sh 2026.09.3"
+INIT_FILE="cookieradar/__init__.py"
+
+fail() {
+    echo "❌ $*" >&2
+    exit 1
+}
+
+if [ $# -lt 1 ] || [ -z "$1" ]; then
+    echo "❌ Uso: ./release.sh <versione>" >&2
+    echo "   Esempio: ./release.sh 2026.09.3" >&2
     exit 1
 fi
 
 VERSION="$1"
 TAG="v${VERSION}"
 
+# Versione calendario: YYYY.MM.N (il tag v<VERSION> deve coincidere con __init__.py,
+# publish.yml lo verifica)
+if ! [[ "$VERSION" =~ ^[0-9]{4}\.(0[1-9]|1[0-2])\.[0-9]+$ ]]; then
+    fail "Versione non valida: ${VERSION} (formato atteso YYYY.MM.N, es. 2026.09.3)"
+fi
+
 echo "🚀 Releasing CookieRadar ${TAG}"
 
-if [ -n "$(git status --porcelain)" ]; then
-    echo "❌ Working tree non pulito — committa prima le modifiche"
-    exit 1
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+[ "$BRANCH" = "main" ] || fail "Non sei su main (branch corrente: ${BRANCH})"
+
+[ -z "$(git status --porcelain)" ] || fail "Working tree non pulito — committa prima le modifiche"
+
+git fetch --quiet --tags origin main
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] \
+    || fail "main locale non è allineato con origin/main — fai pull/push prima della release"
+
+if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null \
+    || [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
+    fail "Tag ${TAG} già esistente"
 fi
 
-if git tag | grep -q "^${TAG}$"; then
-    echo "❌ Tag ${TAG} già esistente"
-    exit 1
-fi
+OLD_VERSION=$(python3 - "$INIT_FILE" <<'EOF'
+import re, sys
+print(re.search(r'__version__ = "(.+?)"', open(sys.argv[1]).read()).group(1))
+EOF
+)
+[ "$OLD_VERSION" != "$VERSION" ] || fail "${VERSION} è già la versione corrente"
 
-OLD_VERSION=$(python3 -c "import re; content=open('cookieradar/__init__.py').read(); print(re.search(r'__version__ = \"(.+?)\"', content).group(1))")
 echo "📝 Bump versione: ${OLD_VERSION} → ${VERSION}"
-sed -i "s/__version__ = \"${OLD_VERSION}\"/__version__ = \"${VERSION}\"/" cookieradar/__init__.py
+python3 - "$INIT_FILE" "$VERSION" <<'EOF'
+import re, sys
+path, version = sys.argv[1], sys.argv[2]
+text = open(path).read()
+new, count = re.subn(r'__version__ = ".+?"', f'__version__ = "{version}"', text, count=1)
+assert count == 1, "__version__ not found"
+open(path, "w").write(new)
+EOF
 
-git add cookieradar/__init__.py
+git add "$INIT_FILE"
 git commit -m "chore: bump version to ${VERSION}"
+git tag -a "$TAG" -m "CookieRadar ${VERSION}"
 
-echo "📤 Push main..."
-git push origin main
-
-echo "🏷️  Tag ${TAG}..."
-git tag ${TAG}
-git push origin ${TAG}
+echo "📤 Push main + tag ${TAG}..."
+# Atomico: o arrivano entrambi o nessuno dei due
+git push --atomic origin main "$TAG"
 
 echo "✅ Done! GitHub Actions si occupa del resto"
 echo "   → Release: github.com/maksimtech/cookieradar/releases"

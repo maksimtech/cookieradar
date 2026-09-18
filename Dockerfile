@@ -4,11 +4,11 @@ LABEL maintainer="maksimtech <github@maksimtech.com>"
 LABEL org.opencontainers.image.title="CookieRadar"
 LABEL org.opencontainers.image.description="Cookie compliance auditor — GDPR art.5/6/7 — pre-consent, post-reject, GTM analysis"
 LABEL org.opencontainers.image.source="https://github.com/maksimtech/cookieradar"
-LABEL org.opencontainers.image.license="MIT"
-# Dipendenze di sistema + Playwright
+LABEL org.opencontainers.image.licenses="MIT"
+# Patch di sicurezza del sistema base (le dipendenze di Chromium arrivano da
+# `playwright install-deps` più sotto)
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends gnupg && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 # Ambiente Python
@@ -21,9 +21,7 @@ RUN pip install --no-cache-dir --root-user-action=ignore "playwright>=1.40.0"
 # Dipendenze di sistema di Chromium (richiedono root)
 RUN playwright install-deps chromium
 # Crea utente non-root
-RUN useradd -m -u 1000 cookieradar && \
-    mkdir -p /home/cookieradar/.cookieradar && \
-    chown -R cookieradar:cookieradar /home/cookieradar
+RUN useradd -m -u 1000 cookieradar
 # Chromium installato come cookieradar, in ~/.cache/ms-playwright
 USER cookieradar
 RUN playwright install chromium
@@ -44,6 +42,5 @@ RUN case "${COOKIERADAR_SOURCE}" in \
     rm -rf /app/src
 USER cookieradar
 WORKDIR /home/cookieradar
-VOLUME ["/home/cookieradar/.cookieradar"]
 ENTRYPOINT ["cookieradar"]
 CMD ["--help"]

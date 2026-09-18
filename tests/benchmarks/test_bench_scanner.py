@@ -1,5 +1,4 @@
 """CookieRadar benchmarks."""
-import pytest
 from cookieradar.scanner import is_tracker, TRACKER_DOMAINS
 
 

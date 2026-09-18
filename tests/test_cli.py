@@ -1,6 +1,8 @@
 """
 CLI tests with a mocked scanner (no browser).
 """
+import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -9,7 +11,7 @@ from typer.testing import CliRunner
 
 import cookieradar.cli as cli
 import cookieradar.scanner as scanner
-from cookieradar.cli import app
+from cookieradar.cli import app, normalize_url
 from cookieradar.scanner import ScanResult, TrackerRequest
 
 runner = CliRunner()
@@ -239,7 +241,6 @@ def test_audit_shows_cookies():
     ("HTTPS://Example.com/", "HTTPS://Example.com/"),
 ])
 def test_normalize_url(raw, expected):
-    from cookieradar.cli import normalize_url
     assert normalize_url(raw) == expected
 
 
@@ -248,7 +249,6 @@ def test_normalize_url(raw, expected):
     "about:blank", "javascript:alert(1)", "data:text/html,x", "", "   ",
 ])
 def test_normalize_url_rejects_other_schemes(raw):
-    from cookieradar.cli import normalize_url
     with pytest.raises(ValueError):
         normalize_url(raw)
 
@@ -355,3 +355,119 @@ def test_batch_utf8_bom_is_ignored(tmp_path):
 
     assert res.exit_code == 0, res.output
     assert seen == ["https://example.com"]
+
+
+# ─── M7: single entry point for `python -m cookieradar` ─────────────────────
+
+def test_python_dash_m_entry_point():
+    proc = subprocess.run([sys.executable, "-m", "cookieradar", "--help"], capture_output=True, text=True, timeout=60)
+
+    assert proc.returncode == 0, proc.stderr
+    assert "audit" in proc.stdout and "batch" in proc.stdout
+
+
+# ─── M6: the spinner describes all three sessions ───────────────────────────
+
+def test_audit_spinner_mentions_all_sessions():
+    messages = []
+
+    class RecordingConsole(Console):
+        def status(self, status, *args, **kwargs):
+            messages.append(str(status))
+            return super().status(status, *args, **kwargs)
+
+    with patch.object(scanner, "scan", _fake_scan(lambda r: None)), \
+         patch.object(cli, "console", RecordingConsole(width=250)):
+        res = runner.invoke(app, ["audit", "example.com"])
+
+    assert res.exit_code == 0, res.output
+    assert len(messages) == 1
+    for session in ("pre-consent", "post-accept", "post-reject"):
+        assert session in messages[0]
+
+
+# ─── M1: --output saves the report, --lang is gone ──────────────────────────
+
+def _violation(r):
+    t = _tracker("doubleclick.net", url="https://stats.doubleclick.net/p?<script>alert(1)</script>")
+    r.pre_consent.trackers = [t]
+    r.post_reject.trackers = [t]
+
+
+def test_audit_output_text(tmp_path):
+    out = tmp_path / "report.txt"
+
+    res = _invoke(["audit", "example.com", "-o", str(out)], _violation)
+
+    assert res.exit_code == 0, res.output
+    text = out.read_text(encoding="utf-8")
+    assert "CookieRadar Report — https://example.com" in text
+    assert "Session 3 — Post-reject" in text
+    assert "VIOLATION" in text and "doubleclick.net" in text
+    assert "\x1b[" not in text  # no ANSI escape codes in the file
+    assert "Auditing" not in text  # progress messages are not part of the report
+    assert str(out) in res.output
+
+
+def test_audit_output_html_is_escaped(tmp_path):
+    out = tmp_path / "report.html"
+
+    res = _invoke(["audit", "example.com", "--output", str(out)], _violation)
+
+    assert res.exit_code == 0, res.output
+    html = out.read_text(encoding="utf-8")
+    assert "<html" in html.lower()
+    assert "VIOLATION" in html
+    assert "<script>alert(1)</script>" not in html
+
+
+def test_audit_output_unwritable_path(tmp_path):
+    out = tmp_path / "missing-dir" / "report.txt"
+
+    res = _invoke(["audit", "example.com", "-o", str(out)])
+
+    assert res.exit_code == 1
+    assert isinstance(res.exception, SystemExit)
+    assert "Cannot write report" in res.output
+
+
+@pytest.mark.parametrize("command", ["audit", "batch"])
+def test_lang_option_removed(command):
+    res = _invoke([command, "example.com", "--lang", "en"])
+
+    assert res.exit_code == 2
+    assert "No such option" in res.output
+
+
+def test_batch_output_writes_one_report_per_url(tmp_path):
+    urls = tmp_path / "urls.txt"
+    urls.write_text("example.com\nhttps://example.com/a/b?x=1\nbroken.example\n")
+    out_dir = tmp_path / "reports"
+
+    async def scan(url, **kwargs):
+        if "broken" in url:
+            raise RuntimeError("net::ERR_NAME_NOT_RESOLVED")
+        r = ScanResult(url=url)
+        r.post_accept.consent_clicked = r.post_reject.consent_clicked = True
+        _violation(r)
+        return r
+
+    res = _invoke(["batch", str(urls), "-o", str(out_dir)], scan=scan)
+
+    assert res.exit_code == 0, res.output
+    files = sorted(p.name for p in out_dir.iterdir())
+    assert files == ["example.com.txt", "example.com_a_b_x_1.txt"]
+    text = (out_dir / "example.com_a_b_x_1.txt").read_text(encoding="utf-8")
+    assert "CookieRadar Report — https://example.com/a/b?x=1" in text
+    assert "VIOLATION" in text
+
+
+def test_batch_output_names_do_not_collide(tmp_path):
+    urls = tmp_path / "urls.txt"
+    urls.write_text("https://example.com/a\nhttp://example.com/a\n")
+    out_dir = tmp_path / "reports"
+
+    res = _invoke(["batch", str(urls), "-o", str(out_dir)])
+
+    assert res.exit_code == 0, res.output
+    assert sorted(p.name for p in out_dir.iterdir()) == ["example.com_a-2.txt", "example.com_a.txt"]

@@ -2,15 +2,28 @@
 Tests for CookieRadar scanner module.
 Uses mocks to avoid real browser interactions.
 """
-import pytest
+import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+from cookieradar import scanner
 from cookieradar.scanner import (
-    is_tracker,
-    TrackerRequest,
-    SessionResult,
-    ScanResult,
+    ACCEPT_LABELS,
+    REJECT_LABELS,
     TRACKER_DOMAINS,
+    ScanResult,
+    SessionResult,
+    TrackerRequest,
+    _run_session,
+    find_violations,
+    is_tracker,
+    tracker_domain,
 )
+from tests.conftest import fake_request, make_mock_context
 
 
 # ─── is_tracker ─────────────────────────────────────────────────────────────
@@ -84,42 +97,6 @@ def test_scan_result_default():
     assert r.post_accept.session == "post-accept"
     assert r.post_reject.session == "post-reject"
 
-def test_scan_result_violation_detection():
-    tracker = TrackerRequest(
-        url="https://www.googletagmanager.com/gtm.js",
-        domain="www.googletagmanager.com",
-        resource_type="script",
-        timestamp=0.0,
-    )
-    r = ScanResult(url="https://tim.it")
-    r.pre_consent.trackers = [tracker]
-    r.post_reject.trackers = [tracker]
-
-    pre_domains = set(t.domain for t in r.pre_consent.trackers)
-    rej_domains = set(t.domain for t in r.post_reject.trackers)
-    persistent = pre_domains & rej_domains
-
-    assert len(persistent) == 1
-    assert "www.googletagmanager.com" in persistent
-
-def test_scan_result_no_violation():
-    tracker = TrackerRequest(
-        url="https://www.googletagmanager.com/gtm.js",
-        domain="www.googletagmanager.com",
-        resource_type="script",
-        timestamp=0.0,
-    )
-    r = ScanResult(url="https://tim.it")
-    r.pre_consent.trackers = [tracker]
-    r.post_reject.trackers = []
-
-    pre_domains = set(t.domain for t in r.pre_consent.trackers)
-    rej_domains = set(t.domain for t in r.post_reject.trackers)
-    persistent = pre_domains & rej_domains
-
-    assert len(persistent) == 0
-
-
 # ─── TRACKER_DOMAINS ─────────────────────────────────────────────────────────
 
 def test_tracker_domains_not_empty():
@@ -137,8 +114,6 @@ def test_tracker_domains_contains_adform():
 
 # ─── _run_session mock ───────────────────────────────────────────────────────
 
-from tests.conftest import fake_request, make_mock_context
-
 
 @pytest.mark.parametrize("name,accept", [
     ("pre-consent", None),
@@ -146,7 +121,6 @@ from tests.conftest import fake_request, make_mock_context
     ("post-reject", False),
 ])
 async def test_run_session_without_banner(name, accept):
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
 
     result = await _run_session(context, "https://example.com", name, accept=accept)
@@ -187,12 +161,10 @@ def _reject_page(reload_requests):
 
 
 async def _drain():
-    import asyncio
     await asyncio.sleep(0)
 
 
 async def test_post_reject_ignores_requests_made_before_rejection():
-    from cookieradar.scanner import _run_session
     context, page = _reject_page(reload_requests=[])
 
     result = await _run_session(context, "https://example.com", "post-reject", accept=False)
@@ -203,7 +175,6 @@ async def test_post_reject_ignores_requests_made_before_rejection():
 
 
 async def test_post_reject_keeps_requests_made_after_reload():
-    from cookieradar.scanner import _run_session
     context, page = _reject_page(reload_requests=["https://www.facebook.com/tr"])
 
     result = await _run_session(context, "https://example.com", "post-reject", accept=False)
@@ -217,7 +188,6 @@ def _tracker(domain):
 
 
 def test_find_violations_splits_persistent_and_new():
-    from cookieradar.scanner import find_violations
     r = ScanResult(url="https://example.com")
     r.pre_consent.trackers = [_tracker("a.doubleclick.net"), _tracker("b.hotjar.com")]
     r.post_reject.trackers = [_tracker("b.hotjar.com"), _tracker("c.facebook.com")]
@@ -230,7 +200,6 @@ def test_find_violations_splits_persistent_and_new():
 
 
 def test_find_violations_none_when_post_reject_clean():
-    from cookieradar.scanner import find_violations
     r = ScanResult(url="https://example.com")
     r.pre_consent.trackers = [_tracker("a.doubleclick.net")]
 
@@ -241,12 +210,8 @@ def test_find_violations_none_when_post_reject_clean():
 
 # ─── G4: timeouts and Playwright errors are recorded, not raised ────────────
 
-from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-
 
 async def test_goto_timeout_sets_error_and_continues():
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
     banner = _visible_button()
 
@@ -266,7 +231,6 @@ async def test_goto_timeout_sets_error_and_continues():
 
 
 async def test_navigation_error_sets_error_without_raising():
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
     page.goto = AsyncMock(side_effect=PlaywrightError("net::ERR_NAME_NOT_RESOLVED at https://nope.invalid/"))
 
@@ -277,7 +241,6 @@ async def test_navigation_error_sets_error_without_raising():
 
 
 async def test_reload_timeout_keeps_post_reject_trackers():
-    from cookieradar.scanner import _run_session
     context, page = _reject_page(reload_requests=[])
 
     async def reload(*args, **kwargs):
@@ -293,7 +256,6 @@ async def test_reload_timeout_keeps_post_reject_trackers():
 
 
 async def test_timeout_ms_is_passed_to_navigation():
-    from cookieradar.scanner import _run_session
     context, page = _reject_page(reload_requests=[])
 
     await _run_session(context, "https://example.com", "post-reject", accept=False, timeout_ms=1234)
@@ -312,7 +274,6 @@ def _mock_playwright(browser):
 
 
 async def test_scan_continues_when_a_session_crashes():
-    from cookieradar import scanner
     contexts = []
 
     async def new_context():
@@ -381,7 +342,6 @@ def _matches(labels, text):
     "Accept", "Accept All", "ACCEPT ALL COOKIES", "OK", "Ok", "  ok  ",
 ])
 def test_accept_labels_match(text):
-    from cookieradar.scanner import ACCEPT_LABELS
     assert _matches(ACCEPT_LABELS, text)
 
 
@@ -390,7 +350,6 @@ def test_accept_labels_match(text):
     "Non accetto", "Accettabile", "Okay, show me more", "Rifiuta",
 ])
 def test_accept_labels_do_not_match_substrings(text):
-    from cookieradar.scanner import ACCEPT_LABELS
     assert not _matches(ACCEPT_LABELS, text)
 
 
@@ -399,7 +358,6 @@ def test_accept_labels_do_not_match_substrings(text):
     "Reject all cookies", "Decline", "Decline all",
 ])
 def test_reject_labels_match(text):
-    from cookieradar.scanner import REJECT_LABELS
     assert _matches(REJECT_LABELS, text)
 
 
@@ -407,7 +365,6 @@ def test_reject_labels_match(text):
     "Rejected items", "Non rifiutare", "Declined payments", "Rifiutato", "Accept",
 ])
 def test_reject_labels_do_not_match_substrings(text):
-    from cookieradar.scanner import REJECT_LABELS
     assert not _matches(REJECT_LABELS, text)
 
 
@@ -415,7 +372,6 @@ def test_reject_labels_do_not_match_substrings(text):
 
 @pytest.mark.parametrize("name,accept", [("post-accept", True), ("post-reject", False)])
 async def test_consent_not_clicked_when_no_button(name, accept):
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
 
     result = await _run_session(context, "https://example.com", name, accept=accept)
@@ -428,7 +384,6 @@ async def test_consent_not_clicked_when_no_button(name, accept):
     ("post-reject", False, "#onetrust-reject-all-handler"),
 ])
 async def test_consent_clicked_when_button_found(name, accept, selector):
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
     btn = _visible_button()
     page.query_selector_all = AsyncMock(side_effect=lambda sel: [btn] if sel == selector else [])
@@ -450,7 +405,6 @@ COOKIE = {"name": "_ga", "value": "GA1.1.1", "domain": ".example.com", "path": "
 
 
 async def test_cookies_collected_after_reload():
-    from cookieradar.scanner import _run_session
     context, page = _reject_page(reload_requests=[])
     calls = []
     page.reload.side_effect = lambda *a, **k: calls.append("reload")
@@ -468,7 +422,6 @@ async def test_cookies_collected_after_reload():
 
 
 async def test_cookies_collected_even_after_navigation_error():
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
     page.goto = AsyncMock(side_effect=PlaywrightError("net::ERR_CONNECTION_RESET"))
     context.cookies = AsyncMock(return_value=[COOKIE])
@@ -480,7 +433,6 @@ async def test_cookies_collected_even_after_navigation_error():
 
 
 async def test_cookies_error_is_recorded_not_raised():
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
     context.cookies = AsyncMock(side_effect=PlaywrightError("Target closed"))
 
@@ -500,7 +452,6 @@ def _hidden_element():
 
 
 async def test_banner_found_when_first_match_is_hidden():
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
     matches = [_hidden_element(), _visible_button()]
     page.query_selector_all = AsyncMock(side_effect=lambda sel: matches if sel == "[id*='cookie']" else [])
@@ -511,7 +462,6 @@ async def test_banner_found_when_first_match_is_hidden():
 
 
 async def test_consent_css_selector_clicks_first_visible_match():
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
     hidden, visible = _hidden_element(), _visible_button()
     page.query_selector_all = AsyncMock(
@@ -536,7 +486,6 @@ async def test_consent_css_selector_clicks_first_visible_match():
     ("https://shopbing.com/", None),
 ])
 def test_tracker_domain_is_registrable_domain(url, expected):
-    from cookieradar.scanner import tracker_domain
     assert tracker_domain(url) == expected
 
 
@@ -548,7 +497,6 @@ def test_tracker_domains_are_registrable_domains():
 
 
 async def test_session_records_registrable_domain():
-    from cookieradar.scanner import _run_session
     context, page = make_mock_context()
 
     async def goto(*args, **kwargs):
@@ -564,9 +512,27 @@ async def test_session_records_registrable_domain():
 
 
 def test_violation_matches_across_subdomains():
-    from cookieradar.scanner import find_violations
     r = ScanResult(url="https://example.com")
     r.pre_consent.trackers = [_tracker("google-analytics.com")]
     r.post_reject.trackers = [_tracker("google-analytics.com")]
 
     assert find_violations(r).persistent == {"google-analytics.com"}
+
+
+# ─── M3: tracker requests carry the real capture time ───────────────────────
+
+async def test_tracker_timestamp_is_capture_time():
+    context, page = make_mock_context()
+
+    async def goto(*args, **kwargs):
+        page.handlers["request"](fake_request("https://stats.doubleclick.net/a"))
+        page.handlers["request"](fake_request("https://stats.doubleclick.net/b"))
+
+    page.goto = AsyncMock(side_effect=goto)
+    before = time.time()
+
+    result = await _run_session(context, "https://example.com", "pre-consent")
+
+    stamps = [t.timestamp for t in result.trackers]
+    assert all(before <= s <= time.time() for s in stamps)
+    assert stamps == sorted(stamps)

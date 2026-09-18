@@ -2,6 +2,7 @@
 Tests for CI helper scripts in .github/scripts/.
 """
 import os
+import tomllib
 import subprocess
 from pathlib import Path
 
@@ -218,3 +219,56 @@ def test_trivy_action_pinned_to_commit_sha():
 
     assert len(sha.strip()) == 40 and all(c in "0123456789abcdef" for c in sha.strip()), line
     assert comment.strip().startswith("v"), line
+
+
+# ─── M10: consistent CI — versions, Python matrix, Sonar version ────────────
+
+def test_each_action_uses_one_version_everywhere():
+    versions = {}
+    for name, ref in _action_refs():
+        action, _, version = ref.partition("@")
+        versions.setdefault(action, set()).add(version)
+    mixed = {action: v for action, v in versions.items() if len(v) > 1}
+    assert not mixed, mixed
+
+
+def _classifier_pythons():
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    prefix = "Programming Language :: Python :: 3."
+    return pyproject, sorted(
+        (c.rsplit(":: ", 1)[1] for c in pyproject["project"]["classifiers"] if c.startswith(prefix)),
+        key=lambda v: tuple(map(int, v.split("."))),
+    )
+
+
+def test_tests_run_on_every_supported_python():
+    pyproject, classifiers = _classifier_pythons()
+    matrix = _workflow("tests.yml")["jobs"]["test"]["strategy"]["matrix"]["python-version"]
+    minimum = pyproject["project"]["requires-python"].removeprefix(">=")
+
+    assert [str(v) for v in matrix] == classifiers
+    assert classifiers[0] == minimum
+
+
+def test_sonar_version_comes_from_the_package():
+    properties = (ROOT / "sonar-project.properties").read_text()
+    step = next(s for s in _all_steps(_workflow("sonarcloud.yml")) if "sonarqube-scan-action" in s.get("uses", ""))
+
+    assert "sonar.projectVersion" not in properties  # was stale (2026.09.1)
+    assert "-Dsonar.projectVersion=" in step["with"]["args"]
+
+
+# ─── M11: Dockerfile hygiene ────────────────────────────────────────────────
+
+DOCKERFILE = (ROOT / "Dockerfile").read_text()
+
+
+def test_dockerfile_uses_standard_oci_license_label():
+    assert 'org.opencontainers.image.licenses="MIT"' in DOCKERFILE
+    assert "org.opencontainers.image.license=" not in DOCKERFILE
+
+
+def test_dockerfile_has_no_unused_packages_or_volumes():
+    assert "gnupg" not in DOCKERFILE
+    assert "VOLUME" not in DOCKERFILE  # nothing in cookieradar reads ~/.cookieradar
+    assert ".cookieradar" not in DOCKERFILE
