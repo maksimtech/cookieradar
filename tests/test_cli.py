@@ -48,7 +48,7 @@ def test_audit_reports_persistent_and_new_trackers():
 
     res = _invoke(["audit", "example.com"], build)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 1, res.output
     assert "VIOLATION" in res.output
     assert "b.hotjar.com" in res.output.split("VIOLATION", 1)[1]
     assert "c.facebook.com" in res.output.split("VIOLATION", 1)[1]
@@ -74,7 +74,7 @@ def test_batch_reports_tracker_new_after_rejection(tmp_path):
 
     res = _invoke(["batch", str(f)], build)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 1, res.output  # VIOLATION
     assert "VIOLATION" in res.output
     assert "c.facebook.com" in res.output
 
@@ -99,7 +99,7 @@ def test_audit_tracker_url_and_domain_with_markup():
 
     res = _invoke(["audit", "example.com"], build)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 1, res.output  # VIOLATION
     assert f"?q={MARKUP}" in res.output
     assert f"evil{MARKUP}.doubleclick.net" in res.output
 
@@ -117,7 +117,7 @@ def test_batch_error_message_with_markup_does_not_stop_batch(tmp_path):
 
     res = _invoke(["batch", str(f)], scan=scan)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 3, res.output  # one URL failed
     assert seen == ["https://first.example", "https://second.example"]
     assert f"net::ERR {MARKUP}" in res.output
 
@@ -151,7 +151,7 @@ def test_audit_scan_failure_exits_cleanly():
 
     res = _invoke(["audit", "example.com"], scan=scan)
 
-    assert res.exit_code == 1
+    assert res.exit_code == 3
     assert not isinstance(res.exception, RuntimeError)
     assert "Executable doesn't exist [/]" in res.output
 
@@ -179,7 +179,7 @@ def test_audit_reject_not_applied_gives_no_verdict():
 
     res = _invoke(["audit", "example.com"], build)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 2, res.output  # UNVERIFIED
     assert "VIOLATION" not in res.output
     assert "No trackers loaded after rejection" not in res.output
     assert "Session 3 — Post-reject NOT APPLIED" in res.output
@@ -207,7 +207,7 @@ def test_batch_reject_not_applied_is_unverified(tmp_path):
 
     res = _invoke(["batch", str(f)], build)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 2, res.output  # UNVERIFIED
     assert "UNVERIFIED" in res.output
     assert "VIOLATION" not in res.output
     assert "reject button not found" in res.output
@@ -265,7 +265,7 @@ def test_audit_adds_scheme_to_http_prefixed_host():
     seen = []
     res = _invoke(["audit", "httpbin.org"], scan=_recording_scan(seen))
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 2, res.output  # _recording_scan: reject not clicked
     assert seen == ["https://httpbin.org"]
 
 
@@ -273,7 +273,7 @@ def test_audit_rejects_file_url():
     seen = []
     res = _invoke(["audit", "file:///etc/passwd"], scan=_recording_scan(seen))
 
-    assert res.exit_code != 0
+    assert res.exit_code == 3
     assert seen == []
     assert "Unsupported URL scheme" in res.output
 
@@ -285,7 +285,7 @@ def test_batch_skips_invalid_url_and_continues(tmp_path):
 
     res = _invoke(["batch", str(f)], scan=_recording_scan(seen))
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 3, res.output  # one URL could not be audited
     assert seen == ["https://httpbin.org", "https://example.com"]
     assert "Unsupported URL scheme" in res.output
 
@@ -299,7 +299,7 @@ def test_batch_ignores_indented_comments_and_blank_lines(tmp_path):
 
     res = _invoke(["batch", str(f)], scan=_recording_scan(seen))
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 2, res.output  # _recording_scan: reject not clicked
     assert seen == ["https://example.com"]
     assert "Loaded 1 URLs" in res.output
 
@@ -307,7 +307,7 @@ def test_batch_ignores_indented_comments_and_blank_lines(tmp_path):
 # ─── W7: unreadable batch files give a clean error, not a traceback ─────────
 
 def _assert_clean_failure(res, *fragments):
-    assert res.exit_code == 2, res.output
+    assert res.exit_code == 3, res.output
     assert isinstance(res.exception, SystemExit), repr(res.exception)
     assert "Traceback" not in res.output
     for fragment in fragments:
@@ -354,7 +354,7 @@ def test_batch_utf8_bom_is_ignored(tmp_path):
 
     res = _invoke(["batch", str(f)], scan=_recording_scan(seen))
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 2, res.output  # _recording_scan: reject not clicked
     assert seen == ["https://example.com"]
 
 
@@ -400,7 +400,7 @@ def test_audit_output_text(tmp_path):
 
     res = _invoke(["audit", "example.com", "-o", str(out)], _violation)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 1, res.output  # VIOLATION
     text = out.read_text(encoding="utf-8")
     assert "CookieRadar Report — https://example.com" in text
     assert "Session 3 — Post-reject" in text
@@ -415,7 +415,7 @@ def test_audit_output_html_is_escaped(tmp_path):
 
     res = _invoke(["audit", "example.com", "--output", str(out)], _violation)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 1, res.output  # VIOLATION
     html = out.read_text(encoding="utf-8")
     assert "<html" in html.lower()
     assert "VIOLATION" in html
@@ -427,7 +427,7 @@ def test_audit_output_unwritable_path(tmp_path):
 
     res = _invoke(["audit", "example.com", "-o", str(out)])
 
-    assert res.exit_code == 1
+    assert res.exit_code == 3
     assert isinstance(res.exception, SystemExit)
     assert "Cannot write report" in res.output
 
@@ -436,7 +436,7 @@ def test_audit_output_unwritable_path(tmp_path):
 def test_lang_option_removed(command):
     res = _invoke([command, "example.com", "--lang", "en"])
 
-    assert res.exit_code == 2
+    assert res.exit_code == 3
     assert "No such option" in res.output
 
 
@@ -455,7 +455,7 @@ def test_batch_output_writes_one_report_per_url(tmp_path):
 
     res = _invoke(["batch", str(urls), "-o", str(out_dir)], scan=scan)
 
-    assert res.exit_code == 0, res.output
+    assert res.exit_code == 1, res.output  # VIOLATION outweighs the failed URL
     files = sorted(p.name for p in out_dir.iterdir())
     assert files == ["example.com.txt", "example.com_a_b_x_1.txt"]
     text = (out_dir / "example.com_a_b_x_1.txt").read_text(encoding="utf-8")
@@ -522,3 +522,69 @@ def test_version_is_read_from_dunder_version():
         res = runner.invoke(app, ["--version"])
 
     assert res.output == "CookieRadar 1999.01.1\n"
+
+
+# ─── Exit codes reflect the verdict ─────────────────────────────────────────
+# 0 OK · 1 VIOLATION · 2 UNVERIFIED · 3 error
+
+def _outcome(r, kind):
+    if kind == "violation":
+        r.post_reject.trackers = [_tracker("hotjar.com")]
+    elif kind == "unverified":
+        r.post_reject.consent_clicked = False
+
+
+def _scan_by_host(outcomes):
+    """Fake scan whose outcome depends on the host: ok, violation, unverified, error."""
+    async def scan(url, **kwargs):
+        kind = outcomes[url.removeprefix("https://")]
+        if kind == "error":
+            raise RuntimeError("net::ERR_NAME_NOT_RESOLVED")
+        return await _fake_scan(lambda r: _outcome(r, kind))(url)
+    return scan
+
+
+@pytest.mark.parametrize("kind, code", [("ok", 0), ("violation", 1), ("unverified", 2), ("error", 3)])
+def test_audit_exit_code_reflects_verdict(kind, code):
+    res = _invoke(["audit", "example.com"], scan=_scan_by_host({"example.com": kind}))
+
+    assert res.exit_code == code, res.output
+
+
+def test_audit_invalid_url_exit_code():
+    res = _invoke(["audit", "javascript:alert(1)"])
+
+    assert res.exit_code == 3, res.output
+
+
+def test_audit_unwritable_output_with_violation_still_exits_1(tmp_path):
+    out = tmp_path / "missing-dir" / "report.txt"
+
+    res = _invoke(["audit", "example.com", "-o", str(out)], lambda r: _outcome(r, "violation"))
+
+    assert res.exit_code == 1, res.output
+    assert "Cannot write report" in res.output
+
+
+def test_usage_error_exit_code_is_not_unverified():
+    res = _invoke(["audit", "example.com", "--no-such-option"])
+
+    assert res.exit_code == 3, res.output
+    assert "No such option" in res.output
+
+
+@pytest.mark.parametrize("kinds, code", [
+    (["ok", "ok"], 0),
+    (["ok", "violation", "unverified", "error"], 1),
+    (["ok", "unverified"], 2),
+    (["ok", "error"], 3),
+    (["unverified", "error"], 3),
+])
+def test_batch_exit_code_reflects_worst_verdict(tmp_path, kinds, code):
+    outcomes = {f"site{i}.example": kind for i, kind in enumerate(kinds)}
+    f = tmp_path / "urls.txt"
+    f.write_text("\n".join(outcomes) + "\n")
+
+    res = _invoke(["batch", str(f)], scan=_scan_by_host(outcomes))
+
+    assert res.exit_code == code, res.output

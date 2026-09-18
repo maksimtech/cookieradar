@@ -8,9 +8,11 @@ import re
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from enum import IntEnum
 from pathlib import Path
 
 import typer
+from typer.core import TyperGroup
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -19,10 +21,54 @@ from rich import box
 
 from cookieradar.scanner import Violations, find_violations
 
+
+class ExitCode(IntEnum):
+    """Process exit status: the verdict, so scripts and CI can act on it."""
+    OK = 0
+    VIOLATION = 1
+    UNVERIFIED = 2
+    ERROR = 3
+
+
+def _worst(codes) -> ExitCode:
+    """A violation found matters most; a URL not audited outweighs an unverified one."""
+    for code in (ExitCode.VIOLATION, ExitCode.ERROR, ExitCode.UNVERIFIED):
+        if code in codes:
+            return code
+    return ExitCode.OK
+
+
+class _Group(TyperGroup):
+    """Command-line usage errors exit with ERROR, not Click's 2 (= UNVERIFIED)."""
+
+    def make_context(self, *args, **kwargs):
+        with _usage_error_is_error():
+            return super().make_context(*args, **kwargs)
+
+    def invoke(self, ctx):
+        with _usage_error_is_error():
+            return super().invoke(ctx)
+
+
+# Click's UsageError: bundled inside Typer by recent versions, so reach it
+# through the public BadParameter instead of importing click.
+_UsageError = next(c for c in typer.BadParameter.__mro__ if c.__name__ == "UsageError")
+
+
+@contextmanager
+def _usage_error_is_error():
+    try:
+        yield
+    except _UsageError as e:
+        e.exit_code = ExitCode.ERROR
+        raise
+
+
 app = typer.Typer(
     name="cookieradar",
     help="🍪 Cookie compliance auditor — GDPR art.5/6/7",
     add_completion=False,
+    cls=_Group,
 )
 
 console = Console()
@@ -163,6 +209,12 @@ def _print_violations(out: Console, violations: Violations, indent: str):
         out.print(f"{indent}[red]→ {escape(d)}[/red] [dim](new after rejection)[/dim]")
 
 
+def _verdict(result) -> ExitCode:
+    if not result.post_reject.consent_clicked:
+        return ExitCode.UNVERIFIED
+    return ExitCode.VIOLATION if find_violations(result).all else ExitCode.OK
+
+
 def _render_report(out: Console, url: str, result):
     """Full report of the three sessions and the verdict."""
     out.print(f"\n[bold]📊 CookieRadar Report — {escape(url)}[/bold]\n")
@@ -184,10 +236,11 @@ def _render_report(out: Console, url: str, result):
 
     # Summary
     violations = find_violations(result)
+    verdict = _verdict(result)
 
-    if not post_rej.consent_clicked:
+    if verdict is ExitCode.UNVERIFIED:
         out.print("[bold yellow]⚠️  UNVERIFIED — could not reject cookies, no verdict on post-reject trackers[/bold yellow]")
-    elif violations.all:
+    elif verdict is ExitCode.VIOLATION:
         out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after rejection:[/bold red]")
         _print_violations(out, violations, "  ")
     else:
@@ -234,7 +287,7 @@ def audit(
         url = normalize_url(url)
     except ValueError as e:
         console.print(f"[red]❌ {escape(str(e))}[/red]")
-        raise typer.Exit(2)
+        raise typer.Exit(ExitCode.ERROR)
 
     console.print(f"\n[dim]Auditing [bold]{escape(url)}[/bold]...[/dim]")
 
@@ -243,17 +296,21 @@ def audit(
             result = asyncio.run(scan(url, headless=headless))
     except Exception as e:
         console.print(f"[red]❌ Error: {escape(str(e))}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(ExitCode.ERROR)
 
     _render_report(console, url, result)
+    codes = {_verdict(result)}
 
     if output:
         try:
             _save_report(url, result, output)
         except OSError as e:
             console.print(f"[red]❌ Cannot write report {escape(str(output))}: {escape(e.strerror or str(e))}[/red]")
-            raise typer.Exit(1)
-        console.print(f"\n[dim]Report saved to {escape(str(output))}[/dim]")
+            codes.add(ExitCode.ERROR)
+        else:
+            console.print(f"\n[dim]Report saved to {escape(str(output))}[/dim]")
+
+    raise typer.Exit(_worst(codes))
 
 
 @app.command()
@@ -270,18 +327,19 @@ def batch(
         urls = _read_urls(file)
     except UnicodeDecodeError:
         console.print(f"[red]❌ Cannot read {escape(file)}: not valid UTF-8[/red]")
-        raise typer.Exit(2)
+        raise typer.Exit(ExitCode.ERROR)
     except OSError as e:
         console.print(f"[red]❌ Cannot read {escape(file)}: {escape(e.strerror or str(e))}[/red]")
-        raise typer.Exit(2)
+        raise typer.Exit(ExitCode.ERROR)
 
     if output:
         try:
             output.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             console.print(f"[red]❌ Cannot create {escape(str(output))}: {escape(e.strerror or str(e))}[/red]")
-            raise typer.Exit(2)
+            raise typer.Exit(ExitCode.ERROR)
     used_names: set[str] = set()
+    codes: set[ExitCode] = set()
 
     console.print(f"\n[dim]Loaded {len(urls)} URLs from {escape(file)}[/dim]\n")
 
@@ -290,20 +348,23 @@ def batch(
             url = normalize_url(url)
         except ValueError as e:
             console.print(f"[red]❌ {escape(url)}: {escape(str(e))}[/red]\n")
+            codes.add(ExitCode.ERROR)
             continue
         console.print(f"[cyan]Auditing {escape(url)}...[/cyan]")
         try:
             result = asyncio.run(scan(url))
             pre = _unique_domains(result.pre_consent)
             rej = _unique_domains(result.post_reject)
-            violations = find_violations(result)
-            if not result.post_reject.consent_clicked:
-                status = "⚠️  UNVERIFIED"
-            else:
-                status = "🔴 VIOLATION" if violations.all else "✅ OK"
+            verdict = _verdict(result)
+            codes.add(verdict)
+            status = {
+                ExitCode.OK: "✅ OK",
+                ExitCode.VIOLATION: "🔴 VIOLATION",
+                ExitCode.UNVERIFIED: "⚠️  UNVERIFIED",
+            }[verdict]
             console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
-            if result.post_reject.consent_clicked:
-                _print_violations(console, violations, "    ")
+            if verdict is not ExitCode.UNVERIFIED:
+                _print_violations(console, find_violations(result), "    ")
             else:
                 console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
             for s in _session_errors(result):
@@ -314,4 +375,7 @@ def batch(
                 console.print(f"    [dim]report: {escape(str(path))}[/dim]")
         except Exception as e:
             console.print(f"  [red]❌ Error: {escape(str(e))}[/red]")
+            codes.add(ExitCode.ERROR)
         console.print()
+
+    raise typer.Exit(_worst(codes))

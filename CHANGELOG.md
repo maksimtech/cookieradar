@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
+### Changed
+- Exit codes now reflect the verdict:
+  0=OK, 1=VIOLATION, 2=UNVERIFIED, 3=error
+  (previously always 0 on success)
+- Batch priority: VIOLATION > error > UNVERIFIED > OK
+- CLI usage errors (unknown option, missing argument) → 3
+  instead of Click's default 2
 
 ## [2026.09.7] - 2026-09-18
 ### Added

@@ -269,11 +269,6 @@ banner at all. If the result looks wrong, retry with `--no-headless`.
 the banner and trackers to appear. Trackers that load much later (e.g. after
 scrolling or a long delay) are not recorded.
 
-**The exit code is not the verdict.** `cookieradar audit` exits with code 0
-whenever the audit ran, whether the verdict is OK, VIOLATION or UNVERIFIED
-(1 if the scan failed, 2 for an invalid address). If you run CookieRadar in
-an automated pipeline, read the verdict from the output.
-
 ## Docker
 
 The image contains CookieRadar and Chromium, ready to use; nothing else to
@@ -326,6 +321,40 @@ cookieradar batch FILE [-o DIRECTORY]
 | `--help` | any | Show help |
 
 `python -m cookieradar` works the same as `cookieradar`.
+
+### Exit codes
+
+The exit code carries the verdict, so a script or a CI pipeline can act on
+it without reading the output:
+
+| Code | `audit` | `batch` |
+|---|---|---|
+| **0** | OK: no tracker loaded after rejection | Every site is OK |
+| **1** | VIOLATION | At least one site has a VIOLATION |
+| **2** | UNVERIFIED: "Reject" could not be clicked | At least one site is UNVERIFIED, none has a VIOLATION, none failed |
+| **3** | Error: invalid address, browser not starting, report not writable, invalid command-line option | The URL file cannot be read, an invalid command-line option, or at least one site could not be audited (invalid address, scan failed, report not writable) and none has a VIOLATION |
+
+A VIOLATION always wins: if one site violates and another fails, `batch`
+exits with 1, and so does `audit` when the verdict is VIOLATION but the
+report file cannot be written. The error is still shown in the output.
+
+A site that times out or cannot be reached is not an error for the exit
+code: the audit runs, the problem is shown in yellow, and the verdict
+follows from what was observed (usually UNVERIFIED, since "Reject" could not
+be clicked).
+
+Example: fail a CI job only on violations, and warn when a site could not be
+verified:
+
+```bash
+cookieradar batch urls.txt -o reports/
+case $? in
+  0) echo "All sites respect the refusal" ;;
+  1) echo "Violations found, see reports/"; exit 1 ;;
+  2) echo "::warning::Some sites could not be verified" ;;
+  *) echo "CookieRadar could not complete the audit"; exit 1 ;;
+esac
+```
 
 ## Development
 
