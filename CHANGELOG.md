@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
+
+## [2026.09.8] - 2026-09-18
 ### Changed
 - Exit codes now reflect the verdict:
   0=OK, 1=VIOLATION, 2=UNVERIFIED, 3=error
@@ -130,7 +132,8 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.09.7...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.09.8...HEAD
+[2026.09.8]: https://github.com/maksimtech/cookieradar/compare/v2026.09.7...v2026.09.8
 [2026.09.7]: https://github.com/maksimtech/cookieradar/compare/v2026.09.6...v2026.09.7
 [2026.09.6]: https://github.com/maksimtech/cookieradar/compare/v2026.09.5...v2026.09.6
 [2026.09.5]: https://github.com/maksimtech/cookieradar/compare/v2026.09.4...v2026.09.5
