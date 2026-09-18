@@ -1,14 +1,18 @@
 name: Build and Push Docker Image
+# Not triggered by tags directly: publish.yml calls this workflow after the
+# PyPI upload, so the image never races with the package it installs.
 on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
+  workflow_call:
     inputs:
       version:
         description: 'Version tag (e.g. v2026.09.4)'
         required: true
-        default: 'v2026.09.4'
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Already published version to rebuild (e.g. v2026.09.4)'
+        required: true
 permissions:
   contents: read
 jobs:
@@ -17,6 +21,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -28,14 +36,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Extract version
         id: version
+        env:
+          RAW: ${{ inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RAW="${{ github.event.inputs.version }}"
-          else
-            RAW="${GITHUB_REF#refs/tags/}"
-          fi
-          echo "VERSION=${RAW}" >> $GITHUB_OUTPUT
-          echo "PIP_VERSION=${RAW#v}" >> $GITHUB_OUTPUT
+          echo "VERSION=v${RAW#v}" >> "$GITHUB_OUTPUT"
+          echo "PIP_VERSION=${RAW#v}" >> "$GITHUB_OUTPUT"
+      - name: Wait for cookieradar on PyPI
+        env:
+          PIP_VERSION: ${{ steps.version.outputs.PIP_VERSION }}
+        run: bash .github/scripts/wait_for_pypi.sh cookieradar "$PIP_VERSION"
       - name: Build image for smoke test
         uses: docker/build-push-action@v6
         with:
@@ -43,9 +52,12 @@ jobs:
           load: true
           tags: cookieradar:smoke
           build-args: |
+            COOKIERADAR_SOURCE=pypi
             COOKIERADAR_VERSION=${{ steps.version.outputs.PIP_VERSION }}
-      - name: Smoke test (Chromium launches as non-root user)
-        run: docker run --rm -i --entrypoint python cookieradar:smoke - < tests/docker/smoke.py
+      - name: Smoke test (Chromium launches as non-root user, version matches)
+        env:
+          PIP_VERSION: ${{ steps.version.outputs.PIP_VERSION }}
+        run: docker run --rm -i -e EXPECTED_VERSION="$PIP_VERSION" --entrypoint python cookieradar:smoke - < tests/docker/smoke.py
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -56,4 +68,5 @@ jobs:
             maksimtech/cookieradar:latest
             maksimtech/cookieradar:${{ steps.version.outputs.VERSION }}
           build-args: |
+            COOKIERADAR_SOURCE=pypi
             COOKIERADAR_VERSION=${{ steps.version.outputs.PIP_VERSION }}

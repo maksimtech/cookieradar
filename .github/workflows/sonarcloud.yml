@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .  # NOSONAR
-          pip install pytest pytest-cov pytest-asyncio
+          pip install pytest pytest-cov pytest-asyncio pyyaml
       - name: Run tests with coverage
         run: |
           pytest tests/ --ignore=tests/benchmarks --cov=cookieradar --cov-report=xml --cov-report=term-missing

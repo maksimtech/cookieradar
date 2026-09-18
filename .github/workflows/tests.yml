@@ -19,7 +19,28 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .  # NOSONAR
-          pip install pytest pytest-cov pytest-asyncio
+          pip install pytest pytest-cov pytest-asyncio pyyaml
       - name: Run tests with coverage
         run: |
           pytest tests/ --ignore=tests/benchmarks --cov=cookieradar --cov-report=xml --cov-report=term-missing
+  docker:
+    name: Docker image (local source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image from local source
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: cookieradar:ci
+          build-args: |
+            COOKIERADAR_SOURCE=local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test (Chromium launches as non-root user, version matches repo)
+        run: |
+          VERSION=$(python3 -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('cookieradar/__init__.py').read()).group(1))")
+          docker run --rm -i -e EXPECTED_VERSION="$VERSION" --entrypoint python cookieradar:ci - < tests/docker/smoke.py
