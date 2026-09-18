@@ -272,3 +272,26 @@ def test_dockerfile_has_no_unused_packages_or_volumes():
     assert "gnupg" not in DOCKERFILE
     assert "VOLUME" not in DOCKERFILE  # nothing in cookieradar reads ~/.cookieradar
     assert ".cookieradar" not in DOCKERFILE
+
+
+# ─── Branch protection: the ruleset requires a check named exactly "Tests" ──
+
+def test_tests_summary_job_for_branch_protection():
+    jobs = _workflow("tests.yml")["jobs"]
+    summary_key, summary = next((k, j) for k, j in jobs.items() if j.get("name") == "Tests")
+    others = set(jobs) - {summary_key}
+
+    # exactly one check called "Tests"; the matrix jobs have their own names
+    assert [j.get("name") for j in jobs.values()].count("Tests") == 1
+    assert set(summary["needs"]) == others  # every other job, including Docker
+
+    # a skipped required check counts as passed: the summary must always run
+    # and fail explicitly when any needed job did not succeed
+    assert summary["if"] == "always()"
+    step_env = {k: v for s in summary["steps"] for k, v in s.get("env", {}).items()}
+    assert any("needs.*.result" in v for v in step_env.values())
+
+
+def test_matrix_jobs_are_named_by_python_version():
+    job = _workflow("tests.yml")["jobs"]["test"]
+    assert job["name"] == "Tests (Python ${{ matrix.python-version }})"

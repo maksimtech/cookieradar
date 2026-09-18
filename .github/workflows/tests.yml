@@ -48,3 +48,20 @@ jobs:
         run: |
           VERSION=$(python3 -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('cookieradar/__init__.py').read()).group(1))")
           docker run --rm -i -e EXPECTED_VERSION="$VERSION" --entrypoint python cookieradar:ci - < tests/docker/smoke.py
+  summary:
+    # The branch ruleset requires a check named exactly "Tests".
+    # always(): a skipped required check counts as passed, so this job must
+    # run even when a needed job fails, and fail explicitly in that case.
+    name: Tests
+    needs: [test, docker]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: All test jobs succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            [ "$result" = "success" ] || { echo "::error::A required test job ended with: $result"; exit 1; }
+          done
