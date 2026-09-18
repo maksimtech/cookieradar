@@ -46,7 +46,7 @@ jobs:
           PIP_VERSION: ${{ steps.version.outputs.PIP_VERSION }}
         run: bash .github/scripts/wait_for_pypi.sh cookieradar "$PIP_VERSION"
       - name: Build image for smoke test
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -59,7 +59,7 @@ jobs:
           PIP_VERSION: ${{ steps.version.outputs.PIP_VERSION }}
         run: docker run --rm -i -e EXPECTED_VERSION="$PIP_VERSION" --entrypoint python cookieradar:smoke - < tests/docker/smoke.py
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
