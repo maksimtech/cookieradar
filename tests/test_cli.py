@@ -301,3 +301,57 @@ def test_batch_ignores_indented_comments_and_blank_lines(tmp_path):
     assert res.exit_code == 0, res.output
     assert seen == ["https://example.com"]
     assert "Loaded 1 URLs" in res.output
+
+
+# ─── W7: unreadable batch files give a clean error, not a traceback ─────────
+
+def _assert_clean_failure(res, *fragments):
+    assert res.exit_code == 2, res.output
+    assert isinstance(res.exception, SystemExit), repr(res.exception)
+    assert "Traceback" not in res.output
+    for fragment in fragments:
+        assert fragment in res.output
+
+
+def test_batch_missing_file(tmp_path):
+    missing = tmp_path / "nope[/b].txt"
+    res = _invoke(["batch", str(missing)])
+
+    _assert_clean_failure(res, "Cannot read", "nope[/b].txt")
+
+
+def test_batch_directory_instead_of_file(tmp_path):
+    res = _invoke(["batch", str(tmp_path)])
+
+    _assert_clean_failure(res, "Cannot read")
+
+
+@pytest.mark.skipif(__import__("os").geteuid() == 0, reason="root ignores file permissions")
+def test_batch_unreadable_file(tmp_path):
+    f = tmp_path / "urls.txt"
+    f.write_text("example.com\n")
+    f.chmod(0)
+
+    res = _invoke(["batch", str(f)])
+
+    _assert_clean_failure(res, "Cannot read")
+
+
+def test_batch_non_utf8_file(tmp_path):
+    f = tmp_path / "urls.txt"
+    f.write_bytes("caffè.it\n".encode("latin-1"))
+
+    res = _invoke(["batch", str(f)])
+
+    _assert_clean_failure(res, "not valid UTF-8")
+
+
+def test_batch_utf8_bom_is_ignored(tmp_path):
+    f = tmp_path / "urls.txt"
+    f.write_bytes("example.com\n".encode("utf-8-sig"))
+    seen = []
+
+    res = _invoke(["batch", str(f)], scan=_recording_scan(seen))
+
+    assert res.exit_code == 0, res.output
+    assert seen == ["https://example.com"]

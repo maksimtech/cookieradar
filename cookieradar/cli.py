@@ -43,7 +43,7 @@ def normalize_url(url: str) -> str:
 
 def _read_urls(path: str) -> list[str]:
     """Non-empty lines of the file, skipping comments (also indented ones)."""
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8-sig") as f:  # -sig: skip a Windows BOM
         lines = [line.strip() for line in f]
     return [line for line in lines if line and not line.startswith("#")]
 
@@ -191,7 +191,14 @@ def batch(
     """
     from cookieradar.scanner import scan
 
-    urls = _read_urls(file)
+    try:
+        urls = _read_urls(file)
+    except UnicodeDecodeError:
+        console.print(f"[red]❌ Cannot read {escape(file)}: not valid UTF-8[/red]")
+        raise typer.Exit(2)
+    except OSError as e:
+        console.print(f"[red]❌ Cannot read {escape(file)}: {escape(e.strerror or str(e))}[/red]")
+        raise typer.Exit(2)
 
     console.print(f"\n[dim]Loaded {len(urls)} URLs from {escape(file)}[/dim]\n")
 

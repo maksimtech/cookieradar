@@ -28,9 +28,9 @@ jobs:
             -f sarif \
             -o bandit-results.sarif \
             --severity-level medium \
-            || true
+            --exit-zero
       - name: Upload Bandit results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('bandit-results.sarif') != ''
         with:
           sarif_file: bandit-results.sarif

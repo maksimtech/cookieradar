@@ -29,6 +29,6 @@ jobs:
           sarif-file: scout-results.sarif
       - name: Upload Scout results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('scout-results.sarif') != ''
         with:
           sarif_file: scout-results.sarif

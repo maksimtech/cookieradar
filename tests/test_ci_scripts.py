@@ -127,3 +127,94 @@ def test_ci_builds_docker_image_from_local_source():
     assert "COOKIERADAR_SOURCE=local" in text
     assert "tests/docker/smoke.py" in text
     assert "push" not in [k for s in job["steps"] for k in s.get("with", {}) if s.get("with", {}).get(k) is True]
+
+
+# ─── W3/W4: no expressions interpolated into shell, no GPG signing ──────────
+
+ALL_WORKFLOWS = sorted(p.name for p in WORKFLOWS.glob("*.yml"))
+
+
+def _all_steps(wf):
+    for job in wf["jobs"].values():
+        yield from job.get("steps", [])
+
+
+@pytest.mark.parametrize("name", ALL_WORKFLOWS)
+def test_no_expressions_interpolated_in_run_scripts(name):
+    # ${{ }} inside run: is pasted into the script before the shell parses it:
+    # a secret or input with quotes/$()/backticks breaks or injects commands.
+    # Values must reach scripts through env: instead.
+    for step in _all_steps(_workflow(name)):
+        assert "${{" not in step.get("run", ""), f"{name}: {step.get('name', step)}"
+
+
+def test_publish_does_not_sign_with_gpg():
+    # PyPI dropped PGP signatures in 2023: signing only exposed the private key
+    text = (WORKFLOWS / "publish.yml").read_text()
+
+    assert "gpg" not in text.lower()
+    assert "GPG_" not in text
+
+
+# ─── W9: security scans must not hide crashes or upload missing SARIF ───────
+
+@pytest.mark.parametrize("name", ALL_WORKFLOWS)
+def test_no_errors_swallowed_with_or_true(name):
+    for step in _all_steps(_workflow(name)):
+        assert "|| true" not in step.get("run", ""), f"{name}: {step.get('name')}"
+
+
+def _sarif_uploads():
+    for name in ALL_WORKFLOWS:
+        for step in _all_steps(_workflow(name)):
+            if "codeql-action/upload-sarif" in step.get("uses", ""):
+                yield name, step
+
+
+def test_sarif_uploads_exist():
+    assert {name for name, _ in _sarif_uploads()} == {"bandit.yml", "docker-scout.yml", "trivy.yml"}
+
+
+@pytest.mark.parametrize("name,step", list(_sarif_uploads()), ids=lambda v: v if isinstance(v, str) else "")
+def test_sarif_upload_only_when_file_exists(name, step):
+    sarif = step["with"]["sarif_file"]
+    condition = step.get("if", "")
+
+    assert f"hashFiles('{sarif}')" in condition, f"{name}: if: {condition!r}"
+    assert "always()" in condition  # still upload findings when the scan step fails
+
+
+def test_bandit_reports_findings_without_failing_but_fails_on_crash():
+    step = next(s for s in _all_steps(_workflow("bandit.yml")) if "bandit -r" in s.get("run", ""))
+
+    assert "--exit-zero" in step["run"]
+
+
+# ─── W10: actions are never referenced by a moving branch ───────────────────
+
+def _action_refs():
+    for name in ALL_WORKFLOWS:
+        for job in _workflow(name)["jobs"].values():
+            refs = [job["uses"]] if "uses" in job else []
+            refs += [s["uses"] for s in job.get("steps", []) if "uses" in s]
+            for ref in refs:
+                if not ref.startswith("./"):
+                    yield name, ref
+
+
+@pytest.mark.parametrize("name,ref", list(_action_refs()))
+def test_actions_not_pinned_to_default_branch(name, ref):
+    _, _, version = ref.partition("@")
+    assert version not in {"master", "main", "HEAD", ""}, f"{name}: {ref}"
+
+
+def test_trivy_action_pinned_to_commit_sha():
+    # trivy-action tags were force-pushed to malware in March 2026
+    # (GHSA-69fq-xp46-6x23): pin the commit, keep the tag as a comment
+    # so Dependabot can still propose updates.
+    line = next(l for l in (WORKFLOWS / "trivy.yml").read_text().splitlines() if "trivy-action@" in l)
+    ref = line.split("@", 1)[1]
+    sha, _, comment = ref.partition("#")
+
+    assert len(sha.strip()) == 40 and all(c in "0123456789abcdef" for c in sha.strip()), line
+    assert comment.strip().startswith("v"), line
