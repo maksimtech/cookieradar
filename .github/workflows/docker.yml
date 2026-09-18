@@ -36,6 +36,16 @@ jobs:
           fi
           echo "VERSION=${RAW}" >> $GITHUB_OUTPUT
           echo "PIP_VERSION=${RAW#v}" >> $GITHUB_OUTPUT
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: cookieradar:smoke
+          build-args: |
+            COOKIERADAR_VERSION=${{ steps.version.outputs.PIP_VERSION }}
+      - name: Smoke test (Chromium launches as non-root user)
+        run: docker run --rm -i --entrypoint python cookieradar:smoke - < tests/docker/smoke.py
       - name: Build and push
         uses: docker/build-push-action@v6
         with:

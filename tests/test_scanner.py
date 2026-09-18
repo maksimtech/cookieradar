@@ -137,62 +137,275 @@ def test_tracker_domains_contains_adform():
 
 # ─── _run_session mock ───────────────────────────────────────────────────────
 
-import pytest
+from tests.conftest import fake_request, make_mock_context
 
-@pytest.mark.asyncio
-async def test_run_session_pre_consent():
-    from cookieradar.scanner import _run_session, SessionResult
-    from unittest.mock import AsyncMock, MagicMock
 
-    mock_context = AsyncMock()
-    mock_page = AsyncMock()
-    mock_context.new_page = AsyncMock(return_value=mock_page)
-    mock_page.goto = AsyncMock()
-    mock_page.wait_for_timeout = AsyncMock()
-    mock_page.query_selector = AsyncMock(return_value=None)
-    mock_context.cookies = AsyncMock(return_value=[])
-    mock_page.close = AsyncMock()
-    mock_page.on = MagicMock()
+@pytest.mark.parametrize("name,accept", [
+    ("pre-consent", None),
+    ("post-accept", True),
+    ("post-reject", False),
+])
+async def test_run_session_without_banner(name, accept):
+    from cookieradar.scanner import _run_session
+    context, page = make_mock_context()
 
-    result = await _run_session(mock_context, "https://example.com", "pre-consent", accept=None)
-    assert result.session == "pre-consent"
+    result = await _run_session(context, "https://example.com", name, accept=accept)
+
     assert isinstance(result, SessionResult)
+    assert result.session == name
+    assert result.error is None
+    page.close.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_run_session_post_accept():
-    from cookieradar.scanner import _run_session, SessionResult
-    from unittest.mock import AsyncMock, MagicMock
-
-    mock_context = AsyncMock()
-    mock_page = AsyncMock()
-    mock_context.new_page = AsyncMock(return_value=mock_page)
-    mock_page.goto = AsyncMock()
-    mock_page.wait_for_timeout = AsyncMock()
-    mock_page.query_selector = AsyncMock(return_value=None)
-    mock_context.cookies = AsyncMock(return_value=[])
-    mock_page.close = AsyncMock()
-    mock_page.on = MagicMock()
-
-    result = await _run_session(mock_context, "https://example.com", "post-accept", accept=True)
-    assert result.session == "post-accept"
+# ─── G1: post-reject must not be contaminated by pre-reject requests ─────────
 
 
-@pytest.mark.asyncio
-async def test_run_session_post_reject():
-    from cookieradar.scanner import _run_session, SessionResult
-    from unittest.mock import AsyncMock, MagicMock
+def _visible_button():
+    btn = AsyncMock()
+    btn.is_visible = AsyncMock(return_value=True)
+    return btn
 
-    mock_context = AsyncMock()
-    mock_page = AsyncMock()
-    mock_context.new_page = AsyncMock(return_value=mock_page)
-    mock_page.goto = AsyncMock()
-    mock_page.wait_for_timeout = AsyncMock()
-    mock_page.query_selector = AsyncMock(return_value=None)
-    mock_context.cookies = AsyncMock(return_value=[])
-    mock_page.close = AsyncMock()
-    mock_page.on = MagicMock()
-    mock_page.reload = AsyncMock()
 
-    result = await _run_session(mock_context, "https://example.com", "post-reject", accept=False)
-    assert result.session == "post-reject"
+def _reject_page(reload_requests):
+    """Page that emits one tracker on goto and `reload_requests` on reload."""
+    context, page = make_mock_context()
+    btn = _visible_button()
+
+    async def goto(*args, **kwargs):
+        page.handlers["request"](fake_request("https://stats.doubleclick.net/pixel", "image"))
+
+    async def reload(*args, **kwargs):
+        for url in reload_requests:
+            page.handlers["request"](fake_request(url, "image"))
+
+    page.goto = AsyncMock(side_effect=goto)
+    page.reload = AsyncMock(side_effect=reload)
+    page.query_selector = AsyncMock(
+        side_effect=lambda sel: btn if sel == "#onetrust-reject-all-handler" else None
+    )
+    return context, page
+
+
+async def _drain():
+    import asyncio
+    await asyncio.sleep(0)
+
+
+async def test_post_reject_ignores_requests_made_before_rejection():
+    from cookieradar.scanner import _run_session
+    context, page = _reject_page(reload_requests=[])
+
+    result = await _run_session(context, "https://example.com", "post-reject", accept=False)
+    await _drain()
+
+    page.reload.assert_awaited_once()
+    assert result.trackers == []
+
+
+async def test_post_reject_keeps_requests_made_after_reload():
+    from cookieradar.scanner import _run_session
+    context, page = _reject_page(reload_requests=["https://www.facebook.com/tr"])
+
+    result = await _run_session(context, "https://example.com", "post-reject", accept=False)
+    await _drain()
+
+    assert [t.domain for t in result.trackers] == ["www.facebook.com"]
+
+
+def _tracker(domain):
+    return TrackerRequest(url=f"https://{domain}/x", domain=domain, resource_type="script", timestamp=0.0)
+
+
+def test_find_violations_splits_persistent_and_new():
+    from cookieradar.scanner import find_violations
+    r = ScanResult(url="https://example.com")
+    r.pre_consent.trackers = [_tracker("a.doubleclick.net"), _tracker("b.hotjar.com")]
+    r.post_reject.trackers = [_tracker("b.hotjar.com"), _tracker("c.facebook.com")]
+
+    v = find_violations(r)
+
+    assert v.persistent == {"b.hotjar.com"}
+    assert v.new == {"c.facebook.com"}
+    assert v.all == {"b.hotjar.com", "c.facebook.com"}
+
+
+def test_find_violations_none_when_post_reject_clean():
+    from cookieradar.scanner import find_violations
+    r = ScanResult(url="https://example.com")
+    r.pre_consent.trackers = [_tracker("a.doubleclick.net")]
+
+    v = find_violations(r)
+
+    assert v.all == set()
+
+
+# ─── G4: timeouts and Playwright errors are recorded, not raised ────────────
+
+from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+
+async def test_goto_timeout_sets_error_and_continues():
+    from cookieradar.scanner import _run_session
+    context, page = make_mock_context()
+    banner = _visible_button()
+
+    async def goto(*args, **kwargs):
+        page.handlers["request"](fake_request("https://stats.doubleclick.net/pixel", "image"))
+        raise PlaywrightTimeoutError("Timeout 30000ms exceeded.")
+
+    page.goto = AsyncMock(side_effect=goto)
+    page.query_selector = AsyncMock(side_effect=lambda sel: banner if sel == "[id*='cookie']" else None)
+
+    result = await _run_session(context, "https://example.com", "pre-consent", accept=None)
+
+    assert "Timeout" in result.error
+    assert [t.domain for t in result.trackers] == ["stats.doubleclick.net"]
+    assert result.banner_found is True  # analysis continued after the timeout
+    page.close.assert_awaited_once()
+
+
+async def test_navigation_error_sets_error_without_raising():
+    from cookieradar.scanner import _run_session
+    context, page = make_mock_context()
+    page.goto = AsyncMock(side_effect=PlaywrightError("net::ERR_NAME_NOT_RESOLVED at https://nope.invalid/"))
+
+    result = await _run_session(context, "https://nope.invalid", "pre-consent", accept=None)
+
+    assert "ERR_NAME_NOT_RESOLVED" in result.error
+    page.close.assert_awaited_once()
+
+
+async def test_reload_timeout_keeps_post_reject_trackers():
+    from cookieradar.scanner import _run_session
+    context, page = _reject_page(reload_requests=[])
+
+    async def reload(*args, **kwargs):
+        page.handlers["request"](fake_request("https://www.facebook.com/tr", "image"))
+        raise PlaywrightTimeoutError("Timeout 30000ms exceeded.")
+
+    page.reload = AsyncMock(side_effect=reload)
+
+    result = await _run_session(context, "https://example.com", "post-reject", accept=False)
+
+    assert "Timeout" in result.error
+    assert [t.domain for t in result.trackers] == ["www.facebook.com"]
+
+
+async def test_timeout_ms_is_passed_to_navigation():
+    from cookieradar.scanner import _run_session
+    context, page = _reject_page(reload_requests=[])
+
+    await _run_session(context, "https://example.com", "post-reject", accept=False, timeout_ms=1234)
+
+    assert page.goto.await_args.kwargs["timeout"] == 1234
+    assert page.reload.await_args.kwargs["timeout"] == 1234
+
+
+def _mock_playwright(browser):
+    pw = MagicMock()
+    pw.chromium.launch = AsyncMock(return_value=browser)
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=pw)
+    cm.__aexit__ = AsyncMock(return_value=False)
+    return MagicMock(return_value=cm)
+
+
+async def test_scan_continues_when_a_session_crashes():
+    from cookieradar import scanner
+    contexts = []
+
+    async def new_context():
+        ctx = AsyncMock()
+        contexts.append(ctx)
+        return ctx
+
+    browser = AsyncMock()
+    browser.new_context = AsyncMock(side_effect=new_context)
+
+    async def run_session(ctx, url, name, accept=None, timeout_ms=30000):
+        if name == "post-accept":
+            raise RuntimeError("Target page, context or browser has been closed")
+        return SessionResult(session=name)
+
+    with patch.object(scanner, "async_playwright", _mock_playwright(browser)), \
+         patch.object(scanner, "_run_session", run_session):
+        result = await scanner.scan("https://example.com")
+
+    assert result.pre_consent.error is None
+    assert "has been closed" in result.post_accept.error
+    assert result.post_accept.session == "post-accept"
+    assert result.post_reject.error is None
+    assert len(contexts) == 3
+    for ctx in contexts:
+        ctx.close.assert_awaited_once()
+    browser.close.assert_awaited_once()
+
+
+# ─── L1: match on hostname with a dot boundary ──────────────────────────────
+
+@pytest.mark.parametrize("url", [
+    "https://shopbing.com/",                            # suffix without dot boundary
+    "https://www.example.it/?ref=facebook.com",         # domain in query string
+    "https://example.com/blog/how-linkedin.com-works",  # domain in path
+    "https://notdoubleclick.net.evil.it/",              # domain as a label prefix
+    "https://myclarity.ms.example.org/",
+    "https://user:facebook.com@example.com/",           # domain in userinfo
+    "data:text/html,googletagmanager.com",
+    "about:blank",
+])
+def test_is_tracker_rejects_substring_matches(url):
+    assert is_tracker(url) is False
+
+
+@pytest.mark.parametrize("url", [
+    "https://facebook.com/tr",                  # exact domain
+    "https://connect.facebook.net/sdk.js",      # subdomain
+    "https://a.b.doubleclick.net/x",            # nested subdomain
+    "https://WWW.Google-Analytics.COM/g/collect",  # case-insensitive
+    "https://www.googletagmanager.com:443/gtm.js",  # explicit port
+    "https://stats.doubleclick.net./pixel",     # fully-qualified trailing dot
+])
+def test_is_tracker_matches_domain_and_subdomains(url):
+    assert is_tracker(url) is True
+
+
+# ─── L2: button labels match whole words, not substrings ────────────────────
+
+def _matches(labels, text):
+    return any(rx.search(text) for rx in labels)
+
+
+@pytest.mark.parametrize("text", [
+    "Accetta", "Accetta tutto", "Accetta tutti", "Accetta tutti i cookie", "Accetto",
+    "Accept", "Accept All", "ACCEPT ALL COOKIES", "OK", "Ok", "  ok  ",
+])
+def test_accept_labels_match(text):
+    from cookieradar.scanner import ACCEPT_LABELS
+    assert _matches(ACCEPT_LABELS, text)
+
+
+@pytest.mark.parametrize("text", [
+    "Cookie settings", "Book now", "Facebook", "Don't accept", "Accept only necessary",
+    "Non accetto", "Accettabile", "Okay, show me more", "Rifiuta",
+])
+def test_accept_labels_do_not_match_substrings(text):
+    from cookieradar.scanner import ACCEPT_LABELS
+    assert not _matches(ACCEPT_LABELS, text)
+
+
+@pytest.mark.parametrize("text", [
+    "Rifiuta", "Rifiuta tutto", "Rifiuta tutti i cookie", "Reject", "Reject All",
+    "Reject all cookies", "Decline", "Decline all",
+])
+def test_reject_labels_match(text):
+    from cookieradar.scanner import REJECT_LABELS
+    assert _matches(REJECT_LABELS, text)
+
+
+@pytest.mark.parametrize("text", [
+    "Rejected items", "Non rifiutare", "Declined payments", "Rifiutato", "Accept",
+])
+def test_reject_labels_do_not_match_substrings(text):
+    from cookieradar.scanner import REJECT_LABELS
+    assert not _matches(REJECT_LABELS, text)

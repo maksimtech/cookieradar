@@ -1,0 +1,13 @@
+<!doctype html>
+<html><body>
+<div id="cookie-banner">
+  <button id="reject" onclick="document.cookie='consent=no; path=/'">Reject All</button>
+</div>
+<script>
+  // Non-compliant site: the tracker ignores the refusal
+  new Image().src = 'https://stats.doubleclick.net/pixel';
+  if (document.cookie.includes('consent=no')) {
+    new Image().src = 'https://www.facebook.com/tr';
+  }
+</script>
+</body></html>

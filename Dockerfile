@@ -20,15 +20,16 @@ ARG COOKIERADAR_VERSION=2026.9.1
 # Installa cookieradar da PyPI
 RUN pip install --no-cache-dir --root-user-action=ignore \
     "cookieradar==${COOKIERADAR_VERSION}"
-# Installa Playwright e Chromium
-RUN playwright install chromium && \
-    playwright install-deps chromium
+# Dipendenze di sistema di Chromium (richiedono root)
+RUN playwright install-deps chromium
 # Crea utente non-root
 RUN useradd -m -u 1000 cookieradar && \
     mkdir -p /home/cookieradar/.cookieradar && \
     chown -R cookieradar:cookieradar /home/cookieradar
 USER cookieradar
 WORKDIR /home/cookieradar
+# Chromium installato come cookieradar, in ~/.cache/ms-playwright
+RUN playwright install chromium
 VOLUME ["/home/cookieradar/.cookieradar"]
 ENTRYPOINT ["cookieradar"]
 CMD ["--help"]

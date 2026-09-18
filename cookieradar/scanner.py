@@ -3,9 +3,15 @@ CookieRadar — Playwright scanner.
 Three clean sessions: pre-consent, post-accept, post-reject+reload.
 """
 import asyncio
+import re
 from dataclasses import dataclass, field
 from typing import Optional
+from urllib.parse import urlparse
 from playwright.async_api import async_playwright, Page, BrowserContext
+from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+DEFAULT_TIMEOUT_MS = 30000
 
 
 @dataclass
@@ -31,6 +37,23 @@ class ScanResult:
     pre_consent: SessionResult = field(default_factory=lambda: SessionResult("pre-consent"))
     post_accept: SessionResult = field(default_factory=lambda: SessionResult("post-accept"))
     post_reject: SessionResult = field(default_factory=lambda: SessionResult("post-reject"))
+
+
+@dataclass
+class Violations:
+    persistent: set[str]  # loaded before consent and still loaded after rejection
+    new: set[str]  # loaded only after rejection
+
+    @property
+    def all(self) -> set[str]:
+        return self.persistent | self.new
+
+
+def find_violations(result: ScanResult) -> Violations:
+    """Every tracker loaded after rejection is a violation."""
+    pre = {t.domain for t in result.pre_consent.trackers}
+    rej = {t.domain for t in result.post_reject.trackers}
+    return Violations(persistent=rej & pre, new=rej - pre)
 
 
 TRACKER_DOMAINS = [
@@ -72,11 +95,64 @@ TRACKER_DOMAINS = [
 
 
 def is_tracker(url: str) -> bool:
-    """Check if URL belongs to a known tracker domain."""
-    for domain in TRACKER_DOMAINS:
-        if domain in url:
-            return True
+    """Check if the URL host is a known tracker domain or one of its subdomains."""
+    host = (urlparse(url).hostname or "").rstrip(".")
+    return any(host == domain or host.endswith("." + domain) for domain in TRACKER_DOMAINS)
+
+
+ACCEPT_SELECTORS = [
+    "#onetrust-accept-btn-handler",
+    "button[id*='accept-all']",
+    "button[class*='accept-all']",
+    "button[id*='agree']",
+]
+REJECT_SELECTORS = [
+    "#onetrust-reject-all-handler",
+    ".ot-pc-refuse-all-handler",
+    "button[id*='reject-all']",
+    "button[class*='refuse-all']",
+]
+
+# Whole accessible names, case-insensitive: "OK" must not match "Cookie settings",
+# "Accept" must not match "Don't accept".
+ACCEPT_LABELS = [
+    re.compile(r"^\s*accett[ao](\s+tutt[oi])?(\s+i\s+cookie)?\s*$", re.I),
+    re.compile(r"^\s*accept(\s+all)?(\s+cookies)?\s*$", re.I),
+    re.compile(r"^\s*ok\s*$", re.I),
+]
+REJECT_LABELS = [
+    re.compile(r"^\s*rifiuta(\s+tutt[oi])?(\s+i\s+cookie)?\s*$", re.I),
+    re.compile(r"^\s*reject(\s+all)?(\s+cookies)?\s*$", re.I),
+    re.compile(r"^\s*decline(\s+all)?\s*$", re.I),
+]
+
+
+async def _click_consent_button(page: Page, selectors: list[str], labels: list[re.Pattern]) -> bool:
+    """Click the first visible match: CSS selectors first, then buttons by accessible name."""
+    for selector in selectors:
+        try:
+            btn = await page.query_selector(selector)
+            if btn and await btn.is_visible():
+                await btn.click()
+                return True
+        except PlaywrightError:
+            pass
+    for label in labels:
+        try:
+            buttons = page.get_by_role("button", name=label)
+            for i in range(await buttons.count()):
+                btn = buttons.nth(i)
+                if await btn.is_visible():
+                    await btn.click()
+                    return True
+        except PlaywrightError:
+            pass
     return False
+
+
+def _add_error(result: SessionResult, error: Exception) -> None:
+    message = str(error).splitlines()[0] if str(error) else type(error).__name__
+    result.error = f"{result.error}; {message}" if result.error else message
 
 
 async def _run_session(
@@ -84,15 +160,19 @@ async def _run_session(
     url: str,
     session_name: str,
     accept: Optional[bool] = None,
+    timeout_ms: int = DEFAULT_TIMEOUT_MS,
 ) -> SessionResult:
-    """Run a single browser session and collect trackers."""
+    """
+    Run a single browser session and collect trackers.
+    Playwright errors are recorded in result.error instead of being raised;
+    a navigation timeout does not stop the analysis of the loaded page.
+    """
     result = SessionResult(session=session_name)
     page = await context.new_page()
 
     # Intercept requests
-    async def handle_request(request):
+    def handle_request(request):
         if is_tracker(request.url):
-            from urllib.parse import urlparse
             domain = urlparse(request.url).netloc
             result.trackers.append(TrackerRequest(
                 url=request.url,
@@ -104,7 +184,10 @@ async def _run_session(
     page.on("request", handle_request)
 
     try:
-        await page.goto(url, wait_until="networkidle", timeout=30000)
+        try:
+            await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+        except PlaywrightTimeoutError as e:
+            _add_error(result, e)
         await page.wait_for_timeout(3000)
 
         # Check for cookie banner
@@ -125,52 +208,15 @@ async def _run_session(
 
         # Accept all
         if accept is True:
-            accept_selectors = [
-                "#onetrust-accept-btn-handler",
-                "button[id*='accept-all']",
-                "button[class*='accept-all']",
-                "button[id*='agree']",
-                "button:has-text('Accetta tutto')",
-                "button:has-text('Accept All')",
-                "button:has-text('Accetta')",
-                "button:has-text('Accept')",
-                "button:has-text('OK')",
-            ]
-            for selector in accept_selectors:
-                try:
-                    btn = await page.query_selector(selector)
-                    if btn and await btn.is_visible():
-                        await btn.click()
-                        await page.wait_for_timeout(2000)
-                        break
-                except:
-                    pass
+            if await _click_consent_button(page, ACCEPT_SELECTORS, ACCEPT_LABELS):
+                await page.wait_for_timeout(2000)
 
         # Reject all
         elif accept is False:
-            rejected = False
-
             # Step 1 — prova rifiuto diretto
-            reject_selectors = [
-                "#onetrust-reject-all-handler",
-                ".ot-pc-refuse-all-handler",
-                "button[id*='reject-all']",
-                "button[class*='refuse-all']",
-                "button:has-text('Rifiuta tutto')",
-                "button:has-text('Reject All')",
-                "button:has-text('Rifiuta')",
-                "button:has-text('Decline')",
-            ]
-            for selector in reject_selectors:
-                try:
-                    btn = await page.query_selector(selector)
-                    if btn and await btn.is_visible():
-                        await btn.click()
-                        await page.wait_for_timeout(2000)
-                        rejected = True
-                        break
-                except:
-                    pass
+            rejected = await _click_consent_button(page, REJECT_SELECTORS, REJECT_LABELS)
+            if rejected:
+                await page.wait_for_timeout(2000)
 
             # Step 2 — OneTrust a due step: apri preferenze poi rifiuta
             if not rejected:
@@ -188,41 +234,50 @@ async def _run_session(
                     pass
 
             if rejected:
-                await page.reload(wait_until="networkidle")
+                # Only requests made after the rejection count for this session
+                result.trackers.clear()
+                try:
+                    await page.reload(wait_until="networkidle", timeout=timeout_ms)
+                except PlaywrightTimeoutError as e:
+                    _add_error(result, e)
                 await page.wait_for_timeout(2000)
+    except PlaywrightError as e:
+        _add_error(result, e)
     finally:
         await page.close()
 
     return result
 
 
-async def scan(url: str, headless: bool = True) -> ScanResult:
+async def scan(url: str, headless: bool = True, timeout_ms: int = DEFAULT_TIMEOUT_MS) -> ScanResult:
     """
     Scan a URL with three clean sessions.
     Session 1: pre-consent (no interaction)
     Session 2: post-accept-all
     Session 3: post-reject-all + reload
+    A failing session is recorded in its error field; the others still run.
     """
     result = ScanResult(url=url)
+    sessions = [
+        ("pre_consent", "pre-consent", None),
+        ("post_accept", "post-accept", True),
+        ("post_reject", "post-reject", False),
+    ]
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=headless)
-
-        # Session 1 — pre-consent
-        ctx1 = await browser.new_context()
-        result.pre_consent = await _run_session(ctx1, url, "pre-consent", accept=None)
-        await ctx1.close()
-
-        # Session 2 — post-accept
-        ctx2 = await browser.new_context()
-        result.post_accept = await _run_session(ctx2, url, "post-accept", accept=True)
-        await ctx2.close()
-
-        # Session 3 — post-reject + reload
-        ctx3 = await browser.new_context()
-        result.post_reject = await _run_session(ctx3, url, "post-reject", accept=False)
-        await ctx3.close()
-
-        await browser.close()
+        try:
+            for attr, name, accept in sessions:
+                ctx = await browser.new_context()
+                try:
+                    session = await _run_session(ctx, url, name, accept=accept, timeout_ms=timeout_ms)
+                except Exception as e:
+                    session = SessionResult(session=name)
+                    _add_error(session, e)
+                finally:
+                    await ctx.close()
+                setattr(result, attr, session)
+        finally:
+            await browser.close()
 
     return result

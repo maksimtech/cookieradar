@@ -42,3 +42,6 @@ test = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "integration: uses a real Chromium against a local site (skipped if not installed)",
+]
