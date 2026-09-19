@@ -7,6 +7,26 @@ and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
 
+## [2026.09.9] - 2026-09-19
+### Added
+- `audit` ends with a "Norme applicate" section, also in the `--output`
+  report: each finding cites the legal provisions it concerns, with the
+  SHA-256 of the exact text applied and the date of that wording. The text is
+  downloaded on every audit and cached in `~/.cookieradar/law_cache.json`
+  (`COOKIERADAR_HOME` moves the folder); a changed text is reported with its
+  previous hash. Offline the cached copy is cited, or "SHA256: non
+  disponibile". A failed law check never changes the verdict or exit code.
+  - VIOLATION → GDPR art. 5(1)(a) and ePrivacy directive 2002/58/EC art. 5(3),
+    consolidated text of 2009 (prior consent; the 2002 text only required a
+    right to refuse).
+  - VIOLATION → Italian Consumer Code, D.Lgs. 206/2005, art. 20 and 21, unfair
+    commercial practice (Normattiva, text in force).
+  - Trackers after rejection → GDPR art. 7.
+  - VIOLATION → directive (EU) 2019/770 art. 3(8), invalid consent.
+  - UNVERIFIED → a note only: without a reject button no provision is cited.
+### Changed
+- New dependency: `httpx`, to download the legal texts.
+
 ## [2026.09.8] - 2026-09-18
 ### Changed
 - Exit codes now reflect the verdict:
