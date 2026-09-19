@@ -75,3 +75,17 @@ async def browser():
             pytest.skip(f"Chromium not available: {e}")
         yield b
         await b.close()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_law_checker(tmp_path, monkeypatch):
+    """No test may reach EUR-Lex or write to ~/.cookieradar: the law cache goes
+    to a temporary folder and every download fails."""
+    from cookieradar import law_fetcher
+
+    monkeypatch.setenv("COOKIERADAR_HOME", str(tmp_path / "cookieradar-home"))
+
+    def no_network(*args, **kwargs):
+        raise law_fetcher.LawFetchError("network disabled in tests")
+
+    monkeypatch.setattr(law_fetcher, "fetch_html", no_network)

@@ -215,8 +215,9 @@ def _verdict(result) -> ExitCode:
     return ExitCode.VIOLATION if find_violations(result).all else ExitCode.OK
 
 
-def _render_report(out: Console, url: str, result):
-    """Full report of the three sessions and the verdict."""
+def _render_report(out: Console, url: str, result, law=None):
+    """Full report of the three sessions and the verdict, then the provisions
+    applied when `law` (a law_checker result) is given."""
     out.print(f"\n[bold]📊 CookieRadar Report — {escape(url)}[/bold]\n")
 
     # Pre-consent
@@ -249,11 +250,15 @@ def _render_report(out: Console, url: str, result):
     if _session_errors(result):
         out.print("[yellow]⚠️  Result may be incomplete: some sessions reported errors[/yellow]")
 
+    if law is not None:
+        out.print()
+        _print_law_check(law, out)
 
-def _save_report(url: str, result, path: Path):
+
+def _save_report(url: str, result, path: Path, law=None):
     """Write the report as HTML (.html/.htm) or plain text; raises OSError."""
     recorder = Console(file=io.StringIO(), record=True, width=120, force_terminal=True)
-    _render_report(recorder, url, result)
+    _render_report(recorder, url, result, law)
     if path.suffix.lower() in (".html", ".htm"):
         recorder.save_html(str(path))
     else:
@@ -269,6 +274,57 @@ def _report_filename(url: str, used: set[str]) -> str:
         name, n = f"{base}-{n}", n + 1
     used.add(name)
     return f"{name}.txt"
+
+
+
+def _law_check(subject, out=None):
+    """Run the law check; any failure is reported and never fails the command."""
+    from cookieradar import law_checker
+
+    try:
+        return law_checker.check(subject)
+    except Exception as e:
+        (out or console).print(f"[yellow]⚠️  Verifica delle norme non riuscita: {escape(str(e))}[/yellow]\n")
+        return None
+
+
+def _print_law_check(law, out=None) -> None:
+    """Cite the provisions applied to the findings, with their SHA-256."""
+    from cookieradar.law_checker import FINDING_TITLES, format_citation
+
+    out = out or console
+    if law is None or not (law.citations or law.notes):
+        return
+
+    out.print("[bold]⚖️  Norme applicate[/bold]")
+    for status in law.acts:
+        name = escape(status.act.name)
+        if status.source == "eur-lex":
+            out.print(f"[dim]{name}: verificato su EUR-Lex (CELEX {status.act.celex})[/dim]")
+        elif status.source == "cache":
+            out.print(f"[yellow]{name}: EUR-Lex non raggiungibile, testo dalla copia in cache non riverificato[/yellow]")
+        else:
+            out.print(f"[yellow]{name}: EUR-Lex non raggiungibile e nessuna copia in cache, testo non verificabile[/yellow]")
+        if status.act.note:
+            out.print(f"[dim]  {escape(status.act.note)}[/dim]")
+        if status.error:
+            out.print(f"[dim]  {escape(status.error)}[/dim]")
+    for provision, previous in law.changed.items():
+        out.print(f"[yellow]⚠️  Il testo di {escape(provision)} è cambiato dall'ultimo audit[/yellow]")
+        out.print(f"[dim]   precedente: {previous}[/dim]")
+    for note in law.notes:
+        out.print(f"[yellow]⚠️  {escape(note)}[/yellow]")
+
+    out.print()
+    finding = None
+    for citation in law.citations:
+        if citation.finding != finding:
+            finding = citation.finding
+            out.print(f"[bold]{escape(FINDING_TITLES[finding])}[/bold]")
+            if law.evidence.get(finding):
+                out.print(f"[dim]{escape(', '.join(law.evidence[finding]))}[/dim]")
+        out.print(format_citation(citation), markup=False, highlight=False)
+        out.print()
 
 
 @app.command()
@@ -298,12 +354,13 @@ def audit(
         console.print(f"[red]❌ Error: {escape(str(e))}[/red]")
         raise typer.Exit(ExitCode.ERROR)
 
-    _render_report(console, url, result)
+    law = _law_check(result)
+    _render_report(console, url, result, law)
     codes = {_verdict(result)}
 
     if output:
         try:
-            _save_report(url, result, output)
+            _save_report(url, result, output, law)
         except OSError as e:
             console.print(f"[red]❌ Cannot write report {escape(str(output))}: {escape(e.strerror or str(e))}[/red]")
             codes.add(ExitCode.ERROR)
