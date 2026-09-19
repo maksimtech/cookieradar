@@ -13,7 +13,9 @@ from cookieradar.law_checker import (
     findings_of,
     notes_of,
 )
-from cookieradar.law_fetcher import EPRIVACY, GDPR, LawFetchError, Provision
+from cookieradar.law_fetcher import (
+    CONSUMER_CODE, DIGITAL_CONTENT, EPRIVACY, GDPR, LawFetchError, Provision,
+)
 from cookieradar.scanner import ScanResult, SessionResult, TrackerRequest
 
 DAY1 = datetime(2026, 9, 19, 14, 0, tzinfo=timezone.utc)
@@ -70,7 +72,9 @@ def online(monkeypatch):
 def test_mapping():
     assert FINDING_ARTICLES == {
         "violation": ((GDPR, "5(1)(a)"), (EPRIVACY, "5(3)")),
+        "unfair_practice": ((CONSUMER_CODE, "20"), (CONSUMER_CODE, "21")),
         "post_reject": ((GDPR, "7"),),
+        "invalid_consent": ((DIGITAL_CONTENT, "3(8)"),),
     }
     assert set(FINDING_TITLES) == set(FINDING_ARTICLES)
 
@@ -84,10 +88,12 @@ def test_violation_lists_the_trackers():
     result = scan_result(pre=["google-analytics.com"], rejected=["google-analytics.com", "hotjar.com"])
     assert findings_of(result) == {
         "violation": ["google-analytics.com", "hotjar.com"],
+        "unfair_practice": ["2 tracker attivi nonostante il rifiuto del consenso"],
         "post_reject": [
             "google-analytics.com (già presente prima del consenso)",
             "hotjar.com (nuovo dopo il rifiuto)",
         ],
+        "invalid_consent": ["2 tracker attivi nonostante il rifiuto del consenso"],
     }
 
 
@@ -107,11 +113,19 @@ def test_violation_cites_gdpr_and_eprivacy(cache, online):
     assert [(c.finding, c.law, c.article) for c in law.citations] == [
         ("violation", "GDPR", "5(1)(a)"),
         ("violation", "ePrivacy dir. 2002/58/CE", "5(3)"),
+        ("unfair_practice", "Codice del Consumo D.Lgs. 206/2005", "20"),
+        ("unfair_practice", "Codice del Consumo D.Lgs. 206/2005", "21"),
         ("post_reject", "GDPR", "7"),
+        ("invalid_consent", "Contenuti digitali dir. 2019/770", "3(8)"),
     ]
     # One download per act, only the articles cited
-    assert online == [(GDPR, ("5", "7")), (EPRIVACY, ("5",))]
-    assert [s.source for s in law.acts] == ["eur-lex", "eur-lex"]
+    assert online == [
+        (GDPR, ("5", "7")),
+        (EPRIVACY, ("5",)),
+        (CONSUMER_CODE, ("20", "21")),
+        (DIGITAL_CONTENT, ("3",)),
+    ]
+    assert [s.source for s in law.acts] == ["verified"] * 4
 
 
 def test_same_number_in_two_acts_gets_two_hashes(cache, online):
@@ -139,7 +153,10 @@ def test_one_act_offline_other_online(cache, monkeypatch):
     monkeypatch.setattr(law_fetcher, "fetch_provisions", eprivacy_down)
     law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
 
-    assert [(s.act, s.source) for s in law.acts] == [(GDPR, "eur-lex"), (EPRIVACY, "unavailable")]
+    assert [(s.act, s.source) for s in law.acts] == [
+        (GDPR, "verified"), (EPRIVACY, "unavailable"),
+        (CONSUMER_CODE, "verified"), (DIGITAL_CONTENT, "verified"),
+    ]
     assert law.citations[0].sha256 is not None
     assert law.citations[1].sha256 is None
 

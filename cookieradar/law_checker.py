@@ -1,13 +1,12 @@
 """
-CookieRadar — EU law provisions for audit findings.
+CookieRadar — EU and Italian law provisions for audit findings.
 
 Maps what an audit found to the provisions it concerns, and cites each one
 with the SHA-256 of the exact text applied and the date of that wording. The
-text is downloaded from EUR-Lex on every audit and compared with the local
-cache; without network the cached copy is cited.
+text is downloaded on every audit (EUR-Lex, or Normattiva for Italian law)
+and compared with the local cache; without network the cached copy is cited.
 
-Adapted from APKRadar's law_checker: only the mapping section is specific to
-CookieRadar.
+Shared by the Radar tools: only the mapping section is specific to CookieRadar.
 """
 from __future__ import annotations
 
@@ -17,20 +16,28 @@ from typing import Optional
 
 from cookieradar import law_fetcher
 from cookieradar.law_cache import LawCache
-from cookieradar.law_fetcher import EPRIVACY, GDPR, Act, LawFetchError
+from cookieradar.law_fetcher import CONSUMER_CODE, DIGITAL_CONTENT, EPRIVACY, GDPR, Act, LawFetchError
 
 # ─── Mapping: CookieRadar findings → provisions ───────────────────────────────
 
-# Finding → cited provisions, in report order
+# Finding → cited provisions, in report order. All four come from the same
+# evidence, trackers loaded after rejection, and cite different rules.
 FINDING_ARTICLES = {
     "violation": ((GDPR, "5(1)(a)"), (EPRIVACY, "5(3)")),
+    "unfair_practice": ((CONSUMER_CODE, "20"), (CONSUMER_CODE, "21")),
     "post_reject": ((GDPR, "7"),),
+    "invalid_consent": ((DIGITAL_CONTENT, "3(8)"),),
 }
 
 FINDING_TITLES = {
     "violation": "VIOLATION — tracker senza consenso valido",
+    "unfair_practice": "Pratica commerciale scorretta",
     "post_reject": "Tracker caricati dopo il rifiuto",
+    "invalid_consent": "Consenso non valido (dati personali nel contratto digitale)",
 }
+
+# Articles downloaded and cached even when not cited, by act
+ALSO_FETCH: dict = {}
 
 UNVERIFIED_NOTE = (
     "UNVERIFIED: banner dei cookie o pulsante di rifiuto non trovato, "
@@ -46,8 +53,10 @@ def findings_of(result) -> dict[str, list[str]]:
     """
     Findings in a CookieRadar ScanResult, with the tracker domains.
 
-    A VIOLATION is a tracker loaded after the user rejected cookies, so both
-    findings come together; they cite different provisions.
+    A VIOLATION is a tracker loaded after the user rejected cookies: the same
+    evidence is a violation of the consent rules (GDPR, ePrivacy), an unfair
+    commercial practice (Consumer Code) and invalid consent in a digital
+    content contract (directive 2019/770).
     """
     from cookieradar.scanner import find_violations
 
@@ -59,7 +68,13 @@ def findings_of(result) -> dict[str, list[str]]:
     domains = sorted(violations.all)
     persistent = [f"{d} (già presente prima del consenso)" for d in sorted(violations.persistent)]
     new = [f"{d} (nuovo dopo il rifiuto)" for d in sorted(violations.new)]
-    return {"violation": domains, "post_reject": persistent + new}
+    summary = [f"{len(domains)} tracker attivi nonostante il rifiuto del consenso"]
+    return {
+        "violation": domains,
+        "unfair_practice": summary,
+        "post_reject": persistent + new,
+        "invalid_consent": summary,
+    }
 
 
 def notes_of(result) -> list[str]:
@@ -80,8 +95,8 @@ class Citation:
 @dataclass(frozen=True)
 class ActStatus:
     act: Act
-    # "eur-lex": verified now; "cache": EUR-Lex unreachable, cached copy;
-    # "unavailable": no text at all
+    # "verified": downloaded now from the act's source (EUR-Lex or Normattiva);
+    # "cache": source unreachable, cached copy; "unavailable": no text at all
     source: str
     error: Optional[str] = None
 
@@ -99,10 +114,21 @@ class LawCheckResult:
     notes: list[str] = field(default_factory=list)
 
 
-def check(subject, *, cache: Optional[LawCache] = None, now: Optional[datetime] = None) -> LawCheckResult:
-    """Cite the provisions that apply to the findings about `subject`."""
-    evidence = findings_of(subject)
-    notes = notes_of(subject)
+def check(
+    subject,
+    *,
+    cache: Optional[LawCache] = None,
+    now: Optional[datetime] = None,
+    **context,
+) -> LawCheckResult:
+    """
+    Cite the provisions that apply to the findings about `subject`.
+
+    `context` is passed on to findings_of and notes_of: what the audit found
+    besides `subject` itself.
+    """
+    evidence = findings_of(subject, **context)
+    notes = notes_of(subject, **context)
     cited = [
         (finding, act, ref)
         for finding in evidence
@@ -118,8 +144,10 @@ def check(subject, *, cache: Optional[LawCache] = None, now: Optional[datetime] 
     fresh = {}
     errors = {}
     for act in acts:
-        # Only the articles cited: "32(1)(a)" is part of article 32
-        articles = tuple(dict.fromkeys(ref.split("(")[0] for _, a, ref in cited if a == act))
+        # The articles cited ("32(1)(a)" is part of article 32) and ALSO_FETCH
+        articles = tuple(dict.fromkeys(
+            [ref.split("(")[0] for _, a, ref in cited if a == act] + list(ALSO_FETCH.get(act, ()))
+        ))
         try:
             provisions = law_fetcher.fetch_provisions(act, articles, now=now)
         except LawFetchError as e:
@@ -139,7 +167,7 @@ def check(subject, *, cache: Optional[LawCache] = None, now: Optional[datetime] 
     statuses = []
     for act in acts:
         if act not in errors:
-            statuses.append(ActStatus(act, "eur-lex"))
+            statuses.append(ActStatus(act, "verified"))
         else:
             cached = any((act.celex, ref) in provisions for _, a, ref in cited if a == act)
             statuses.append(ActStatus(act, "cache" if cached else "unavailable", errors[act]))
