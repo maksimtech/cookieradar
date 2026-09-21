@@ -68,6 +68,6 @@ def test_fetch_provisions_uses_the_consolidated_celex(monkeypatch):
     monkeypatch.setattr(law_fetcher, "fetch_html", fake_fetch_html)
     provisions = fetch_provisions(EPRIVACY, ("5",))
 
-    assert urls == ["https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:02002L0058-20091219"]
+    assert urls == ["https://publications.europa.eu/resource/celex/02002L0058-20091219"]
     assert provisions["5(3)"].celex == "02002L0058-20091219"
     assert provisions["5(3)"].key == ("02002L0058-20091219", "5(3)")
