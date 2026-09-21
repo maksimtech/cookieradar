@@ -1,5 +1,10 @@
 name: Docker Scout CVE Scan
 on:
+  # The scan reads maksimtech/cookieradar:latest from Docker Hub, so it is only
+  # meaningful once a new image is published — which happens on a tag, not on a
+  # push to main. Without this, re-scanning after a release meant re-running an
+  # earlier run by hand.
+  workflow_dispatch:
   push:
     branches: [ main ]
   schedule:
