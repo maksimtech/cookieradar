@@ -7,6 +7,20 @@ and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
 
+## [2026.09.10] - 2026-09-21
+### Fixed
+- Docker image: base moved from `python:3.12-slim-bookworm` to
+  `python:3.12-slim-trixie`. Docker Scout reported three critical CVEs against
+  Debian 12 packages in the published image: CVE-2026-75803 (openssl
+  3.0.20-1~deb12u2), CVE-2026-12087 and CVE-2026-13221 (perl 5.36.0-7+deb12u3).
+  Python stays on 3.12, so this changes the distribution only.
+
+### Added
+- `docker-build-check.yml`: builds the image from the repository source and runs
+  `tests/docker/smoke.py` against it without pushing anything. The release
+  workflow publishes to Docker Hub, including `:latest`, so until now there was
+  no way to try a Dockerfile change out. Manual dispatch only.
+
 ## [2026.09.9] - 2026-09-19
 ### Added
 - `audit` ends with a "Norme applicate" section, also in the `--output`
@@ -152,7 +166,9 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.09.8...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.09.10...HEAD
+[2026.09.10]: https://github.com/maksimtech/cookieradar/compare/v2026.09.9...v2026.09.10
+[2026.09.9]: https://github.com/maksimtech/cookieradar/compare/v2026.09.8...v2026.09.9
 [2026.09.8]: https://github.com/maksimtech/cookieradar/compare/v2026.09.7...v2026.09.8
 [2026.09.7]: https://github.com/maksimtech/cookieradar/compare/v2026.09.6...v2026.09.7
 [2026.09.6]: https://github.com/maksimtech/cookieradar/compare/v2026.09.5...v2026.09.6
