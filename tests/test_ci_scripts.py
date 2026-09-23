@@ -173,7 +173,9 @@ def _sarif_uploads():
 
 
 def test_sarif_uploads_exist():
-    assert {name for name, _ in _sarif_uploads()} == {"bandit.yml", "docker-scout.yml", "trivy.yml"}
+    assert {name for name, _ in _sarif_uploads()} == {
+        "bandit.yml", "docker-scout.yml", "snyk.yml", "trivy.yml",
+    }
 
 
 @pytest.mark.parametrize("name,step", list(_sarif_uploads()), ids=lambda v: v if isinstance(v, str) else "")
