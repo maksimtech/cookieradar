@@ -6,18 +6,18 @@ import asyncio
 import io
 import re
 import sys
-from contextlib import contextmanager
-from datetime import datetime, timezone
+from contextlib import contextmanager, suppress
+from datetime import UTC, datetime
 from enum import IntEnum
 from pathlib import Path
 
 import typer
-from typer.core import TyperGroup
+from rich import box
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 from rich.text import Text
-from rich.markup import escape
-from rich import box
+from typer.core import TyperGroup
 
 from cookieradar.scanner import Violations, find_violations
 
@@ -45,10 +45,8 @@ def enable_utf8_output() -> None:
         encoding = (getattr(stream, "encoding", "") or "").lower().replace("-", "")
         if encoding == "utf8":
             continue
-        try:
+        with suppress(ValueError, OSError):
             reconfigure(encoding="utf-8", errors="replace")
-        except (ValueError, OSError):
-            pass
 
 enable_utf8_output()
 
@@ -200,7 +198,7 @@ def _cookie_expiry(cookie: dict) -> str:
     expires = cookie.get("expires", -1)
     if expires is None or expires < 0:
         return "session"
-    return datetime.fromtimestamp(expires, tz=timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(expires, tz=UTC).strftime("%Y-%m-%d")
 
 
 def _print_cookies(out: Console, cookies: list[dict]):
@@ -272,7 +270,10 @@ def _render_report(out: Console, url: str, result, law=None):
     verdict = _verdict(result)
 
     if verdict is ExitCode.UNVERIFIED:
-        out.print("[bold yellow]⚠️  UNVERIFIED — could not reject cookies, no verdict on post-reject trackers[/bold yellow]")
+        out.print(
+            "[bold yellow]⚠️  UNVERIFIED — could not reject cookies, "
+            "no verdict on post-reject trackers[/bold yellow]"
+        )
     elif verdict is ExitCode.VIOLATION:
         out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after rejection:[/bold red]")
         _print_violations(out, violations, "  ")
@@ -335,9 +336,19 @@ def _print_law_check(law, out=None) -> None:
         if status.source == "verified":
             out.print(f"[dim]{name}: verificato su {source} ({act.id_label} {escape(act.celex)})[/dim]")
         elif status.source == "cache":
-            out.print(f"[yellow]{name}: {source} non raggiungibile, testo dalla copia in cache non riverificato[/yellow]")
+            out.print(
+                f"[yellow]{name}: {source} non raggiungibile, "
+                "testo dalla copia in cache non riverificato[/yellow]"
+            )
         else:
-            out.print(f"[yellow]{name}: {source} non raggiungibile e nessuna copia in cache, testo non verificabile[/yellow]")
+            # The missing SHA-256 below is the consequence of this line, and
+            # the two used to sit apart: a reader who saw the gap went looking
+            # for a bug in the hashing. There is no verified text to hash, and
+            # printing one anyway would assert a verification never made.
+            out.print(
+                f"[yellow]{name}: {source} non raggiungibile e nessuna copia in cache, "
+                "testo non verificabile: le citazioni che seguono restano senza SHA-256[/yellow]"
+            )
         if act.note:
             out.print(f"[dim]  {escape(act.note)}[/dim]")
         if status.error:
@@ -376,7 +387,7 @@ def audit(
         url = normalize_url(url)
     except ValueError as e:
         console.print(f"[red]❌ {escape(str(e))}[/red]")
-        raise typer.Exit(ExitCode.ERROR)
+        raise typer.Exit(ExitCode.ERROR) from None
 
     console.print(f"\n[dim]Auditing [bold]{escape(url)}[/bold]...[/dim]")
 
@@ -385,7 +396,7 @@ def audit(
             result = asyncio.run(scan(url, headless=headless))
     except Exception as e:
         console.print(f"[red]❌ Error: {escape(str(e))}[/red]")
-        raise typer.Exit(ExitCode.ERROR)
+        raise typer.Exit(ExitCode.ERROR) from None
 
     law = _law_check(result)
     _render_report(console, url, result, law)
@@ -417,17 +428,17 @@ def batch(
         urls = _read_urls(file)
     except UnicodeDecodeError:
         console.print(f"[red]❌ Cannot read {escape(file)}: not valid UTF-8[/red]")
-        raise typer.Exit(ExitCode.ERROR)
+        raise typer.Exit(ExitCode.ERROR) from None
     except OSError as e:
         console.print(f"[red]❌ Cannot read {escape(file)}: {escape(e.strerror or str(e))}[/red]")
-        raise typer.Exit(ExitCode.ERROR)
+        raise typer.Exit(ExitCode.ERROR) from None
 
     if output:
         try:
             output.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             console.print(f"[red]❌ Cannot create {escape(str(output))}: {escape(e.strerror or str(e))}[/red]")
-            raise typer.Exit(ExitCode.ERROR)
+            raise typer.Exit(ExitCode.ERROR) from None
     used_names: set[str] = set()
     codes: set[ExitCode] = set()
 
