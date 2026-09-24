@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
-from playwright.async_api import BrowserContext, Page, async_playwright
+from playwright.async_api import BrowserContext, Cookie, Page, async_playwright
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -26,7 +26,9 @@ class TrackerRequest:
 class SessionResult:
     session: str  # pre-consent, post-accept, post-reject
     trackers: list[TrackerRequest] = field(default_factory=list)
-    cookies: list[dict] = field(default_factory=list)
+    # playwright's context.cookies() returns list[Cookie], a TypedDict; the
+    # annotation said list[dict], which is not the same type.
+    cookies: list[Cookie] = field(default_factory=list)
     banner_found: bool = False
     error: str | None = None
     consent_clicked: bool = False  # accept/reject button found and clicked
