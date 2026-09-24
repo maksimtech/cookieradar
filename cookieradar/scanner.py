@@ -5,9 +5,9 @@ Three clean sessions: pre-consent, post-accept, post-reject+reload.
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Optional
 from urllib.parse import urlparse
-from playwright.async_api import async_playwright, Page, BrowserContext
+
+from playwright.async_api import BrowserContext, Page, async_playwright
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -28,7 +28,7 @@ class SessionResult:
     trackers: list[TrackerRequest] = field(default_factory=list)
     cookies: list[dict] = field(default_factory=list)
     banner_found: bool = False
-    error: Optional[str] = None
+    error: str | None = None
     consent_clicked: bool = False  # accept/reject button found and clicked
 
 
@@ -95,7 +95,7 @@ TRACKER_DOMAINS = [
 ]
 
 
-def tracker_domain(url: str) -> Optional[str]:
+def tracker_domain(url: str) -> str | None:
     """
     Registrable domain of a tracker URL, or None if the host is not a tracker.
     TRACKER_DOMAINS entries are registrable domains, so the matching entry is
@@ -180,7 +180,7 @@ async def _run_session(
     context: BrowserContext,
     url: str,
     session_name: str,
-    accept: Optional[bool] = None,
+    accept: bool | None = None,
     timeout_ms: int = DEFAULT_TIMEOUT_MS,
 ) -> SessionResult:
     """
