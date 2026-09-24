@@ -7,6 +7,50 @@ and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
 
+## [2026.09.11] - 2026-09-24
+
+### Fixed
+- **An unverifiable law now says what it costs.** The report warned that an act
+  could not be fetched, and separately printed `SHA256: non disponibile` against
+  each citation, with nothing joining the two — so a missing hash read as a
+  defect in the hashing. It is not: with no verified text there is nothing to
+  hash, and printing one anyway would assert a verification that never happened.
+  The warning now names the consequence, and the three states are pinned by
+  test: `verified` and `cache` both keep the hash, only `unavailable` loses it.
+- **`COOKIERADAR_HOME` is no longer taken literally.** `~/cache` made a
+  directory actually named `~`, which is what anyone writing that in a
+  Dockerfile `ENV` got. A relative value resolved against the working directory,
+  so the cache landed somewhere different depending on where the command ran
+  from and quietly stopped being one cache. And `"   "` is truthy, so whitespace
+  became a directory name.
+- CLI error paths raise `typer.Exit` with `from None`. Each had already printed
+  a readable message, so chaining would only have put a Python traceback in
+  front of a CLI user.
+
+### Changed
+- ruff, mypy, hypothesis and mutmut are development dependencies, with a
+  `Quality` workflow running ruff and mypy on every push and pull request, and a
+  weekly, non-blocking mutation run.
+- **The test suite runs on Windows again.** `tests/test_cli.py` called
+  `os.geteuid()` at import time inside a `skipif` decorator; `geteuid` exists
+  only on POSIX, so on Windows the `AttributeError` aborted collection and pytest
+  stopped the whole session — forty-odd unrelated CLI cases were not running, and
+  22 failures were hiding behind the abort. All 22 are now fixed or skipped with
+  a stated reason.
+- Nine new properties checked against generated input, including the family of
+  URL schemes `normalize_url` must refuse rather than rewrite, and one that pins
+  `normalize_text` as idempotent: its output is hashed, and that hash is what
+  says "the law changed".
+- A contract test refuses any code in this repository that lets the locale
+  choose a text encoding.
+- **Every string the tool writes itself is now in English**, which the
+  CHANGELOGs already were. The report's section is `Provisions applied` rather
+  than `Norme applicate`, and finding titles, scope notes, evidence lines and
+  the release script's messages follow. What the tool *quotes* is unchanged: a
+  provision's text is fetched from the official Italian version of each act and
+  hashed, so translating it would change every SHA-256 in every cache and report
+  "the law changed" for every citation on the next run, for nothing.
+
 ## [2026.09.10] - 2026-09-21
 ### Fixed
 - Docker image: base moved from `python:3.12-slim-bookworm` to
@@ -23,7 +67,7 @@ and this project uses calendar versioning (YYYY.MM.N).
 
 ## [2026.09.9] - 2026-09-19
 ### Added
-- `audit` ends with a "Norme applicate" section, also in the `--output`
+- `audit` ends with a "Provisions applied" section, also in the `--output`
   report: each finding cites the legal provisions it concerns, with the
   SHA-256 of the exact text applied and the date of that wording. The text is
   downloaded on every audit and cached in `~/.cookieradar/law_cache.json`
