@@ -10,15 +10,31 @@ import pytest
 ROOT = Path(__file__).parent.parent
 CURRENT = "2026.09.4"
 
+# release.sh calls python3 and bash. Git Bash on Windows provides bash but not
+# python3, so the script exits 127 before reaching any of the checks these cases
+# assert on — a missing toolchain reported as a failing release script. Skipped
+# with a reason instead: Linux CI, where the release actually runs, is unaffected.
+pytestmark = pytest.mark.skipif(
+    shutil.which("python3") is None,
+    reason="release.sh requires python3 on PATH (absent in Git Bash on Windows)",
+)
+
 
 def _git(cwd, *args, check=True):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=check).stdout.strip()
+    return subprocess.run(
+        ["git", *args], cwd=cwd, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", check=check,
+    ).stdout.strip()
 
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
     gitconfig = tmp_path / "gitconfig"
-    gitconfig.write_text("[user]\n\tname = Test\n\temail = test@example.com\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n")
+    gitconfig.write_text(
+        "[user]\n\tname = Test\n\temail = test@example.com\n"
+        "[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n",
+        encoding="utf-8",
+    )
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(gitconfig))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
 
@@ -27,7 +43,7 @@ def repo(tmp_path, monkeypatch):
     work = tmp_path / "work"
     _git(tmp_path, "clone", "-q", str(remote), str(work))
     (work / "cookieradar").mkdir()
-    (work / "cookieradar" / "__init__.py").write_text(f'__version__ = "{CURRENT}"\n')
+    (work / "cookieradar" / "__init__.py").write_text(f'__version__ = "{CURRENT}"\n', encoding="utf-8")
     shutil.copy(ROOT / "release.sh", work / "release.sh")
     _git(work, "add", ".")
     _git(work, "commit", "-q", "-m", "initial")
@@ -36,7 +52,8 @@ def repo(tmp_path, monkeypatch):
 
 
 def _release(work, *args):
-    return subprocess.run(["bash", "release.sh", *args], cwd=work, capture_output=True, text=True, timeout=60)
+    return subprocess.run(["bash", "release.sh", *args], cwd=work, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=60)
 
 
 def _remote_tags(remote):
@@ -49,7 +66,7 @@ def test_release_bumps_version_and_pushes_commit_and_tag(repo):
     proc = _release(work, "2026.09.5")
 
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert (work / "cookieradar" / "__init__.py").read_text() == '__version__ = "2026.09.5"\n'
+    assert (work / "cookieradar" / "__init__.py").read_text(encoding="utf-8") == '__version__ = "2026.09.5"\n'
     assert _git(remote, "log", "-1", "--format=%s", "main") == "chore: bump version to 2026.09.5"
     assert _remote_tags(remote) == ["v2026.09.5"]
     assert _git(remote, "rev-parse", "v2026.09.5^{commit}") == _git(remote, "rev-parse", "main")
@@ -88,7 +105,7 @@ def test_release_requires_main_branch(repo):
 
 def test_release_requires_clean_tree(repo):
     work, remote = repo
-    (work / "notes.txt").write_text("wip")
+    (work / "notes.txt").write_text("wip", encoding="utf-8")
 
     _assert_refused(_release(work, "2026.09.5"), remote, "Working tree non pulito")
 
@@ -97,7 +114,7 @@ def test_release_refuses_when_behind_origin(repo, tmp_path):
     work, remote = repo
     other = tmp_path / "other"
     _git(tmp_path, "clone", "-q", str(remote), str(other))
-    (other / "x.txt").write_text("x")
+    (other / "x.txt").write_text("x", encoding="utf-8")
     _git(other, "add", ".")
     _git(other, "commit", "-q", "-m", "someone else")
     _git(other, "push", "-q", "origin", "main")
@@ -111,7 +128,7 @@ def test_release_refuses_when_behind_origin(repo, tmp_path):
 
 def test_release_refuses_unpushed_commits(repo):
     work, remote = repo
-    (work / "x.txt").write_text("x")
+    (work / "x.txt").write_text("x", encoding="utf-8")
     _git(work, "add", ".")
     _git(work, "commit", "-q", "-m", "local only")
 

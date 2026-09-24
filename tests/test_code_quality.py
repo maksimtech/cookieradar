@@ -15,7 +15,7 @@ SOURCES = sorted((Path(__file__).parent.parent / "cookieradar").glob("*.py"))
 def test_no_bare_or_base_exception_handlers(path):
     # A bare except (or BaseException) also swallows KeyboardInterrupt and
     # asyncio.CancelledError, so Ctrl-C and task cancellation stop working.
-    for node in ast.walk(ast.parse(path.read_text())):
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if isinstance(node, ast.ExceptHandler):
             where = f"{path.name}:{node.lineno}"
             assert node.type is not None, f"bare except at {where}"
@@ -26,20 +26,20 @@ def test_no_bare_or_base_exception_handlers(path):
 
 @pytest.mark.parametrize("path", SOURCES, ids=lambda p: p.name)
 def test_no_empty_modules(path):
-    assert path.read_text().strip(), f"{path.name} is empty"
+    assert path.read_text(encoding="utf-8").strip(), f"{path.name} is empty"
 
 
 # ─── M5: every runtime dependency is actually used ──────────────────────────
 
 def _runtime_dependencies():
-    pyproject = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text())
+    pyproject = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))
     return [re.split(r"[<>=!~\[ ;]", dep, maxsplit=1)[0] for dep in pyproject["project"]["dependencies"]]
 
 
 def _imported_top_level_modules():
     modules = set()
     for path in SOURCES:
-        for node in ast.walk(ast.parse(path.read_text())):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Import):
                 modules.update(alias.name.split(".")[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:

@@ -2,8 +2,8 @@
 Tests for CI helper scripts in .github/scripts/.
 """
 import os
-import tomllib
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -24,15 +24,15 @@ def fake_pip(tmp_path):
         f'echo "$@" >> "{log}"\n'
         f'n=$(wc -l < "{log}")\n'
         '[ "$n" -ge "$SUCCEED_AT" ]\n'
-    )
+, encoding="utf-8")
     pip.chmod(0o755)
 
     def run(succeed_at, *args):
         env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "SUCCEED_AT": str(succeed_at)}
         proc = subprocess.run(
             ["bash", str(WAIT_FOR_PYPI), *args], env=env, capture_output=True, text=True, timeout=30
-        )
-        calls = log.read_text().splitlines() if log.exists() else []
+, encoding="utf-8", errors="replace")
+        calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
         return proc, calls
 
     return run
@@ -78,7 +78,7 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 
 
 def _workflow(name):
-    wf = yaml.safe_load((WORKFLOWS / name).read_text())
+    wf = yaml.safe_load((WORKFLOWS / name).read_text(encoding="utf-8"))
     wf["on"] = wf.pop(True, wf.get("on"))  # PyYAML parses the `on` key as True
     return wf
 
@@ -151,7 +151,7 @@ def test_no_expressions_interpolated_in_run_scripts(name):
 
 def test_publish_does_not_sign_with_gpg():
     # PyPI dropped PGP signatures in 2023: signing only exposed the private key
-    text = (WORKFLOWS / "publish.yml").read_text()
+    text = (WORKFLOWS / "publish.yml").read_text(encoding="utf-8")
 
     assert "gpg" not in text.lower()
     assert "GPG_" not in text
@@ -215,7 +215,8 @@ def test_trivy_action_pinned_to_commit_sha():
     # trivy-action tags were force-pushed to malware in March 2026
     # (GHSA-69fq-xp46-6x23): pin the commit, keep the tag as a comment
     # so Dependabot can still propose updates.
-    line = next(l for l in (WORKFLOWS / "trivy.yml").read_text().splitlines() if "trivy-action@" in l)
+    rows = (WORKFLOWS / "trivy.yml").read_text(encoding="utf-8").splitlines()
+    line = next(row for row in rows if "trivy-action@" in row)
     ref = line.split("@", 1)[1]
     sha, _, comment = ref.partition("#")
 
@@ -227,7 +228,7 @@ def test_trivy_action_pinned_to_commit_sha():
 
 def test_each_action_uses_one_version_everywhere():
     versions = {}
-    for name, ref in _action_refs():
+    for _name, ref in _action_refs():
         action, _, version = ref.partition("@")
         versions.setdefault(action, set()).add(version)
     mixed = {action: v for action, v in versions.items() if len(v) > 1}
@@ -235,7 +236,7 @@ def test_each_action_uses_one_version_everywhere():
 
 
 def _classifier_pythons():
-    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     prefix = "Programming Language :: Python :: 3."
     return pyproject, sorted(
         (c.rsplit(":: ", 1)[1] for c in pyproject["project"]["classifiers"] if c.startswith(prefix)),
@@ -253,7 +254,7 @@ def test_tests_run_on_every_supported_python():
 
 
 def test_sonar_version_comes_from_the_package():
-    properties = (ROOT / "sonar-project.properties").read_text()
+    properties = (ROOT / "sonar-project.properties").read_text(encoding="utf-8")
     step = next(s for s in _all_steps(_workflow("sonarcloud.yml")) if "sonarqube-scan-action" in s.get("uses", ""))
 
     assert "sonar.projectVersion" not in properties  # was stale (2026.09.1)
@@ -262,7 +263,7 @@ def test_sonar_version_comes_from_the_package():
 
 # ─── M11: Dockerfile hygiene ────────────────────────────────────────────────
 
-DOCKERFILE = (ROOT / "Dockerfile").read_text()
+DOCKERFILE = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
 
 def test_dockerfile_uses_standard_oci_license_label():

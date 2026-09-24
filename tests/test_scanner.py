@@ -25,7 +25,6 @@ from cookieradar.scanner import (
 )
 from tests.conftest import fake_request, make_mock_context
 
-
 # ─── is_tracker ─────────────────────────────────────────────────────────────
 
 def test_is_tracker_known_domain():

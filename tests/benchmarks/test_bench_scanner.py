@@ -1,5 +1,5 @@
 """CookieRadar benchmarks."""
-from cookieradar.scanner import is_tracker, TRACKER_DOMAINS
+from cookieradar.scanner import TRACKER_DOMAINS, is_tracker
 
 
 def test_bench_is_tracker(benchmark):

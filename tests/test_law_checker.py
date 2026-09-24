@@ -1,5 +1,5 @@
 """Tests for mapping CookieRadar findings to GDPR and ePrivacy provisions."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -14,12 +14,17 @@ from cookieradar.law_checker import (
     notes_of,
 )
 from cookieradar.law_fetcher import (
-    CONSUMER_CODE, DIGITAL_CONTENT, EPRIVACY, GDPR, LawFetchError, Provision,
+    CONSUMER_CODE,
+    DIGITAL_CONTENT,
+    EPRIVACY,
+    GDPR,
+    LawFetchError,
+    Provision,
 )
 from cookieradar.scanner import ScanResult, SessionResult, TrackerRequest
 
-DAY1 = datetime(2026, 9, 19, 14, 0, tzinfo=timezone.utc)
-DAY2 = datetime(2026, 10, 1, 9, 30, tzinfo=timezone.utc)
+DAY1 = datetime(2026, 9, 19, 14, 0, tzinfo=UTC)
+DAY2 = datetime(2026, 10, 1, 9, 30, tzinfo=UTC)
 
 
 def _session(name, domains, clicked=True):

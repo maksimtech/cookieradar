@@ -1,6 +1,7 @@
 """
 CLI tests with a mocked scanner (no browser).
 """
+import os
 import subprocess
 import sys
 from unittest.mock import patch
@@ -67,7 +68,7 @@ def test_audit_no_violation_when_post_reject_clean():
 
 def test_batch_reports_tracker_new_after_rejection(tmp_path):
     f = tmp_path / "urls.txt"
-    f.write_text("example.com\n")
+    f.write_text("example.com\n", encoding="utf-8")
 
     def build(r):
         r.post_reject.trackers = [_tracker("c.facebook.com")]
@@ -106,7 +107,7 @@ def test_audit_tracker_url_and_domain_with_markup():
 
 def test_batch_error_message_with_markup_does_not_stop_batch(tmp_path):
     f = tmp_path / "urls.txt"
-    f.write_text("first.example\nsecond.example\n")
+    f.write_text("first.example\nsecond.example\n", encoding="utf-8")
     seen = []
 
     async def scan(url, **kwargs):
@@ -124,7 +125,7 @@ def test_batch_error_message_with_markup_does_not_stop_batch(tmp_path):
 
 def test_batch_url_with_markup(tmp_path):
     f = tmp_path / "urls.txt"
-    f.write_text(f"https://example.com/{MARKUP}\n")
+    f.write_text(f"https://example.com/{MARKUP}\n", encoding="utf-8")
 
     res = _invoke(["batch", str(f)])
 
@@ -158,7 +159,7 @@ def test_audit_scan_failure_exits_cleanly():
 
 def test_batch_shows_session_errors(tmp_path):
     f = tmp_path / "urls.txt"
-    f.write_text("example.com\n")
+    f.write_text("example.com\n", encoding="utf-8")
 
     def build(r):
         r.pre_consent.error = "Timeout 30000ms exceeded."
@@ -199,7 +200,7 @@ def test_audit_accept_not_applied_is_reported():
 
 def test_batch_reject_not_applied_is_unverified(tmp_path):
     f = tmp_path / "urls.txt"
-    f.write_text("example.com\n")
+    f.write_text("example.com\n", encoding="utf-8")
 
     def build(r):
         r.post_reject.trackers = [_tracker("doubleclick.net")]
@@ -280,7 +281,7 @@ def test_audit_rejects_file_url():
 
 def test_batch_skips_invalid_url_and_continues(tmp_path):
     f = tmp_path / "urls.txt"
-    f.write_text("httpbin.org\nfile:///etc/passwd\nexample.com\n")
+    f.write_text("httpbin.org\nfile:///etc/passwd\nexample.com\n", encoding="utf-8")
     seen = []
 
     res = _invoke(["batch", str(f)], scan=_recording_scan(seen))
@@ -294,7 +295,7 @@ def test_batch_skips_invalid_url_and_continues(tmp_path):
 
 def test_batch_ignores_indented_comments_and_blank_lines(tmp_path):
     f = tmp_path / "urls.txt"
-    f.write_text("# header\n  # commento indentato\n\t# tab\n\n   \nexample.com\n")
+    f.write_text("# header\n  # commento indentato\n\t# tab\n\n   \nexample.com\n", encoding="utf-8")
     seen = []
 
     res = _invoke(["batch", str(f)], scan=_recording_scan(seen))
@@ -315,10 +316,14 @@ def _assert_clean_failure(res, *fragments):
 
 
 def test_batch_missing_file(tmp_path):
-    missing = tmp_path / "nope[/b].txt"
+    # "[bold]" is Rich markup, so an unescaped filename loses it from the
+    # message. The closing form "[/b]" would say the same thing, but Path()
+    # reads its "/" as a separator: the name became "nope[\b].txt" on Windows
+    # and the assertion could not match. An opening tag needs no slash.
+    missing = tmp_path / "nope[bold].txt"
     res = _invoke(["batch", str(missing)])
 
-    _assert_clean_failure(res, "Cannot read", "nope[/b].txt")
+    _assert_clean_failure(res, "Cannot read", "nope[bold].txt")
 
 
 def test_batch_directory_instead_of_file(tmp_path):
@@ -327,10 +332,17 @@ def test_batch_directory_instead_of_file(tmp_path):
     _assert_clean_failure(res, "Cannot read")
 
 
-@pytest.mark.skipif(__import__("os").geteuid() == 0, reason="root ignores file permissions")
+# geteuid() exists only on POSIX and this called it at import time, so on
+# Windows the AttributeError took the whole module's collection down with it —
+# 40-odd unrelated CLI cases stopped running. Windows also lets the owner read
+# a file it has just chmod(0)'d, so there is nothing to assert there either.
+_PERMISSIONS_ENFORCED = hasattr(os, "geteuid") and os.geteuid() != 0
+
+
+@pytest.mark.skipif(not _PERMISSIONS_ENFORCED, reason="this OS does not enforce file permissions for the owner")
 def test_batch_unreadable_file(tmp_path):
     f = tmp_path / "urls.txt"
-    f.write_text("example.com\n")
+    f.write_text("example.com\n", encoding="utf-8")
     f.chmod(0)
 
     res = _invoke(["batch", str(f)])
@@ -361,7 +373,11 @@ def test_batch_utf8_bom_is_ignored(tmp_path):
 # ─── M7: single entry point for `python -m cookieradar` ─────────────────────
 
 def test_python_dash_m_entry_point():
-    proc = subprocess.run([sys.executable, "-m", "cookieradar", "--help"], capture_output=True, text=True, timeout=60)
+    proc = subprocess.run(
+        [sys.executable, "-m", "cookieradar", "--help"],
+        capture_output=True, text=True, timeout=60,
+        encoding="utf-8", errors="replace",
+    )
 
     assert proc.returncode == 0, proc.stderr
     assert "audit" in proc.stdout and "batch" in proc.stdout
@@ -442,7 +458,7 @@ def test_lang_option_removed(command):
 
 def test_batch_output_writes_one_report_per_url(tmp_path):
     urls = tmp_path / "urls.txt"
-    urls.write_text("example.com\nhttps://example.com/a/b?x=1\nbroken.example\n")
+    urls.write_text("example.com\nhttps://example.com/a/b?x=1\nbroken.example\n", encoding="utf-8")
     out_dir = tmp_path / "reports"
 
     async def scan(url, **kwargs):
@@ -465,7 +481,7 @@ def test_batch_output_writes_one_report_per_url(tmp_path):
 
 def test_batch_output_names_do_not_collide(tmp_path):
     urls = tmp_path / "urls.txt"
-    urls.write_text("https://example.com/a\nhttp://example.com/a\n")
+    urls.write_text("https://example.com/a\nhttp://example.com/a\n", encoding="utf-8")
     out_dir = tmp_path / "reports"
 
     res = _invoke(["batch", str(urls), "-o", str(out_dir)])
@@ -500,7 +516,11 @@ with patch.object(scanner, "scan", fake), \\
 
 
 def test_audit_flushes_console_before_shutdown():
-    proc = subprocess.run([sys.executable, "-c", _SHUTDOWN_SCRIPT], capture_output=True, text=True, timeout=60)
+    proc = subprocess.run(
+        [sys.executable, "-c", _SHUTDOWN_SCRIPT],
+        capture_output=True, text=True, timeout=60,
+        encoding="utf-8", errors="replace",
+    )
 
     assert proc.returncode == 0, proc.stderr
     assert "sys.meta_path is None" not in proc.stderr
@@ -583,7 +603,7 @@ def test_usage_error_exit_code_is_not_unverified():
 def test_batch_exit_code_reflects_worst_verdict(tmp_path, kinds, code):
     outcomes = {f"site{i}.example": kind for i, kind in enumerate(kinds)}
     f = tmp_path / "urls.txt"
-    f.write_text("\n".join(outcomes) + "\n")
+    f.write_text("\n".join(outcomes) + "\n", encoding="utf-8")
 
     res = _invoke(["batch", str(f)], scan=_scan_by_host(outcomes))
 
