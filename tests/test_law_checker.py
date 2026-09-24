@@ -93,12 +93,12 @@ def test_violation_lists_the_trackers():
     result = scan_result(pre=["google-analytics.com"], rejected=["google-analytics.com", "hotjar.com"])
     assert findings_of(result) == {
         "violation": ["google-analytics.com", "hotjar.com"],
-        "unfair_practice": ["2 tracker attivi nonostante il rifiuto del consenso"],
+        "unfair_practice": ["2 trackers active despite consent being rejected"],
         "post_reject": [
-            "google-analytics.com (già presente prima del consenso)",
-            "hotjar.com (nuovo dopo il rifiuto)",
+            "google-analytics.com (already present before consent)",
+            "hotjar.com (new after rejection)",
         ],
-        "invalid_consent": ["2 tracker attivi nonostante il rifiuto del consenso"],
+        "invalid_consent": ["2 trackers active despite consent being rejected"],
     }
 
 

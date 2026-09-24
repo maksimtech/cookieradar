@@ -82,32 +82,32 @@ def _assert_refused(proc, remote, message):
 
 def test_release_requires_argument(repo):
     work, remote = repo
-    _assert_refused(_release(work), remote, "Uso:")
+    _assert_refused(_release(work), remote, "Usage:")
 
 
 @pytest.mark.parametrize("version", ["2026.9", "v2026.09.5", "2026.09.5-rc1", "latest", "2026.13.1"])
 def test_release_rejects_invalid_version(repo, version):
     work, remote = repo
-    _assert_refused(_release(work, version), remote, "Versione non valida")
+    _assert_refused(_release(work, version), remote, "Invalid version")
 
 
 def test_release_rejects_current_version(repo):
     work, remote = repo
-    _assert_refused(_release(work, CURRENT), remote, "già la versione corrente")
+    _assert_refused(_release(work, CURRENT), remote, "is already the current version")
 
 
 def test_release_requires_main_branch(repo):
     work, remote = repo
     _git(work, "checkout", "-q", "-b", "feature")
 
-    _assert_refused(_release(work, "2026.09.5"), remote, "Non sei su main")
+    _assert_refused(_release(work, "2026.09.5"), remote, "Not on main")
 
 
 def test_release_requires_clean_tree(repo):
     work, remote = repo
     (work / "notes.txt").write_text("wip", encoding="utf-8")
 
-    _assert_refused(_release(work, "2026.09.5"), remote, "Working tree non pulito")
+    _assert_refused(_release(work, "2026.09.5"), remote, "Working tree not clean")
 
 
 def test_release_refuses_when_behind_origin(repo, tmp_path):
@@ -122,7 +122,7 @@ def test_release_refuses_when_behind_origin(repo, tmp_path):
     proc = _release(work, "2026.09.5")
 
     assert proc.returncode != 0
-    assert "non è allineato con origin/main" in proc.stdout + proc.stderr
+    assert "is not aligned with origin/main" in proc.stdout + proc.stderr
     assert _remote_tags(remote) == []
 
 
@@ -132,7 +132,7 @@ def test_release_refuses_unpushed_commits(repo):
     _git(work, "add", ".")
     _git(work, "commit", "-q", "-m", "local only")
 
-    _assert_refused(_release(work, "2026.09.5"), remote, "non è allineato con origin/main")
+    _assert_refused(_release(work, "2026.09.5"), remote, "is not aligned with origin/main")
 
 
 def test_release_refuses_tag_existing_only_on_remote(repo, tmp_path):
@@ -142,5 +142,5 @@ def test_release_refuses_tag_existing_only_on_remote(repo, tmp_path):
     proc = _release(work, "2026.09.5")
 
     assert proc.returncode != 0
-    assert "già esistente" in proc.stdout + proc.stderr
+    assert "already exists" in proc.stdout + proc.stderr
     assert _git(remote, "log", "-1", "--format=%s", "main") == "initial"

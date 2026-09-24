@@ -73,12 +73,12 @@ def test_violation_cites_gdpr_eprivacy_and_article_7(eurlex):
     out = _audit(scan_result(rejected=["doubleclick.net"]))
 
     assert out.exit_code == 1, out.output   # VIOLATION, unchanged
-    assert "Norme applicate" in out.output
-    assert "Norma applicata: GDPR art. 5(1)(a)" in out.output
+    assert "Provisions applied" in out.output
+    assert "Provision applied: GDPR art. 5(1)(a)" in out.output
     assert f"SHA256: {_sha(GDPR_PAGE, ('5',), '5(1)(a)')}" in out.output
-    assert "Norma applicata: ePrivacy dir. 2002/58/CE art. 5(3)" in out.output
+    assert "Provision applied: ePrivacy dir. 2002/58/CE art. 5(3)" in out.output
     assert f"SHA256: {_sha(EPRIVACY_PAGE, ('5',), '5(3)')}" in out.output
-    assert "Norma applicata: GDPR art. 7\n" in out.output
+    assert "Provision applied: GDPR art. 7\n" in out.output
     assert f"SHA256: {_sha(GDPR_PAGE, ('7',), '7')}" in out.output
     assert "testo consolidato al 19.12.2009" in out.output
     # GDPR, ePrivacy, 2019/770 once each; Normattiva one page per article
@@ -88,14 +88,14 @@ def test_violation_cites_gdpr_eprivacy_and_article_7(eurlex):
 def test_violation_is_an_unfair_practice_and_invalid_consent(eurlex):
     out = _audit(scan_result(rejected=["doubleclick.net"]))
 
-    assert "Pratica commerciale scorretta" in out.output
-    assert "Norma applicata: Codice del Consumo D.Lgs. 206/2005 art. 20\n" in out.output
+    assert "Unfair commercial practice" in out.output
+    assert "Provision applied: Codice del Consumo D.Lgs. 206/2005 art. 20\n" in out.output
     assert f"SHA256: {_sha(FIXTURES / 'normattiva_cdc_art20.html', ('20',), '20')}" in out.output
-    assert "Norma applicata: Codice del Consumo D.Lgs. 206/2005 art. 21\n" in out.output
+    assert "Provision applied: Codice del Consumo D.Lgs. 206/2005 art. 21\n" in out.output
     assert f"SHA256: {_sha(FIXTURES / 'normattiva_cdc_art21.html', ('21',), '21')}" in out.output
-    assert "verificato su Normattiva" in out.output
-    assert "Consenso non valido" in out.output
-    assert "Norma applicata: Contenuti digitali dir. 2019/770 art. 3(8)" in out.output
+    assert "verified against Normattiva" in out.output
+    assert "Consent not valid" in out.output
+    assert "Provision applied: Contenuti digitali dir. 2019/770 art. 3(8)" in out.output
     assert f"SHA256: {_sha(DIGITAL_CONTENT_PAGE, ('3',), '3(8)')}" in out.output
 
 
@@ -111,7 +111,7 @@ def test_unverified_prints_note_and_cites_nothing(eurlex):
     out = _audit(scan_result(rejected=["doubleclick.net"], clicked=False))
 
     assert out.exit_code == 2   # UNVERIFIED, unchanged
-    assert "banner dei cookie o pulsante di rifiuto non trovato" in out.output
+    assert "cookie banner or reject button not found" in out.output
     assert "Norma applicata" not in out.output
     assert eurlex == []
 
@@ -132,7 +132,7 @@ def test_offline_without_cache():
     out = _audit(scan_result(rejected=["doubleclick.net"]))
 
     assert out.exit_code == 1
-    assert "SHA256: non disponibile" in out.output
+    assert "SHA256: not available" in out.output
 
 
 def test_law_check_failure_does_not_change_verdict(monkeypatch):

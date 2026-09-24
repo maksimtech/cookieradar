@@ -234,7 +234,7 @@ async def _run_session(
 
         # Reject all
         elif accept is False:
-            # Step 1 — prova rifiuto diretto
+            # Step 1 — try rejecting outright
             rejected = await _click_consent_button(page, REJECT_SELECTORS, REJECT_LABELS)
             if rejected:
                 await page.wait_for_timeout(2000)

@@ -29,18 +29,18 @@ FINDING_ARTICLES = {
 }
 
 FINDING_TITLES = {
-    "violation": "VIOLATION — tracker senza consenso valido",
-    "unfair_practice": "Pratica commerciale scorretta",
-    "post_reject": "Tracker caricati dopo il rifiuto",
-    "invalid_consent": "Consenso non valido (dati personali nel contratto digitale)",
+    "violation": "VIOLATION — trackers without valid consent",
+    "unfair_practice": "Unfair commercial practice",
+    "post_reject": "Trackers loaded after rejection",
+    "invalid_consent": "Consent not valid (personal data in the digital contract)",
 }
 
 # Articles downloaded and cached even when not cited, by act
 ALSO_FETCH: dict = {}
 
 UNVERIFIED_NOTE = (
-    "UNVERIFIED: banner dei cookie o pulsante di rifiuto non trovato, "
-    "quindi nessuna norma è citata per la sessione post-rifiuto"
+    "UNVERIFIED: cookie banner or reject button not found, so no provision is "
+    "cited for the post-reject session"
 )
 
 
@@ -65,9 +65,9 @@ def findings_of(result) -> dict[str, list[str]]:
     if not violations.all:
         return {}
     domains = sorted(violations.all)
-    persistent = [f"{d} (già presente prima del consenso)" for d in sorted(violations.persistent)]
-    new = [f"{d} (nuovo dopo il rifiuto)" for d in sorted(violations.new)]
-    summary = [f"{len(domains)} tracker attivi nonostante il rifiuto del consenso"]
+    persistent = [f"{d} (already present before consent)" for d in sorted(violations.persistent)]
+    new = [f"{d} (new after rejection)" for d in sorted(violations.new)]
+    summary = [f"{len(domains)} trackers active despite consent being rejected"]
     return {
         "violation": domains,
         "unfair_practice": summary,
@@ -200,7 +200,7 @@ def check(
 
 def format_citation(citation: Citation) -> str:
     return (
-        f"Norma applicata: {citation.law} art. {citation.article}\n"
-        f"SHA256: {citation.sha256 or 'non disponibile'}\n"
-        f"Versione del: {citation.version_date or 'non disponibile'}"
+        f"Provision applied: {citation.law} art. {citation.article}\n"
+        f"SHA256: {citation.sha256 or 'not available'}\n"
+        f"Version of: {citation.version_date or 'not available'}"
     )
