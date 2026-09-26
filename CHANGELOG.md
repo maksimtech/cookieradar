@@ -7,6 +7,64 @@ and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
 
+## [2026.40] - 2026-09-26
+### Changed
+
+- **Baseline: the five Radar restart from a common number.** They had drifted to
+  .32, .12, .11, .6 and .3 of the same generation, which left the shared part of
+  the version meaning nothing at all. The highest count in the suite was taken,
+  rounded up for headroom, and every Radar starts again from 2026.40 — a jump
+  for most of them, and a number that means the same thing in all five.
+
+  From here the count belongs to each Radar again, and something urgent gets a
+  third segment on top: 2026.40.1 before 2026.41, the way a suite has always
+  done it. 2026 is a settling year; from 2027 the count moves when the code
+  moves.
+
+
+### Fixed
+
+- **`SessionResult.cookies` is typed `list[Cookie]`, not `list[dict]`.**
+  Playwright's `context.cookies()` returns `Cookie`, a TypedDict, and the
+  annotation named a different type. No behaviour changes — the values were
+  always whatever Playwright returned — but anyone importing `SessionResult` and
+  running a type checker was being told the wrong shape.
+
+  It was invisible locally because mypy ran from an environment without
+  playwright installed, where `ignore_missing_imports` makes its types `Any`, and
+  `Any` satisfies everything. CI, which installs the project, was right.
+
+- **A session that never took place is no longer reported as a clean one.**
+  A site whose reject button is not found never gets a third session, and its
+  empty tracker table said "✅ No trackers detected" — under the heading
+  "Post-reject", three lines below the warning that no rejection had happened.
+  Zero trackers after a refusal that never occurred is not a result. The table
+  now says which of the two it is, and the summary names the sessions that did
+  run: "0 before consent, 6 after accepting", followed by the sentence that it
+  is what the visit established and not a verdict on the site.
+
+- **A banner that accepts and offers no way to refuse is now a finding.**
+  Until now it produced the same ending as a banner nobody could find: one
+  UNVERIFIED line and nothing else. They are not the same. In the first case
+  the mechanism was located and half of it was exercised, and the half that
+  could not be is the one that matters. It cites GDPR art. 4(11), which defines
+  consent as a freely given indication of the data subject's wishes, and
+  ePrivacy art. 5(3), which is what makes consent necessary at all.
+
+  What it does not claim is that no refusal control exists. It reports that
+  none was found, because this tool cannot tell a control that is absent from
+  one its selectors did not recognise, and two tests exist to keep that
+  sentence honest.
+
+- The note that closes an unverified audit used to read "cookie banner or
+  reject button not found" in both situations. It now says which one happened.
+
+### Changed
+
+- Coverage now leaves the job log. `--cov` had been measured on every run and
+  reported only to the console, where nothing can compare it against the previous
+  commit; it goes to Codecov now, once, from one matrix entry.
+
 ## [2026.09.11] - 2026-09-24
 
 ### Fixed
