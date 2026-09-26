@@ -25,6 +25,33 @@ from cookieradar.scanner import (
 )
 from tests.conftest import fake_request, make_mock_context
 
+# ─── the status of the document that was served ─────────────────────────────
+
+
+def test_the_status_of_the_main_document_is_recorded():
+    """`page.goto` returns the response and the scanner used to drop it. On a
+    site behind an edge that answers 403, everything downstream — no trackers,
+    no banner, no cookies — describes an error page."""
+    context, page = make_mock_context()
+    page.goto = AsyncMock(return_value=MagicMock(status=403))
+
+    result = asyncio.run(_run_session(context, "https://example.com", "pre-consent"))
+
+    assert result.status == 403
+
+
+def test_a_navigation_with_no_response_leaves_the_status_unset():
+    """A timeout produces no response object. None is the honest value: the
+    session already carries the error, and inventing a status would give the
+    report a second thing to explain."""
+    context, page = make_mock_context()
+    page.goto = AsyncMock(return_value=None)
+
+    result = asyncio.run(_run_session(context, "https://example.com", "pre-consent"))
+
+    assert result.status is None
+
+
 # ─── is_tracker ─────────────────────────────────────────────────────────────
 
 def test_is_tracker_known_domain():

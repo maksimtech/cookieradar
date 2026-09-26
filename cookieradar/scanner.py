@@ -30,6 +30,10 @@ class SessionResult:
     # annotation said list[dict], which is not the same type.
     cookies: list[Cookie] = field(default_factory=list)
     banner_found: bool = False
+    # The status of the main document. None when the navigation produced no
+    # response at all — a timeout, which the session already reports as an
+    # error — and not to be read as a failure in its own right.
+    status: int | None = None
     error: str | None = None
     consent_clicked: bool = False  # accept/reject button found and clicked
 
@@ -50,6 +54,24 @@ class Violations:
     @property
     def all(self) -> set[str]:
         return self.persistent | self.new
+
+
+def page_not_served(result: ScanResult) -> bool:
+    """The site answered with an error status, so nothing else describes it.
+
+    Measured on canon.it, 2026-09-26: 403 Access Denied from the Akamai edge,
+    364 bytes, identical with and without a browser User-Agent. A headless
+    browser loads that page like any other and finds no trackers, no banner and
+    one cookie — and every one of those is a fact about an error page.
+
+    Reporting it as "0 trackers before consent" is the strongest claim this
+    tool can make, assembled entirely out of never having seen the site.
+
+    A status of None is not a failure: the navigation produced no response,
+    which is a timeout, and the session already carries that as an error.
+    """
+    status = result.pre_consent.status
+    return status is not None and status >= 400
 
 
 def find_violations(result: ScanResult) -> Violations:
@@ -208,7 +230,11 @@ async def _run_session(
 
     try:
         try:
-            await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+            response = await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+            # Kept rather than discarded: everything measured below describes
+            # whatever document came back, and on canon.it that is a 364-byte
+            # Access Denied page from an edge.
+            result.status = response.status if response is not None else None
         except PlaywrightTimeoutError as e:
             _add_error(result, e)
         await page.wait_for_timeout(3000)

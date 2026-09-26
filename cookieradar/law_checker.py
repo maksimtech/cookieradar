@@ -52,6 +52,11 @@ UNVERIFIED_NOTE = (
 
 # The other way a session can go unverified, and the one that is not about this
 # tool's reach: the banner was there and it was used.
+NOT_SERVED_NOTE = (
+    "NOT MEASURED: the site answered with an error status, so no provision is "
+    "cited — there is nothing here to apply one to"
+)
+
 NO_REFUSAL_NOTE = (
     "UNVERIFIED: the banner was found and accepted, and no refusal control was "
     "found on it, so no provision is cited for the post-reject session — the "
@@ -119,6 +124,12 @@ def findings_of(result) -> dict[str, list[str]]:
 
 
 def notes_of(result) -> list[str]:
+    from cookieradar.scanner import page_not_served
+
+    if page_not_served(result):
+        # Before anything else: "no banner was found" is a statement about a
+        # site, and on an error page there is no site to make it about.
+        return [NOT_SERVED_NOTE]
     if _rejected(result):
         return []
     return [NO_REFUSAL_NOTE if refusal_not_offered(result) else UNVERIFIED_NOTE]

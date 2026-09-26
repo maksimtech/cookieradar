@@ -19,7 +19,7 @@ from rich.table import Table
 from rich.text import Text
 from typer.core import TyperGroup
 
-from cookieradar.scanner import Violations, find_violations
+from cookieradar.scanner import Violations, find_violations, page_not_served
 
 
 def enable_utf8_output() -> None:
@@ -235,6 +235,16 @@ NOTHING_ACCEPTED = "nothing was accepted, so nothing was measured after acceptan
 NOTHING_REJECTED = "nothing was rejected, so nothing was measured after rejection"
 
 
+def _not_served(status: int | None) -> str:
+    """What every table says when the site never answered with a page.
+
+    An error page has no trackers, and printing that as a clean result is the
+    same mistake as a tick under a rejection that never happened — one screen
+    higher and for all three sessions at once.
+    """
+    return f"the site answered HTTP {status}: this is an error page, not the site"
+
+
 def _unique_domains(session) -> set[str]:
     return {t.domain for t in session.trackers}
 
@@ -270,6 +280,10 @@ def _print_violations(out: Console, violations: Violations, indent: str):
 
 
 def _verdict(result) -> ExitCode:
+    if page_not_served(result):
+        # Not UNVERIFIED: that means the site was seen and the refusal could
+        # not be exercised. Here the site was never seen.
+        return ExitCode.ERROR
     if not result.post_reject.consent_clicked:
         return ExitCode.UNVERIFIED
     return ExitCode.VIOLATION if find_violations(result).all else ExitCode.OK
@@ -283,14 +297,18 @@ def _render_report(out: Console, url: str, result, law=None):
     # Pre-consent
     pre = result.pre_consent
     out.print(f"[bold red]🔴 Session 1 — Pre-consent ({len(_unique_domains(pre))} unique trackers)[/bold red]")
-    _print_session(out, "Pre-consent trackers", pre)
+    _print_session(
+        out, "Pre-consent trackers", pre,
+        _not_served(pre.status) if page_not_served(result) else None,
+    )
 
     # Post-accept
     post_acc = result.post_accept
     _print_consent_header(out, "🟡 Session 2 — Post-accept", "yellow", post_acc, ACCEPT_NOT_APPLIED)
     _print_session(
         out, "Post-accept trackers", post_acc,
-        None if post_acc.consent_clicked else NOTHING_ACCEPTED,
+        _not_served(post_acc.status) if page_not_served(result)
+        else None if post_acc.consent_clicked else NOTHING_ACCEPTED,
     )
 
     # Post-reject
@@ -298,14 +316,25 @@ def _render_report(out: Console, url: str, result, law=None):
     _print_consent_header(out, "🟢 Session 3 — Post-reject", "green", post_rej, REJECT_NOT_APPLIED)
     _print_session(
         out, "Post-reject trackers", post_rej,
-        None if post_rej.consent_clicked else NOTHING_REJECTED,
+        _not_served(post_rej.status) if page_not_served(result)
+        else None if post_rej.consent_clicked else NOTHING_REJECTED,
     )
 
     # Summary
     violations = find_violations(result)
     verdict = _verdict(result)
 
-    if verdict is ExitCode.UNVERIFIED:
+    if page_not_served(result):
+        status = result.pre_consent.status
+        out.print(
+            f"[bold red]⛔ NOT MEASURED — the site answered HTTP {status}, so "
+            f"nothing above describes it[/bold red]"
+        )
+        out.print(
+            "[red]   No trackers, no banner and no cookies on an error page are "
+            "facts about the error page. This audit did not happen.[/red]"
+        )
+    elif verdict is ExitCode.UNVERIFIED:
         out.print(
             "[bold yellow]⚠️  UNVERIFIED — no refusal could be applied, so nothing "
             "was tested after one[/bold yellow]"

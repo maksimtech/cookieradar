@@ -219,6 +219,101 @@ def test_a_banner_never_found_does_not_get_the_refusal_finding():
     assert "no refusal control was found" not in res.output.lower()
 
 
+def test_on_an_error_page_no_session_shows_a_clean_table():
+    """All three describe the same 364-byte error page, so none of them gets a
+    tick. The summary saying NOT MEASURED while the tables say "No trackers
+    detected" is the contradiction this closes."""
+    def build(r):
+        for session in (r.pre_consent, r.post_accept, r.post_reject):
+            session.status = 403
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert "No trackers detected" not in res.output
+    assert res.output.lower().count("error page") >= 2
+
+
+def test_on_an_error_page_no_provision_is_cited_and_the_reason_is_the_page():
+    """Not "no banner was found": that is a claim about a site nobody saw."""
+    def build(r):
+        for session in (r.pre_consent, r.post_accept, r.post_reject):
+            session.status = 403
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert "no cookie banner was found" not in res.output
+    assert "NOT MEASURED" in res.output
+
+def test_a_page_that_was_never_served_is_not_a_measurement():
+    """Measured on canon.it, 2026-09-26: 403 Access Denied from the Akamai
+    edge, 364 bytes, the same with and without a browser User-Agent. What the
+    headless browser loaded was an error page, and the report said
+    "Trackers measured: 0 before consent" — a number for a visit that did not
+    happen.
+
+    An error page has no trackers and no banner, and saying so as a finding is
+    the strongest possible claim built out of never having looked.
+    """
+    def build(r):
+        r.pre_consent.status = 403
+        r.post_accept.status = 403
+        r.post_reject.status = 403
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert "403" in res.output
+    assert "0 before consent" not in res.output
+    assert "not measured" in res.output.lower() or "could not" in res.output.lower()
+
+
+def test_a_page_that_was_never_served_exits_as_an_error():
+    """Not UNVERIFIED: that means the site was seen and the refusal could not
+    be exercised. Here nothing was seen at all, and a gate treating 2 as
+    "inconclusive but fine" would wave through a site nobody audited."""
+    def build(r):
+        r.pre_consent.status = 403
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 3, res.output
+
+
+def test_a_served_page_still_reports_its_numbers():
+    """The guard against over-correcting. A site that answers 200 and loads
+    nothing before consent has been measured, and that is worth saying."""
+    def build(r):
+        r.pre_consent.status = 200
+        r.post_accept.status = 200
+        r.post_accept.trackers = [_tracker("a.example"), _tracker("b.example")]
+        r.post_reject.status = 200
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert "0 before consent" in res.output
+    assert "2 after accepting" in res.output
+
+
+def test_a_status_nobody_recorded_is_not_read_as_a_failure():
+    """`status` is None when the navigation never produced a response object —
+    a timeout, say, which the session already reports as an error. Treating
+    the absence of a number as an error status would turn one failure into
+    two."""
+    def build(r):
+        r.pre_consent.status = None
+        r.post_accept.trackers = [_tracker("a.example")]
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 2, res.output
+    assert "0 before consent" in res.output
+
+
 def test_a_session_that_never_happened_is_not_shown_as_clean():
     """Measured on kyoceradocumentsolutions.it, 2026-09-26.
 
