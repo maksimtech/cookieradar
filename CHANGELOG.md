@@ -7,6 +7,30 @@ and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
 
+## [2026.40.1] - 2026-09-26
+
+### Fixed
+
+- **A page that was never served is no longer reported as a measurement.**
+  canon.it answers 403 Access Denied from the Akamai edge — 364 bytes,
+  identical with and without a browser User-Agent. The headless browser loads
+  that like any other document, finds no trackers, no banner and one cookie,
+  and the report said "Trackers measured: 0 before consent": the strongest
+  claim this tool can make, assembled out of never having seen the site.
+
+  `page.goto` returns the response and the scanner was discarding it. The
+  status is kept now, and a pre-consent document that came back 4xx or 5xx
+  means the audit did not happen. The verdict is ERROR rather than UNVERIFIED —
+  UNVERIFIED means the site was seen and the refusal could not be exercised,
+  and a gate treating it as "inconclusive but fine" would wave through
+  something nobody audited. All three session tables say so instead of showing
+  a clean result, and no provision is cited, because "no cookie banner was
+  found" is a statement about a site and there is no site here to make it
+  about.
+
+  A status of None is left alone: the navigation produced no response at all,
+  which is a timeout the session already reports as its own error.
+
 ## [2026.40] - 2026-09-26
 ### Changed
 
