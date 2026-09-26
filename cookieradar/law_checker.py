@@ -26,6 +26,12 @@ FINDING_ARTICLES = {
     "unfair_practice": ((CONSUMER_CODE, "20"), (CONSUMER_CODE, "21")),
     "post_reject": ((GDPR, "7"),),
     "invalid_consent": ((DIGITAL_CONTENT, "3(8)"),),
+    # Different evidence from the four above: not what the trackers did, but
+    # what the banner offered. Art. 4(11) defines consent as a freely given
+    # indication of the data subject's wishes, and a choice with one button is
+    # the case that definition exists to exclude; art. 5(3) is what makes
+    # consent necessary here in the first place.
+    "no_refusal": ((GDPR, "4(11)"), (EPRIVACY, "5(3)")),
 }
 
 FINDING_TITLES = {
@@ -33,19 +39,47 @@ FINDING_TITLES = {
     "unfair_practice": "Unfair commercial practice",
     "post_reject": "Trackers loaded after rejection",
     "invalid_consent": "Consent not valid (personal data in the digital contract)",
+    "no_refusal": "Accept was applied and no refusal control was found",
 }
 
 # Articles downloaded and cached even when not cited, by act
 ALSO_FETCH: dict = {}
 
 UNVERIFIED_NOTE = (
-    "UNVERIFIED: cookie banner or reject button not found, so no provision is "
-    "cited for the post-reject session"
+    "UNVERIFIED: no cookie banner was found, so no provision is cited for the "
+    "post-reject session"
+)
+
+# The other way a session can go unverified, and the one that is not about this
+# tool's reach: the banner was there and it was used.
+NO_REFUSAL_NOTE = (
+    "UNVERIFIED: the banner was found and accepted, and no refusal control was "
+    "found on it, so no provision is cited for the post-reject session — the "
+    "banner is cited instead"
 )
 
 
 def _rejected(result) -> bool:
     return bool(result.post_reject.consent_clicked)
+
+
+def refusal_not_offered(result) -> bool:
+    """Acceptance was exercised, refusal could not be.
+
+    Both halves are required. Without the accept half this is the audit failing
+    to locate the banner at all, which is a limitation of the audit and says
+    nothing about the site — and the two must not collapse into one outcome,
+    because only one of them is evidence.
+
+    What this cannot establish is that no refusal control exists: it reports
+    that none was found, which is a different sentence and the only one the
+    evidence supports.
+    """
+    return bool(
+        result.post_accept.banner_found
+        and result.post_accept.consent_clicked
+        and not result.post_reject.consent_clicked
+    )
 
 
 def findings_of(result) -> dict[str, list[str]]:
@@ -60,6 +94,14 @@ def findings_of(result) -> dict[str, list[str]]:
     from cookieradar.scanner import find_violations
 
     if not _rejected(result):
+        if refusal_not_offered(result):
+            accepted = len({t.domain for t in result.post_accept.trackers})
+            return {
+                "no_refusal": [
+                    "accept was applied and no refusal control was found on the banner",
+                    f"{accepted} trackers loaded after accepting",
+                ]
+            }
         return {}
     violations = find_violations(result)
     if not violations.all:
@@ -77,7 +119,9 @@ def findings_of(result) -> dict[str, list[str]]:
 
 
 def notes_of(result) -> list[str]:
-    return [] if _rejected(result) else [UNVERIFIED_NOTE]
+    if _rejected(result):
+        return []
+    return [NO_REFUSAL_NOTE if refusal_not_offered(result) else UNVERIFIED_NOTE]
 
 
 # ─── Citations ────────────────────────────────────────────────────────────────

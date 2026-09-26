@@ -187,6 +187,125 @@ def test_audit_reject_not_applied_gives_no_verdict():
     assert "reject button not found" in res.output
 
 
+def test_the_report_weighs_a_banner_that_only_accepts():
+    """The asymmetry has to reach the summary, not sit three screens up.
+
+    Before this, a site whose banner accepted and could not refuse produced the
+    same closing lines as a site whose banner was never found: UNVERIFIED and
+    nothing else. The two deserve different endings.
+    """
+    def build(r):
+        for s in (r.pre_consent, r.post_accept, r.post_reject):
+            s.banner_found = True
+        r.post_accept.consent_clicked = True
+        r.post_accept.trackers = [_tracker("adobedtm.com"), _tracker("demdex.net")]
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert "accept" in res.output.lower()
+    assert "no refusal control was found" in res.output.lower()
+
+
+def test_a_banner_never_found_does_not_get_the_refusal_finding():
+    def build(r):
+        for s in (r.pre_consent, r.post_accept, r.post_reject):
+            s.banner_found = False
+        r.post_accept.consent_clicked = False
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert "no refusal control was found" not in res.output.lower()
+
+
+def test_a_session_that_never_happened_is_not_shown_as_clean():
+    """Measured on kyoceradocumentsolutions.it, 2026-09-26.
+
+    The banner was found and accept worked, but there was no reject button, so
+    the third session never took place. It was printed as
+    "Session 3 — Post-reject NOT APPLIED (0 unique trackers)" with a table
+    saying "✅ No trackers detected" — a green tick for a rejection that never
+    happened, three lines under a warning that it never happened.
+
+    The page was loaded, so something was measured; what was not measured is
+    the thing the session is named after.
+    """
+    def build(r):
+        r.pre_consent.trackers = [_tracker("a.example")]
+        r.post_accept.trackers = [_tracker("b.example")]
+        r.post_reject.consent_clicked = False
+        r.post_reject.trackers = []
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 2, res.output
+    assert "No trackers detected" not in res.output, (
+        "the only empty session is the one that never ran"
+    )
+    assert "nothing was rejected" in res.output.lower()
+
+
+def test_a_session_that_did_happen_and_found_nothing_still_says_so():
+    """The correction must not swallow a real result. A rejection that was
+    applied and left nothing behind is the outcome this tool exists to
+    confirm."""
+    def build(r):
+        r.pre_consent.trackers = [_tracker("a.example")]
+        r.post_reject.consent_clicked = True
+        r.post_reject.trackers = []
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 0, res.output
+    assert "No trackers detected" in res.output
+
+
+def test_an_accept_that_never_happened_gets_the_same_treatment():
+    def build(r):
+        r.pre_consent.trackers = [_tracker("a.example")]
+        r.post_accept.consent_clicked = False
+        r.post_accept.trackers = []
+        r.post_reject.trackers = [_tracker("c.example")]
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert "nothing was accepted" in res.output.lower()
+
+
+def test_the_unverified_summary_says_what_was_measured():
+    """"Could not reject" is half the report. The other half is what the visit
+    did establish, and on the site that prompted this it was the better half:
+    nothing loaded before consent. A reader who sees only UNVERIFIED either
+    scrolls back for it or leaves with nothing.
+    """
+    def build(r):
+        r.pre_consent.trackers = []
+        r.post_accept.trackers = [_tracker("a.example"), _tracker("b.example")]
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 2, res.output
+    assert "UNVERIFIED" in res.output
+    assert "0 before consent" in res.output
+    assert "2 after accepting" in res.output
+
+
+def test_the_unverified_summary_is_not_a_clean_bill_of_health():
+    """It says what was measured, and it must not let that read as a verdict:
+    a site with no trackers before consent and an untested refusal is not a
+    compliant site, it is a site that was half measured."""
+    def build(r):
+        r.pre_consent.trackers = []
+        r.post_reject.consent_clicked = False
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert "compliant" not in res.output.lower()
+    assert "not a verdict" in res.output.lower()
+
+
 def test_audit_accept_not_applied_is_reported():
     def build(r):
         r.post_accept.consent_clicked = False

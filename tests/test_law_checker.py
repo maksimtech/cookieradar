@@ -80,6 +80,9 @@ def test_mapping():
         "unfair_practice": ((CONSUMER_CODE, "20"), (CONSUMER_CODE, "21")),
         "post_reject": ((GDPR, "7"),),
         "invalid_consent": ((DIGITAL_CONTENT, "3(8)"),),
+        # Evidence about the banner, not about the trackers: art. 4(11) is the
+        # definition of consent as freely given, art. 5(3) is what requires it.
+        "no_refusal": ((GDPR, "4(11)"), (EPRIVACY, "5(3)")),
     }
     assert set(FINDING_TITLES) == set(FINDING_ARTICLES)
 
@@ -100,6 +103,71 @@ def test_violation_lists_the_trackers():
         ],
         "invalid_consent": ["2 trackers active despite consent being rejected"],
     }
+
+
+def _accept_only(trackers=("adobedtm.com", "demdex.net")):
+    """The banner was found, accept was applied, no refusal control was found.
+
+    Modelled on kyoceradocumentsolutions.it as measured on 2026-09-26.
+    """
+    result = ScanResult(
+        url="https://example.com",
+        pre_consent=_session("pre-consent", (), clicked=False),
+        post_accept=_session("post-accept", trackers, clicked=True),
+        post_reject=_session("post-reject", (), clicked=False),
+    )
+    for session in (result.pre_consent, result.post_accept, result.post_reject):
+        session.banner_found = True
+    return result
+
+
+def test_a_banner_that_accepts_and_cannot_refuse_is_a_finding():
+    """Not a limitation of the audit: an observation about the mechanism.
+
+    Acceptance was exercised and worked. Refusal could not be exercised because
+    no control for it was found. That asymmetry is the evidence, and it is
+    evidence about the consent mechanism rather than about the trackers.
+    """
+    found = findings_of(_accept_only())
+
+    assert "no_refusal" in found
+    assert any("accept" in line.lower() for line in found["no_refusal"])
+    assert any("refus" in line.lower() for line in found["no_refusal"])
+
+
+def test_the_finding_says_what_was_observed_and_not_what_the_site_offers():
+    """The audit cannot tell "there is no reject button" from "this tool did
+    not find one". Anything that claims the former is a verdict the evidence
+    does not support."""
+    lines = " ".join(findings_of(_accept_only())["no_refusal"]).lower()
+
+    assert "not found" in lines or "no refusal control was found" in lines
+    assert "does not offer" not in lines
+    assert "no reject button exists" not in lines
+
+
+def test_no_banner_at_all_stays_a_limitation_of_the_audit():
+    """Neither button was reached, so the mechanism was never located. That is
+    this tool admitting what it could not do, and it must not turn into a
+    statement about the site."""
+    result = scan_result(pre=["doubleclick.net"], rejected=["doubleclick.net"], clicked=False)
+
+    assert findings_of(result) == {}
+
+
+def test_a_site_where_both_buttons_worked_has_no_refusal_finding():
+    assert "no_refusal" not in findings_of(scan_result(pre=["a.com"], rejected=[]))
+
+
+def test_the_note_says_which_of_the_two_situations_happened():
+    """One sentence covering both described neither, and described the wrong
+    one out loud as soon as the banner-only case started carrying citations."""
+    accepted_only = " ".join(notes_of(_accept_only())).lower()
+    assert "the banner was found and accepted" in accepted_only
+    assert "no refusal control was found" in accepted_only
+
+    no_banner = " ".join(notes_of(scan_result(clicked=False))).lower()
+    assert "no cookie banner was found" in no_banner
 
 
 def test_unverified_cites_nothing_and_notes_why():

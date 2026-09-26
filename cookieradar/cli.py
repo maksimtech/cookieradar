@@ -163,8 +163,14 @@ def _read_urls(path: str) -> list[str]:
     return [line for line in lines if line and not line.startswith("#")]
 
 
-def _print_session(out: Console, title: str, session):
-    """Print session results."""
+def _print_session(out: Console, title: str, session, unmeasured: str | None = None):
+    """Print session results.
+
+    `unmeasured` is the reason this session never took place. It exists because
+    an empty table is not one result: "the page loaded nothing" and "the thing
+    this session is named after never happened" are different answers, and only
+    the first deserves a tick.
+    """
     table = Table(
         title=title,
         box=box.ROUNDED,
@@ -182,7 +188,10 @@ def _print_session(out: Console, title: str, session):
             table.add_row(Text(t.domain), Text(t.url[:60]), Text(t.resource_type))
 
     if not session.trackers:
-        table.add_row("[green]✅ No trackers detected[/green]", "", "")
+        if unmeasured:
+            table.add_row(f"[yellow]⚠️  {unmeasured}[/yellow]", "", "")
+        else:
+            table.add_row("[green]✅ No trackers detected[/green]", "", "")
 
     out.print(table)
     out.print(f"[dim]Banner found: {'✅' if session.banner_found else '❌'}[/dim]")
@@ -219,9 +228,30 @@ def _session_errors(result) -> list:
 ACCEPT_NOT_APPLIED = "accept button not found: this session shows the page without consent"
 REJECT_NOT_APPLIED = "reject button not found: this session is equivalent to pre-consent"
 
+# What an empty table means when the consent step never ran. The page was still
+# loaded, so something was measured — just not the thing the session is named
+# after, which is the only thing a reader is looking at that table for.
+NOTHING_ACCEPTED = "nothing was accepted, so nothing was measured after acceptance"
+NOTHING_REJECTED = "nothing was rejected, so nothing was measured after rejection"
+
 
 def _unique_domains(session) -> set[str]:
     return {t.domain for t in session.trackers}
+
+
+def _what_was_measured(result) -> str:
+    """The sessions that did happen, in the order they happened.
+
+    Only those: naming a session that never ran would put a number next to it,
+    and a number next to a session that did not take place is the thing this
+    whole report is careful not to print.
+    """
+    parts = [f"{len(_unique_domains(result.pre_consent))} before consent"]
+    if result.post_accept.consent_clicked:
+        parts.append(f"{len(_unique_domains(result.post_accept))} after accepting")
+    if result.post_reject.consent_clicked:
+        parts.append(f"{len(_unique_domains(result.post_reject))} after rejecting")
+    return ", ".join(parts)
 
 
 def _print_consent_header(out: Console, label: str, style: str, session, not_applied: str):
@@ -258,12 +288,18 @@ def _render_report(out: Console, url: str, result, law=None):
     # Post-accept
     post_acc = result.post_accept
     _print_consent_header(out, "🟡 Session 2 — Post-accept", "yellow", post_acc, ACCEPT_NOT_APPLIED)
-    _print_session(out, "Post-accept trackers", post_acc)
+    _print_session(
+        out, "Post-accept trackers", post_acc,
+        None if post_acc.consent_clicked else NOTHING_ACCEPTED,
+    )
 
     # Post-reject
     post_rej = result.post_reject
     _print_consent_header(out, "🟢 Session 3 — Post-reject", "green", post_rej, REJECT_NOT_APPLIED)
-    _print_session(out, "Post-reject trackers", post_rej)
+    _print_session(
+        out, "Post-reject trackers", post_rej,
+        None if post_rej.consent_clicked else NOTHING_REJECTED,
+    )
 
     # Summary
     violations = find_violations(result)
@@ -271,9 +307,34 @@ def _render_report(out: Console, url: str, result, law=None):
 
     if verdict is ExitCode.UNVERIFIED:
         out.print(
-            "[bold yellow]⚠️  UNVERIFIED — could not reject cookies, "
-            "no verdict on post-reject trackers[/bold yellow]"
+            "[bold yellow]⚠️  UNVERIFIED — no refusal could be applied, so nothing "
+            "was tested after one[/bold yellow]"
         )
+        # Half the report is what could not be concluded. The other half is what
+        # the visit did establish, and on the site that prompted this it was the
+        # better half — nothing loaded before consent. Left to be inferred by
+        # scrolling back, it reads either as nothing or, worse, as a pass.
+        out.print(f"[yellow]   Trackers measured: {_what_was_measured(result)}.[/yellow]")
+        out.print(
+            "[yellow]   That is what this visit established, not a verdict on the "
+            "site.[/yellow]"
+        )
+        from cookieradar.law_checker import refusal_not_offered
+
+        if refusal_not_offered(result):
+            # The banner was found and half of it worked. That is not the same
+            # report as a banner nobody could locate, and it used to end in the
+            # same two lines.
+            out.print(
+                "[bold red]   Accept was applied and no refusal control was found "
+                "on the banner.[/bold red]"
+            )
+            out.print(
+                "[red]   Refusing has to be offered for consent to be consent. "
+                "Whether the control is absent or merely unfound, this audit "
+                "cannot say — only that acceptance was reachable and refusal was "
+                "not.[/red]"
+            )
     elif verdict is ExitCode.VIOLATION:
         out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after rejection:[/bold red]")
         _print_violations(out, violations, "  ")
