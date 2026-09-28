@@ -205,15 +205,15 @@ def _print_session(out: Console, title: str, session, unmeasured: str | None = N
 
 
 def _load_trackers(path):
-    """Carica un trackerdb da `path`, o None se non ne e' stato chiesto uno.
+    """Load a trackerdb from `path`, or None when none was asked for.
 
-    Un percorso sbagliato solleva invece di procedere senza arricchimento: chi
-    ha scritto --trackers si aspetta un report piu' ricco, e uno impoverito in
-    silenzio e' indistinguibile da uno completo.
+    A bad path raises instead of carrying on without the enrichment: whoever
+    typed --trackers expects a richer report, and one quietly impoverished is
+    indistinguishable from a complete one.
 
-    CookieRadar non distribuisce dati di Ghostery: ghostery/trackerdb e'
-    CC-BY-NC-SA-4.0, incompatibile con MIT, e il percorso punta a una copia che
-    l'utente si e' procurato.
+    CookieRadar does not distribute Ghostery's data: ghostery/trackerdb is
+    CC-BY-NC-SA-4.0, incompatible with MIT, and the path points at a copy the
+    operator obtained themselves.
     """
     if path is None:
         return None
@@ -223,42 +223,44 @@ def _load_trackers(path):
 
 
 def _print_external(out: Console, session) -> None:
-    """Su quanti host esterni sono stati scelti i conteggi, e quanti sono sfuggiti.
+    """Out of how many external hosts the counts were chosen, and how many got away.
 
-    Senza questa riga "9 tracker" non ha denominatore: un host non riconosciuto
-    spariva esattamente come uno mai contattato. Il conteggio vale anche senza
-    un trackerdb - con i soli 34 domini interni - perche' la distinzione non
-    nasce da un elenco piu' lungo ma dal decidere di misurarla.
+    Without this line "9 trackers" has no denominator: an unrecognised host
+    disappeared exactly like one never contacted. The count holds without a
+    trackerdb too — with the 34 built-in domains alone — because the distinction
+    does not come from a longer list but from deciding to measure it.
     """
     from cookieradar.scanner import summarise_external
 
     summary = summarise_external(session)
     if summary.hosts == 0:
-        # Zero host esterni non merita una riga: il resto del report lo dice.
+        # Zero external hosts does not deserve a line: the rest of the report
+        # says so already.
         return
 
     unknown = len(summary.unknown)
-    # L'unita' e' l'host, e va detta: la riga sopra conta i *domini* della lista
-    # interna, e su tim.it sono 5 domini contro 10 host. Due misure diverse
-    # dello stesso fatto, che senza il sostantivo si leggono come un errore.
+    # The unit is the host, and it has to be named: the line above counts the
+    # *domains* of the built-in list, and on tim.it that is 5 domains against 10
+    # hosts. Two different measurements of the same fact, which without the noun
+    # read as an error.
     out.print(
-        f"[dim]Host esterni contattati: {summary.hosts} — "
-        f"riconosciuti {summary.identified}, sconosciuti {unknown}[/dim]"
+        f"[dim]External hosts contacted: {summary.hosts} — "
+        f"recognised {summary.identified}, unknown {unknown}[/dim]"
     )
     if summary.categories:
         parts = ", ".join(f"{escape(c)} {n}" for c, n in
                           sorted(summary.categories.items(), key=lambda kv: -kv[1]))
-        out.print(f"[dim]  finalita': {parts}[/dim]")
+        out.print(f"[dim]  purposes: {parts}[/dim]")
     if summary.organizations:
         parts = ", ".join(f"{escape(o)} {n}" for o, n in
                           sorted(summary.organizations.items(), key=lambda kv: -kv[1])[:6])
-        out.print(f"[dim]  aziende: {parts}[/dim]")
+        out.print(f"[dim]  companies: {parts}[/dim]")
     if summary.unknown:
-        # Troncato, ma il totale resta: nascondere quanti sono nasconderebbe
-        # proprio la misura per cui questa riga esiste.
+        # Truncated, but the total stays: hiding how many there are would hide
+        # the very measurement this line exists for.
         shown = ", ".join(escape(h) for h in summary.unknown[:8])
-        more = f" e altri {unknown - 8}" if unknown > 8 else ""
-        out.print(f"[dim]  sconosciuti ({unknown}): {shown}{more}[/dim]")
+        more = f" and {unknown - 8} more" if unknown > 8 else ""
+        out.print(f"[dim]  unknown ({unknown}): {shown}{more}[/dim]")
 
 
 def _cookie_expiry(cookie: dict) -> str:

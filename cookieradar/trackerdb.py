@@ -1,50 +1,51 @@
-"""Legge una copia di `ghostery/trackerdb` che l'utente si e' procurato.
+"""Reads a copy of `ghostery/trackerdb` the operator obtained themselves.
 
-**Questo modulo e' un lettore, non dei dati.** Il codice e' nostro e viaggia
-sotto MIT come il resto di CookieRadar; `ghostery/trackerdb` e' CC-BY-NC-SA-4.0,
-che vieta l'uso commerciale e obbliga ogni derivato a portarsi dietro lo stesso
-divieto. Impacchettarlo dentro un pacchetto MIT metterebbe fuori regola
-chiunque usi CookieRadar al lavoro, senza che se ne accorga - l'etichetta
-direbbe una cosa e il contenuto un'altra.
+**This module is a reader, not the data.** The code is ours and ships under MIT
+like the rest of CookieRadar; `ghostery/trackerdb` is CC-BY-NC-SA-4.0, which
+forbids commercial use and binds every derivative to carry the same prohibition.
+Packing it inside an MIT package would put anyone using CookieRadar at work out
+of compliance without their noticing — the label would say one thing and the
+contents another.
 
-Quindi CookieRadar non distribuisce nessun dato di Ghostery. Chi vuole
-quell'arricchimento clona il repository e indica il percorso; la clausola non
-commerciale vincola il suo uso, ed e' una sua decisione informata.
+So CookieRadar distributes none of Ghostery's data. Whoever wants that enrichment
+clones the repository and passes the path; the non-commercial clause binds their
+use, and that is their own informed decision.
 
-Il formato, letto dai file veri il 27/09/2026:
+The format, read off the real files on 2026-09-27:
 
-    name: Google Analytics          coppie chiave: valore
+    name: Google Analytics          key: value pairs
     category: site_analytics
     organization: google
 
-    --- domains                     blocchi delimitati da una riga --- nome,
-    google-analytics.com            chiusi da una riga identica
+    --- domains                     blocks delimited by a --- name line,
+    google-analytics.com            closed by an identical line
     --- domains
 
-Le forme che ricorrono davvero, contate su 3535 pattern e 2608 organizzazioni:
-3535 hanno name/category/website_url, 3098 una organization (437 no), 3458 un
-blocco domains (77 no), e 2567 valori sono dichiarati e lasciati in bianco.
+The shapes that actually recur, counted across 3,535 patterns and 2,608
+organizations: 3,535 have name/category/website_url, 3,098 an organization (437
+do not), 3,458 a domains block (77 do not), and 2,567 values are declared and
+left blank.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
-# Il blocco `filters` non viene letto. E' sintassi da ad blocker
-# (`||mmtro.com^$3p`), cioe' un secondo linguaggio dentro lo stesso file, e
-# CookieRadar deve riconoscere chi e' stato contattato, non bloccarlo. I 77
-# pattern che identificano solo per filtro restano caricati e non combaciano
-# mai: e' un limite della nostra copertura, ed e' contato invece che nascosto.
+# The `filters` block is not read. It is ad blocker syntax (`||mmtro.com^$3p`),
+# a second language inside the same file, and CookieRadar has to recognise who was
+# contacted rather than block them. The 77 patterns that identify only by filter
+# stay loaded and never match: a limit of our coverage, counted rather than
+# hidden.
 _BLOCK_PREFIX = "--- "
 
 
 def parse_eno(text: str) -> dict[str, str | list[str]]:
-    """Il documento come dizionario: valori per le chiavi, liste per i blocchi.
+    """The document as a dictionary: values for keys, lists for blocks.
 
-    Una chiave dichiarata e lasciata in bianco NON finisce nel risultato: nei
-    file veri succede 2567 volte, e restituire "" renderebbe "non compilato"
-    indistinguibile da "compilato con niente". Un blocco vuoto invece resta,
-    come lista vuota: il blocco c'e' e dice che non c'e' nulla dentro.
+    A key declared and left blank does NOT reach the result: in the real files
+    that happens 2,567 times, and returning "" would make "not filled in"
+    indistinguishable from "filled in with nothing". An empty block does stay, as
+    an empty list: the block is there and says there is nothing inside it.
     """
     doc: dict[str, str | list[str]] = {}
     block: str | None = None
@@ -65,14 +66,14 @@ def parse_eno(text: str) -> dict[str, str | list[str]]:
                 lines.append(line.strip())
             continue
         if ":" in line:
-            # Solo sul primo due punti: gli URL ne contengono uno.
+            # On the first colon only: the URLs contain one.
             key, _, value = line.partition(":")
             key, value = key.strip(), value.strip()
             if key and value:
                 doc[key] = value
 
-    # Un blocco aperto e mai chiuso: si tiene quello che si e' letto, perche'
-    # scartarlo perderebbe dati veri per un errore di battitura altrui.
+    # A block opened and never closed: what was read is kept, because discarding
+    # it would lose real data over somebody else's typo.
     if block is not None:
         doc[block] = lines
     return doc
@@ -108,7 +109,7 @@ def _list(doc: dict, key: str) -> list[str]:
 
 
 class TrackerDB:
-    """Ricerca per host, con la stessa semantica di `scanner.tracker_domain`."""
+    """Lookup by host, with the same semantics as `scanner.tracker_domain`."""
 
     def __init__(self, trackers: list[Tracker], organizations: dict[str, Organization]):
         self._organizations = organizations
@@ -118,10 +119,10 @@ class TrackerDB:
             if not tracker.domains:
                 self._without_domains += 1
             for domain in tracker.domains:
-                # Il primo che rivendica un dominio se lo tiene: due pattern
-                # che rivendicano lo stesso sono un dato di Ghostery, non una
-                # decisione nostra, e sceglierne uno a caso ogni volta
-                # renderebbe il report non riproducibile.
+                # The first to claim a domain keeps it: two patterns claiming
+                # the same one are a fact about Ghostery's data, not a decision
+                # of ours, and picking one at random each time would make the
+                # report irreproducible.
                 self._by_domain.setdefault(domain.lower(), tracker)
         self._trackers = len(trackers)
 
@@ -139,15 +140,15 @@ class TrackerDB:
 
     @property
     def without_domains(self) -> int:
-        """Pattern che identificano solo per regola di filtro: non combaciano mai."""
+        """Patterns that identify only by filter rule: they never match."""
         return self._without_domains
 
     def lookup(self, host: str) -> Tracker | None:
-        """Il tracker che rivendica `host`, o None.
+        """The tracker that claims `host`, or None.
 
-        Combacia il dominio esatto e i suoi sottodomini - `region1.google-
-        analytics.com` e' Google Analytics - e non un suffisso qualunque:
-        `notgoogle-analytics.com` e' un dominio diverso.
+        Matches the exact domain and its subdomains — `region1.google-
+        analytics.com` is Google Analytics — and not any old suffix:
+        `notgoogle-analytics.com` is a different domain.
         """
         host = (host or "").strip().rstrip(".").lower()
         if not host:
@@ -161,7 +162,7 @@ class TrackerDB:
 
     @classmethod
     def from_directory(cls, path: str | Path) -> TrackerDB:
-        """Carica da una cartella `db/`, o dalla radice del clone che la contiene."""
+        """Load from a `db/` directory, or from the clone root that holds it."""
         root = Path(path)
         if not (root / "patterns").is_dir() and (root / "db" / "patterns").is_dir():
             root = root / "db"
@@ -190,9 +191,9 @@ class TrackerDB:
             trackers.append(Tracker(
                 id=file.stem,
                 name=_text(doc, "name") or file.stem,
-                # `category` c'e' in tutti i 3535 file veri; se un giorno
-                # mancasse, "unknown" dice che non lo sappiamo invece di
-                # attribuire una finalita' a caso.
+                # `category` is present in all 3,535 real files; if it ever went
+                # missing, "unknown" says we do not know instead of attributing
+                # some purpose at random.
                 category=_text(doc, "category") or "unknown",
                 domains=tuple(_list(doc, "domains")),
                 website_url=_text(doc, "website_url"),

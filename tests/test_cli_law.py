@@ -62,9 +62,9 @@ def eurlex(monkeypatch):
 
 
 def _audit(result, *args):
-    # La firma deve seguire quella vera di scanner.scan: una finta piu'
-    # stretta fa fallire il comando con un TypeError, e il test misura
-    # quello invece di cio' per cui e' stato scritto.
+    # The signature has to follow the real one of scanner.scan: a narrower fake
+    # makes the command fail with a TypeError, and the test then measures that
+    # instead of what it was written for.
     async def fake_scan(url, headless=True, trackers=None):
         return result
 

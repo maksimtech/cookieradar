@@ -1,14 +1,14 @@
 """
-CookieRadar — il riepilogo degli host esterni nel report
+CookieRadar — the external-host summary in the report
 
-Il conteggio non dipende da Ghostery: con i soli 34 domini interni il report
-sa gia' dire su quanti host quei conteggi sono stati scelti, e quanti gli sono
-sfuggiti. Un trackerdb sposta il confine fra "identificati" e "sconosciuti", non
-crea la distinzione.
+The count does not depend on Ghostery: with the 34 built-in domains alone the
+report can already say out of how many hosts those counts were chosen, and how
+many got away. A trackerdb moves the boundary between "identified" and "unknown";
+it does not create the distinction.
 
-Il percorso indicato con --trackers deve fallire rumorosamente se non e' un
-trackerdb: una scansione che procede in silenzio senza l'arricchimento chiesto
-consegna un report piu' povero di quello atteso, e nessuno se ne accorge.
+The path given with --trackers has to fail loudly when it is not a trackerdb: a
+scan that carries on silently without the enrichment that was asked for delivers
+a poorer report than expected, and nobody notices.
 """
 from io import StringIO
 
@@ -85,15 +85,15 @@ def test_a_long_list_of_unknown_hosts_is_truncated_with_the_count():
     assert "80" in text
 
 
-# ── il percorso di --trackers ────────────────────────────────────────────────
+# ── the --trackers path ─────────────────────────────────────────────────────
 
 def test_a_bad_trackers_path_is_an_error_not_a_silent_downgrade(tmp_path):
-    """Chiedere l'arricchimento e non ottenerlo, senza saperlo, produce un
-    report piu' povero di quello atteso e indistinguibile da uno completo."""
+    """Asking for the enrichment and not getting it, without knowing, produces a
+    report poorer than expected and indistinguishable from a complete one."""
     from cookieradar.cli import _load_trackers
 
     with pytest.raises(ValueError):
-        _load_trackers(tmp_path / "non-esiste")
+        _load_trackers(tmp_path / "does-not-exist")
 
 
 def test_no_path_means_no_trackerdb_and_that_is_not_an_error():

@@ -26,22 +26,22 @@ class TrackerRequest:
 
 @dataclass
 class ExternalRequest:
-    """Una richiesta a un host fuori dal sito, riconosciuto o meno.
+    """A request to a host outside the site, recognised or not.
 
-    `TrackerRequest` sopra continua a contenere solo quelli riconosciuti, e
-    tutto cio' che lo consuma resta com'era. Questa lista e' il denominatore
-    che mancava: senza, "9 tracker" non dice su quanti host quei nove siano
-    stati scelti, e un host sconosciuto sparisce come uno mai contattato.
+    `TrackerRequest` above still holds only the recognised ones, and everything
+    consuming it stays as it was. This list is the denominator that was missing:
+    without it, "9 trackers" does not say out of how many hosts those nine were
+    chosen, and an unknown host disappears like one never contacted.
     """
     url: str
     host: str
     resource_type: str
     timestamp: float
-    # Il dominio dell'elenco interno che ha combaciato, se ha combaciato.
+    # The domain from the built-in list that matched, if one did.
     domain: str | None = None
-    # L'arricchimento da un trackerdb, quando l'utente ne ha indicato uno.
-    # None significa "non caricato" oppure "non presente in quel database":
-    # due cose diverse che il riepilogo tiene separate guardando `domain`.
+    # The enrichment from a trackerdb, when the operator supplied one. None
+    # means "not loaded" or "not present in that database": two different things
+    # the summary keeps apart by looking at `domain`.
     tracker: Tracker | None = None
 
 
@@ -55,29 +55,29 @@ class ExternalSummary:
 
 
 def is_same_site(page_host: str, request_host: str) -> bool:
-    """`request_host` appartiene allo stesso sito di `page_host`?
+    """Does `request_host` belong to the same site as `page_host`?
 
-    Vale l'uguaglianza e il rapporto di sottodominio in entrambi i versi, cosi'
-    che `example.it`, `www.example.it` e `static.cdn.example.it` siano lo stesso
-    sito. Non serve una lista di suffissi pubblici, che sarebbe una dipendenza e
-    un file di dati in piu' per coprire un caso - `x.co.uk` contro `y.co.uk` -
-    che questa regola gia' tratta come esterno, correttamente.
+    Equality counts, and so does the subdomain relation in both directions, so
+    that `example.it`, `www.example.it` and `static.cdn.example.it` are one site.
+    No public suffix list is needed, which would be a dependency and a data file
+    more to cover a case — `x.co.uk` against `y.co.uk` — that this rule already
+    treats as external, correctly.
 
-    Un host vuoto - le richieste `data:` e `blob:` non ne hanno - non e' ne' del
-    sito ne' di un terzo, e non si conta da nessuna parte.
+    An empty host — `data:` and `blob:` requests have none — is neither the
+    site's nor a third party's, and is counted nowhere.
 
-    Un `www.` iniziale viene tolto dall'host della pagina prima del confronto.
-    Senza, una scansione di `www.tim.it` dichiarava estraneo `api.tim.it`:
-    nessuno dei due e' sottodominio dell'altro, lo sono entrambi di `tim.it`.
-    Misurato su tim.it il 27/09/2026, dove `api.tim.it` compariva fra gli host
-    sconosciuti insieme ai tracker veri.
+    A leading `www.` is stripped from the page's host before the comparison.
+    Without that, a scan of `www.tim.it` declared `api.tim.it` a stranger:
+    neither is a subdomain of the other, both are subdomains of `tim.it`.
+    Measured on tim.it on 2026-09-27, where `api.tim.it` appeared among the
+    unknown hosts next to the real trackers.
 
-    Resta fuori il caso di due sottodomini fratelli quando la pagina non e' su
-    `www.`: scansionando `shop.example.com`, `blog.example.com` risulta
-    esterno. Toglierlo richiederebbe di sapere dove finisce il dominio
-    registrabile, cioe' una lista di suffissi pubblici - una dipendenza e un
-    file di dati - e sbagliare quel confine produrrebbe l'errore opposto e
-    peggiore: `x.co.uk` e `y.co.uk` dichiarati lo stesso sito.
+    The case of two sibling subdomains when the page is not on `www.` stays out:
+    scanning `shop.example.com`, `blog.example.com` comes out external. Removing
+    that would require knowing where the registrable domain ends, that is a
+    public suffix list — a dependency and a data file — and getting that boundary
+    wrong would produce the opposite and worse error: `x.co.uk` and `y.co.uk`
+    declared the same site.
     """
     a = (page_host or "").strip().rstrip(".").lower()
     b = (request_host or "").strip().rstrip(".").lower()
@@ -89,10 +89,10 @@ def is_same_site(page_host: str, request_host: str) -> bool:
 
 
 def summarise_external(session: "SessionResult") -> ExternalSummary:
-    """Il riepilogo per host, non per richiesta.
+    """The summary per host, not per request.
 
-    Venti richieste allo stesso host sono un host: il report parla di chi e'
-    stato contattato, non di quante volte.
+    Twenty requests to the same host are one host: the report speaks of who was
+    contacted, not of how many times.
     """
     by_host: dict[str, ExternalRequest] = {}
     for request in session.external:
@@ -336,9 +336,9 @@ async def _run_session(
                 timestamp=now,
             ))
 
-        # Ogni host esterno, riconosciuto o no. Prima di questa riga tutto
-        # cio' che non era fra i 34 domini interni spariva, e il report non
-        # poteva dire su quanti host i suoi conteggi fossero stati scelti.
+        # Every external host, recognised or not. Before this line everything
+        # that was not among the 34 built-in domains disappeared, and the report
+        # could not say out of how many hosts its counts had been chosen.
         host = (urlparse(request.url).hostname or "").rstrip(".")
         if host and not is_same_site(page_host, host):
             result.external.append(ExternalRequest(
@@ -409,10 +409,10 @@ async def _run_session(
             if rejected:
                 result.consent_clicked = True
                 # Only requests made after the rejection count for this session.
-                # `external` va azzerata insieme a `trackers`: tenerla
-                # farebbe comparire fra i post-rifiuto ogni host contattato
-                # prima, e il conteggio degli sconosciuti sarebbe il doppio di
-                # quello vero.
+                # `external` is cleared together with `trackers`: keeping it
+                # would make every host contacted before the rejection appear
+                # among the post-rejection ones, and the count of unknowns would
+                # be twice the truth.
                 result.trackers.clear()
                 result.external.clear()
                 try:
