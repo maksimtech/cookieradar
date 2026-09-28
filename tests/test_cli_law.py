@@ -62,7 +62,10 @@ def eurlex(monkeypatch):
 
 
 def _audit(result, *args):
-    async def fake_scan(url, headless=True):
+    # La firma deve seguire quella vera di scanner.scan: una finta piu'
+    # stretta fa fallire il comando con un TypeError, e il test misura
+    # quello invece di cio' per cui e' stato scritto.
+    async def fake_scan(url, headless=True, trackers=None):
         return result
 
     with patch("cookieradar.scanner.scan", fake_scan):

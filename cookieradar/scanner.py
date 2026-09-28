@@ -11,6 +11,8 @@ from playwright.async_api import BrowserContext, Cookie, Page, async_playwright
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from cookieradar.trackerdb import Tracker, TrackerDB
+
 DEFAULT_TIMEOUT_MS = 30000
 
 
@@ -23,12 +25,117 @@ class TrackerRequest:
 
 
 @dataclass
+class ExternalRequest:
+    """Una richiesta a un host fuori dal sito, riconosciuto o meno.
+
+    `TrackerRequest` sopra continua a contenere solo quelli riconosciuti, e
+    tutto cio' che lo consuma resta com'era. Questa lista e' il denominatore
+    che mancava: senza, "9 tracker" non dice su quanti host quei nove siano
+    stati scelti, e un host sconosciuto sparisce come uno mai contattato.
+    """
+    url: str
+    host: str
+    resource_type: str
+    timestamp: float
+    # Il dominio dell'elenco interno che ha combaciato, se ha combaciato.
+    domain: str | None = None
+    # L'arricchimento da un trackerdb, quando l'utente ne ha indicato uno.
+    # None significa "non caricato" oppure "non presente in quel database":
+    # due cose diverse che il riepilogo tiene separate guardando `domain`.
+    tracker: Tracker | None = None
+
+
+@dataclass
+class ExternalSummary:
+    hosts: int
+    identified: int
+    unknown: list[str]
+    organizations: dict[str, int]
+    categories: dict[str, int]
+
+
+def is_same_site(page_host: str, request_host: str) -> bool:
+    """`request_host` appartiene allo stesso sito di `page_host`?
+
+    Vale l'uguaglianza e il rapporto di sottodominio in entrambi i versi, cosi'
+    che `example.it`, `www.example.it` e `static.cdn.example.it` siano lo stesso
+    sito. Non serve una lista di suffissi pubblici, che sarebbe una dipendenza e
+    un file di dati in piu' per coprire un caso - `x.co.uk` contro `y.co.uk` -
+    che questa regola gia' tratta come esterno, correttamente.
+
+    Un host vuoto - le richieste `data:` e `blob:` non ne hanno - non e' ne' del
+    sito ne' di un terzo, e non si conta da nessuna parte.
+
+    Un `www.` iniziale viene tolto dall'host della pagina prima del confronto.
+    Senza, una scansione di `www.tim.it` dichiarava estraneo `api.tim.it`:
+    nessuno dei due e' sottodominio dell'altro, lo sono entrambi di `tim.it`.
+    Misurato su tim.it il 27/09/2026, dove `api.tim.it` compariva fra gli host
+    sconosciuti insieme ai tracker veri.
+
+    Resta fuori il caso di due sottodomini fratelli quando la pagina non e' su
+    `www.`: scansionando `shop.example.com`, `blog.example.com` risulta
+    esterno. Toglierlo richiederebbe di sapere dove finisce il dominio
+    registrabile, cioe' una lista di suffissi pubblici - una dipendenza e un
+    file di dati - e sbagliare quel confine produrrebbe l'errore opposto e
+    peggiore: `x.co.uk` e `y.co.uk` dichiarati lo stesso sito.
+    """
+    a = (page_host or "").strip().rstrip(".").lower()
+    b = (request_host or "").strip().rstrip(".").lower()
+    if not a or not b:
+        return False
+    if a.startswith("www.") and a.count(".") >= 2:
+        a = a[4:]
+    return a == b or a.endswith("." + b) or b.endswith("." + a)
+
+
+def summarise_external(session: "SessionResult") -> ExternalSummary:
+    """Il riepilogo per host, non per richiesta.
+
+    Venti richieste allo stesso host sono un host: il report parla di chi e'
+    stato contattato, non di quante volte.
+    """
+    by_host: dict[str, ExternalRequest] = {}
+    for request in session.external:
+        by_host.setdefault(request.host, request)
+
+    unknown: list[str] = []
+    organizations: dict[str, int] = {}
+    categories: dict[str, int] = {}
+    identified = 0
+    for host, request in by_host.items():
+        if request.tracker is None and request.domain is None:
+            unknown.append(host)
+            continue
+        identified += 1
+        tracker = request.tracker
+        if tracker is None:
+            continue
+        categories[tracker.category] = categories.get(tracker.category, 0) + 1
+        # 437 pattern reali non hanno una organization: contarli fra gli
+        # identificati e tacerne l'azienda e' corretto, scartarli no.
+        if tracker.organization is not None:
+            name = tracker.organization.name
+            organizations[name] = organizations.get(name, 0) + 1
+
+    return ExternalSummary(
+        hosts=len(by_host),
+        identified=identified,
+        unknown=sorted(unknown),
+        organizations=organizations,
+        categories=categories,
+    )
+
+
+@dataclass
 class SessionResult:
     session: str  # pre-consent, post-accept, post-reject
     trackers: list[TrackerRequest] = field(default_factory=list)
     # playwright's context.cookies() returns list[Cookie], a TypedDict; the
     # annotation said list[dict], which is not the same type.
     cookies: list[Cookie] = field(default_factory=list)
+    # Ogni host esterno contattato, riconosciuto o no. `trackers` sopra resta
+    # il sottoinsieme riconosciuto, e tutto cio' che lo consuma non cambia.
+    external: list[ExternalRequest] = field(default_factory=list)
     banner_found: bool = False
     # The status of the main document. None when the navigation produced no
     # response at all — a timeout, which the session already reports as an
@@ -206,6 +313,7 @@ async def _run_session(
     session_name: str,
     accept: bool | None = None,
     timeout_ms: int = DEFAULT_TIMEOUT_MS,
+    trackers: TrackerDB | None = None,
 ) -> SessionResult:
     """
     Run a single browser session and collect trackers.
@@ -214,16 +322,32 @@ async def _run_session(
     """
     result = SessionResult(session=session_name)
     page = await context.new_page()
+    page_host = (urlparse(url).hostname or "").rstrip(".")
 
     # Intercept requests
     def handle_request(request):
+        now = time.time()
         domain = tracker_domain(request.url)
         if domain:
             result.trackers.append(TrackerRequest(
                 url=request.url,
                 domain=domain,
                 resource_type=request.resource_type,
-                timestamp=time.time(),
+                timestamp=now,
+            ))
+
+        # Ogni host esterno, riconosciuto o no. Prima di questa riga tutto
+        # cio' che non era fra i 34 domini interni spariva, e il report non
+        # poteva dire su quanti host i suoi conteggi fossero stati scelti.
+        host = (urlparse(request.url).hostname or "").rstrip(".")
+        if host and not is_same_site(page_host, host):
+            result.external.append(ExternalRequest(
+                url=request.url,
+                host=host,
+                resource_type=request.resource_type,
+                timestamp=now,
+                domain=domain,
+                tracker=trackers.lookup(host) if trackers is not None else None,
             ))
 
     page.on("request", handle_request)
@@ -284,8 +408,13 @@ async def _run_session(
 
             if rejected:
                 result.consent_clicked = True
-                # Only requests made after the rejection count for this session
+                # Only requests made after the rejection count for this session.
+                # `external` va azzerata insieme a `trackers`: tenerla
+                # farebbe comparire fra i post-rifiuto ogni host contattato
+                # prima, e il conteggio degli sconosciuti sarebbe il doppio di
+                # quello vero.
                 result.trackers.clear()
+                result.external.clear()
                 try:
                     await page.reload(wait_until="networkidle", timeout=timeout_ms)
                 except PlaywrightTimeoutError as e:
@@ -303,7 +432,8 @@ async def _run_session(
     return result
 
 
-async def scan(url: str, headless: bool = True, timeout_ms: int = DEFAULT_TIMEOUT_MS) -> ScanResult:
+async def scan(url: str, headless: bool = True, timeout_ms: int = DEFAULT_TIMEOUT_MS,
+               trackers: TrackerDB | None = None) -> ScanResult:
     """
     Scan a URL with three clean sessions.
     Session 1: pre-consent (no interaction)
@@ -324,7 +454,9 @@ async def scan(url: str, headless: bool = True, timeout_ms: int = DEFAULT_TIMEOU
             for attr, name, accept in sessions:
                 ctx = await browser.new_context()
                 try:
-                    session = await _run_session(ctx, url, name, accept=accept, timeout_ms=timeout_ms)
+                    session = await _run_session(ctx, url, name, accept=accept,
+                                                 timeout_ms=timeout_ms,
+                                                 trackers=trackers)
                 except Exception as e:
                     session = SessionResult(session=name)
                     _add_error(session, e)

@@ -198,9 +198,67 @@ def _print_session(out: Console, title: str, session, unmeasured: str | None = N
     out.print(f"[dim]Cookies: {len(session.cookies)}[/dim]")
     if session.cookies:
         _print_cookies(out, session.cookies)
+    _print_external(out, session)
     if session.error:
         out.print(f"[yellow]⚠️  Error: {escape(session.error)}[/yellow]")
     out.print()
+
+
+def _load_trackers(path):
+    """Carica un trackerdb da `path`, o None se non ne e' stato chiesto uno.
+
+    Un percorso sbagliato solleva invece di procedere senza arricchimento: chi
+    ha scritto --trackers si aspetta un report piu' ricco, e uno impoverito in
+    silenzio e' indistinguibile da uno completo.
+
+    CookieRadar non distribuisce dati di Ghostery: ghostery/trackerdb e'
+    CC-BY-NC-SA-4.0, incompatibile con MIT, e il percorso punta a una copia che
+    l'utente si e' procurato.
+    """
+    if path is None:
+        return None
+    from cookieradar.trackerdb import TrackerDB
+
+    return TrackerDB.from_directory(path)
+
+
+def _print_external(out: Console, session) -> None:
+    """Su quanti host esterni sono stati scelti i conteggi, e quanti sono sfuggiti.
+
+    Senza questa riga "9 tracker" non ha denominatore: un host non riconosciuto
+    spariva esattamente come uno mai contattato. Il conteggio vale anche senza
+    un trackerdb - con i soli 34 domini interni - perche' la distinzione non
+    nasce da un elenco piu' lungo ma dal decidere di misurarla.
+    """
+    from cookieradar.scanner import summarise_external
+
+    summary = summarise_external(session)
+    if summary.hosts == 0:
+        # Zero host esterni non merita una riga: il resto del report lo dice.
+        return
+
+    unknown = len(summary.unknown)
+    # L'unita' e' l'host, e va detta: la riga sopra conta i *domini* della lista
+    # interna, e su tim.it sono 5 domini contro 10 host. Due misure diverse
+    # dello stesso fatto, che senza il sostantivo si leggono come un errore.
+    out.print(
+        f"[dim]Host esterni contattati: {summary.hosts} — "
+        f"riconosciuti {summary.identified}, sconosciuti {unknown}[/dim]"
+    )
+    if summary.categories:
+        parts = ", ".join(f"{escape(c)} {n}" for c, n in
+                          sorted(summary.categories.items(), key=lambda kv: -kv[1]))
+        out.print(f"[dim]  finalita': {parts}[/dim]")
+    if summary.organizations:
+        parts = ", ".join(f"{escape(o)} {n}" for o, n in
+                          sorted(summary.organizations.items(), key=lambda kv: -kv[1])[:6])
+        out.print(f"[dim]  aziende: {parts}[/dim]")
+    if summary.unknown:
+        # Troncato, ma il totale resta: nascondere quanti sono nasconderebbe
+        # proprio la misura per cui questa riga esiste.
+        shown = ", ".join(escape(h) for h in summary.unknown[:8])
+        more = f" e altri {unknown - 8}" if unknown > 8 else ""
+        out.print(f"[dim]  sconosciuti ({unknown}): {shown}{more}[/dim]")
 
 
 def _cookie_expiry(cookie: dict) -> str:
@@ -466,6 +524,10 @@ def audit(
     url: str = typer.Argument(..., help="URL to audit (e.g. https://tim.it)"),
     headless: bool = typer.Option(True, "--headless/--no-headless", help="Run browser headless"),
     output: Path = typer.Option(None, "--output", "-o", help="Save report to file (.html for HTML, text otherwise)"),
+    trackers: Path = typer.Option(
+        None, "--trackers",
+        help="Percorso a una copia di ghostery/trackerdb (non distribuita: CC-BY-NC-SA)",
+    ),
 ):
     """
     Audit a website for cookie compliance.
@@ -479,11 +541,26 @@ def audit(
         console.print(f"[red]❌ {escape(str(e))}[/red]")
         raise typer.Exit(ExitCode.ERROR) from None
 
+    try:
+        trackerdb = _load_trackers(trackers)
+    except ValueError as e:
+        console.print(f"[red]{escape(str(e))}[/red]")
+        raise typer.Exit(ExitCode.ERROR) from None
+
     console.print(f"\n[dim]Auditing [bold]{escape(url)}[/bold]...[/dim]")
+    if trackerdb is not None:
+        # Quanto e' grande la base dati usata: un report arricchito da un
+        # trackerdb vecchio o parziale non si distingue da uno arricchito bene,
+        # se non si dice con cosa.
+        console.print(
+            f"[dim]trackerdb: {trackerdb.trackers} tracker, "
+            f"{trackerdb.domains} domini, "
+            f"{trackerdb.organizations} organizzazioni[/dim]"
+        )
 
     try:
         with _status("[cyan]Running 3 browser sessions: pre-consent, post-accept, post-reject...[/cyan]"):
-            result = asyncio.run(scan(url, headless=headless))
+            result = asyncio.run(scan(url, headless=headless, trackers=trackerdb))
     except Exception as e:
         console.print(f"[red]❌ Error: {escape(str(e))}[/red]")
         raise typer.Exit(ExitCode.ERROR) from None

@@ -310,7 +310,10 @@ async def test_scan_continues_when_a_session_crashes():
     browser = AsyncMock()
     browser.new_context = AsyncMock(side_effect=new_context)
 
-    async def run_session(ctx, url, name, accept=None, timeout_ms=30000):
+    # `trackers` accettato e ignorato: la finta deve reggere la firma
+    # vera, o l'errore che il test provoca non e' quello che misura.
+    async def run_session(ctx, url, name, accept=None, timeout_ms=30000,
+                          trackers=None):
         if name == "post-accept":
             raise RuntimeError("Target page, context or browser has been closed")
         return SessionResult(session=name)
