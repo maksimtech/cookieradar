@@ -7,6 +7,49 @@ and this project uses calendar versioning (YYYY.MM.N).
 
 ## [Unreleased]
 
+### Added
+
+- **Every external host contacted, not only the recognised ones**, and a reader
+  for Ghostery's trackerdb format without shipping Ghostery's data.
+
+- **A bot-management challenge is no longer audited as if it were the site.**
+  2026.40.1 closed the honest refusal — a status of 4xx or 5xx. The other shape
+  answers **200**: Cloudflare's "Just a moment…", AWS WAF's 202, DataDome's
+  interstitial. The browser loads it like any document and finds no trackers and
+  no banner, which is also what a compliant site looks like, so the strongest
+  claim this tool makes was again available without having seen the site.
+
+  The page's own identity decides — its title or its text — or a status that
+  means "not the page you asked for". The verdict is ERROR, as for a page never
+  served, and the report says to try `--no-headless`: a challenge is sometimes
+  served to a visible browser, and a refused address never is.
+
+  Two things it deliberately does not do. **A bot-management cookie is not a
+  challenge**: `__cf_bm` is set on a large share of ordinary sites that serve
+  their own pages perfectly well, so cookies and vendor hosts only corroborate a
+  page that has already identified itself — reading them as proof would refuse to
+  audit compliant sites and look like caution while losing coverage. And **a bare
+  429 or 503 is not called a challenge**: both are above 400, so the existing
+  check already says "this is not the site", which is all that is known. A 503
+  that also says "Just a moment" is a challenge, and the text is what says so.
+
+### Fixed
+
+- **The report now says which kind of refusal it met.** msi.com answers 403 and
+  the report said only "this is an error page, not the site" — true, and it left
+  the cause to the reader, who read it as headless Chromium being detected.
+  Measured on 2026-09-29: `httpx` with no browser at all gets the identical 403,
+  with and without a current Chrome User-Agent, and
+  `--disable-blink-features=AutomationControlled` changes nothing. That is an edge
+  refusing a network address, and no browser setting will alter it.
+
+  The verdict now says so, and says an audit needs access from an allowed address
+  — printed once beneath the verdict rather than inside a 60-column table cell,
+  which cut the sentence off and repeated it three times.
+
+- The report stops changing language halfway: the external-host section was
+  written in Italian while the rest of the output is English.
+
 ## [2026.40.1] - 2026-09-26
 
 ### Fixed
