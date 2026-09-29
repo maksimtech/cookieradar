@@ -19,7 +19,7 @@ from rich.table import Table
 from rich.text import Text
 from typer.core import TyperGroup
 
-from cookieradar.scanner import Violations, find_violations, page_not_served
+from cookieradar.scanner import Violations, bot_challenge, find_violations, page_not_served
 
 
 def enable_utf8_output() -> None:
@@ -301,8 +301,42 @@ def _not_served(status: int | None) -> str:
     An error page has no trackers, and printing that as a clean result is the
     same mistake as a tick under a rejection that never happened — one screen
     higher and for all three sessions at once.
+
+    The wording names the edge rather than the browser, and that sentence exists
+    because of a real wrong turn: on 2026-09-29 msi.com answered 403 here, the
+    report said only "this is an error page", and the natural reading was that
+    headless Chromium had been detected. It had not. `httpx` with no browser at
+    all gets the identical 403 from that edge, with and without a Chrome
+    User-Agent, so nothing about the browser was going to change it — and an hour
+    could have gone into making Chromium look more human for no reason.
     """
     return f"the site answered HTTP {status}: this is an error page, not the site"
+
+
+def _challenged(challenge) -> str:
+    """What every table says when a challenge stood in front of the site.
+
+    Separate from `_not_served` on purpose. Both mean "the site was not seen" and
+    they ask different things of whoever reads the report: a challenge can often be
+    passed by running the scan with a visible browser (`--no-headless`), where an
+    edge that refuses an address cannot.
+    """
+    return "a bot-management challenge answered instead of the site"
+
+
+def _why_not_the_site(result) -> str | None:
+    """The one note the tables carry, or None when the site really answered.
+
+    Order matters: an error status is checked first because it is the stronger
+    statement and the one an operator can act on differently. `bot_challenge`
+    already declines to call a bare 4xx or 5xx a challenge, so the two cannot
+    both fire — but reading the status first means that if they ever could, the
+    report would not suggest changing the browser for a refused address.
+    """
+    if page_not_served(result):
+        return _not_served(result.pre_consent.status)
+    challenge = bot_challenge(result)
+    return _challenged(challenge) if challenge.seen else None
 
 
 def _unique_domains(session) -> set[str]:
@@ -340,9 +374,12 @@ def _print_violations(out: Console, violations: Violations, indent: str):
 
 
 def _verdict(result) -> ExitCode:
-    if page_not_served(result):
+    if page_not_served(result) or bot_challenge(result).seen:
         # Not UNVERIFIED: that means the site was seen and the refusal could
-        # not be exercised. Here the site was never seen.
+        # not be exercised. Here the site was never seen — either the edge
+        # refused it outright, or what came back was a challenge and not the
+        # page. A challenge answering 200 would otherwise reach the checks
+        # below and be reported as a site with no trackers and no banner.
         return ExitCode.ERROR
     if not result.post_reject.consent_clicked:
         return ExitCode.UNVERIFIED
@@ -359,7 +396,7 @@ def _render_report(out: Console, url: str, result, law=None):
     out.print(f"[bold red]🔴 Session 1 — Pre-consent ({len(_unique_domains(pre))} unique trackers)[/bold red]")
     _print_session(
         out, "Pre-consent trackers", pre,
-        _not_served(pre.status) if page_not_served(result) else None,
+        _why_not_the_site(result),
     )
 
     # Post-accept
@@ -384,6 +421,7 @@ def _render_report(out: Console, url: str, result, law=None):
     violations = find_violations(result)
     verdict = _verdict(result)
 
+    challenge = bot_challenge(result)
     if page_not_served(result):
         status = result.pre_consent.status
         out.print(
@@ -393,6 +431,31 @@ def _render_report(out: Console, url: str, result, law=None):
         out.print(
             "[red]   No trackers, no banner and no cookies on an error page are "
             "facts about the error page. This audit did not happen.[/red]"
+        )
+        # Said here and not in the tables, where a 60-column cell cuts it off and
+        # repeats it three times. The distinction is what an operator acts on: an
+        # edge refusing an address is not a browser being detected. Measured on
+        # msi.com, 2026-09-29 — httpx with no browser at all gets the identical
+        # 403, with and without a Chrome User-Agent — and reading the old message
+        # as "headless Chromium was spotted" is the wrong turn this sentence exists
+        # to prevent.
+        out.print(
+            "[dim]   A refusal at this status is the edge declining the request, "
+            "not a browser check: the same status usually comes back from any "
+            "client, so no browser setting changes it. An audit needs access from "
+            "an address the site allows.[/dim]"
+        )
+    elif challenge.seen:
+        out.print(
+            "[bold red]⛔ NOT MEASURED — a bot-management challenge answered "
+            "instead of the site[/bold red]"
+        )
+        out.print(f"[red]   {escape(challenge.describe())}[/red]")
+        out.print(
+            "[dim]   Nothing above describes the site: a challenge page has no "
+            "trackers and no banner, which is also what a compliant site looks "
+            "like. Unlike a refused address, this one is sometimes served to a "
+            "visible browser — try again with --no-headless.[/dim]"
         )
     elif verdict is ExitCode.UNVERIFIED:
         out.print(

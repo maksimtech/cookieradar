@@ -4,6 +4,7 @@ Three clean sessions: pre-consent, post-accept, post-reject+reload.
 """
 import re
 import time
+from contextlib import suppress
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
@@ -143,6 +144,12 @@ class SessionResult:
     status: int | None = None
     error: str | None = None
     consent_clicked: bool = False  # accept/reject button found and clicked
+    # The document's own identity, kept so that `bot_challenge` can tell a
+    # challenge page from the site. A challenge answering 200 is invisible to
+    # everything that only reads counts: it has no trackers and no banner, which
+    # is exactly what a compliant site looks like.
+    title: str = ""
+    text: str = ""
 
 
 @dataclass
@@ -179,6 +186,129 @@ def page_not_served(result: ScanResult) -> bool:
     """
     status = result.pre_consent.status
     return status is not None and status >= 400
+
+
+# A bot-management edge refuses in two ways, and only one of them looks like a
+# refusal. `page_not_served` catches the status; these catch the other, where the
+# challenge answers 200 and the browser loads it like any other page.
+#
+# 202 is what AWS WAF returns with its JavaScript challenge: a success status
+# carrying something that is not the page, which is why it needs naming here.
+#
+# 429 and 503 are deliberately *not* in this set, although a challenge often uses
+# them. They are above 400, so `page_not_served` already reports "this is not the
+# site" — which is true — and calling a bare 503 a bot challenge would put a cause
+# on it that nobody established. A 503 that also says "Just a moment" is a
+# challenge, and the text is what says so.
+CHALLENGE_STATUSES = frozenset({202})
+
+# Enough for a challenge's words, which are always in the first screenful, and not
+# enough to carry someone else's article around in a report.
+_TEXT_SNIFF = 4000
+
+# The page's own words. Deliberately narrow: this tool audits cookie banners, so
+# the words "cookies" and "please enable" appear on almost every compliant site
+# in the corpus, and a marker that fired on a consent notice would make
+# cookieradar refuse to audit exactly the sites doing it right.
+CHALLENGE_TEXT = (
+    re.compile(r"just a moment", re.I),
+    re.compile(r"checking your browser", re.I),
+    re.compile(r"attention required.{0,3}\|\s*cloudflare", re.I),
+    re.compile(r"verify(ing)? (that )?you are (human|a human)", re.I),
+    re.compile(r"review(ing)? the security of your connection", re.I),
+    re.compile(r"pardon our interruption", re.I),
+    re.compile(r"incapsula incident", re.I),
+    re.compile(r"request unsuccessful", re.I),
+    re.compile(r"enable javascript and cookies to continue", re.I),
+    re.compile(r"ddos protection by", re.I),
+    re.compile(r"(cf-browser-verification|__cf_chl|challenge-platform)", re.I),
+)
+
+# Corroboration only, never a verdict on their own. `__cf_bm` is set on a large
+# share of ordinary sites that serve their own pages perfectly well: reading it as
+# a block would lose coverage silently, which is the failure that looks like
+# caution. Once the page has already said it is a challenge, naming the vendor is
+# what lets an operator ask the right party for access.
+CHALLENGE_COOKIES = (
+    "__cf_bm", "cf_clearance", "__cf_chl",        # Cloudflare
+    "aws-waf-token",                               # AWS WAF
+    "datadome",                                    # DataDome
+    "_px", "_pxhd", "_pxvid",                      # HUMAN / PerimeterX
+    "ak_bmsc", "bm_sv", "bm_sz", "bm_mi",          # Akamai Bot Manager
+    "incap_ses", "visid_incap", "nlbi_",           # Imperva
+    "reese84",                                     # Kasada
+)
+
+CHALLENGE_HOSTS = (
+    "challenges.cloudflare.com",
+    "captcha-delivery.com",
+    "perimeterx.net",
+    "px-cloud.net",
+    "hcaptcha.com",
+    "recaptcha.net",
+)
+
+
+@dataclass(frozen=True)
+class Challenge:
+    """Why the document in hand is not the site, in words a reader can check."""
+
+    signals: tuple[str, ...] = ()
+
+    @property
+    def seen(self) -> bool:
+        return bool(self.signals)
+
+    def describe(self) -> str:
+        return "; ".join(self.signals)
+
+
+def bot_challenge(result: ScanResult) -> Challenge:
+    """Whether a bot-management challenge stood between us and the site.
+
+    Measured on msi.com on 2026-09-29, this is *not* what a headless browser
+    normally meets: msi.com answers 403 with a 363-byte Access Denied page, and
+    `httpx` with no browser at all gets the identical answer with and without a
+    Chrome User-Agent. That is an edge refusing a network address, which
+    `page_not_served` already reports, and no browser setting changes it.
+
+    What this catches is the other shape: a challenge served with a status the
+    scanner reads as success. The page identity decides — its title or its text —
+    or a status that means "not the page you asked for". Cookies and vendor hosts
+    are added to the explanation once one of those has fired, and never decide on
+    their own.
+
+    An error page is left alone: 403 and a challenge both mean "the site was not
+    seen", but they need different actions from whoever reads the report, so
+    merging them would tell an operator to change their browser when the answer is
+    to ask for access from this address.
+    """
+    pre = result.pre_consent
+    status = pre.status
+    signals: list[str] = []
+    haystack = f"{pre.title}\n{pre.text}"
+    for pattern in CHALLENGE_TEXT:
+        found = pattern.search(haystack)
+        if found:
+            where = "title" if pattern.search(pre.title) else "page text"
+            signals.append(f"the {where} says {found.group(0)!r}")
+            break
+    if status in CHALLENGE_STATUSES:
+        signals.append(f"the site answered HTTP {status}, which is a challenge "
+                       f"and not a page")
+    if not signals:
+        return Challenge()
+
+    named = [c["name"] for c in pre.cookies
+             if any(str(c.get("name", "")).startswith(p) for p in CHALLENGE_COOKIES)]
+    if named:
+        signals.append("bot-management cookies set: " + ", ".join(sorted(named)))
+    vendors = sorted({r.host for r in pre.external
+                      if any(r.host == h or r.host.endswith(f".{h}")
+                             for h in CHALLENGE_HOSTS)})
+    if vendors:
+        signals.append("challenge hosts contacted: " + ", ".join(vendors))
+    return Challenge(signals=tuple(signals))
 
 
 def find_violations(result: ScanResult) -> Violations:
@@ -362,6 +492,21 @@ async def _run_session(
         except PlaywrightTimeoutError as e:
             _add_error(result, e)
         await page.wait_for_timeout(3000)
+
+        # The document's own identity, for `bot_challenge`. Taken after the wait
+        # above because a challenge either resolves or settles into its final
+        # words in the first seconds, and the title before that is often empty.
+        #
+        # Both are best effort: a page that navigated away mid-read raises, and a
+        # missing title is not worth losing a session over. The cap is because
+        # only the first screenful ever carries a challenge's words, and a report
+        # should not hold a megabyte of someone else's article.
+        with suppress(PlaywrightError):
+            result.title = await page.title()
+        with suppress(PlaywrightError):
+            result.text = (await page.evaluate(
+                "() => document.body ? document.body.innerText : ''"
+            ))[:_TEXT_SNIFF]
 
         # Check for cookie banner
         banner_selectors = [
