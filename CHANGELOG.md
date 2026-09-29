@@ -3,9 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project uses calendar versioning (YYYY.MM.N).
+and this project uses **CalVer, Apple style**: `YYYY.count[.fix]`, not SemVer.
+`YYYY` is the generation, shared by the five Radar; the count belongs to each of
+them and moves when its code moves; the third segment is for something urgent on
+what has already shipped. The line above said `YYYY.MM.N` until 2026-09-29, which
+no version in this file has ever matched — 40 is not a month, and
+`tests/test_version_contract.py` has been enforcing the real form all along.
 
 ## [Unreleased]
+
+## [2026.41] - 2026-09-29
 
 ### Added
 
