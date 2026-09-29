@@ -29,9 +29,16 @@ jobs:
       - name: Read package version
         id: version
         run: echo "version=$(python -c 'from cookieradar import __version__; print(__version__)')" >> "$GITHUB_OUTPUT"
+      # `qualitygate.wait` is what makes this job mean something. Without it the
+      # step uploads the analysis and succeeds, and SonarCloud decides the gate
+      # afterwards — so the workflow can be green while the gate is ERROR, and
+      # the only way to find out is to open sonarcloud.io by hand. With it, a red
+      # gate is a red job.
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          args: -Dsonar.projectVersion=${{ steps.version.outputs.version }}
+          args: >
+            -Dsonar.projectVersion=${{ steps.version.outputs.version }}
+            -Dsonar.qualitygate.wait=true
