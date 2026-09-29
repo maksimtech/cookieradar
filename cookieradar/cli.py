@@ -147,13 +147,20 @@ def _status(message: str):
     is printed only when the proxy is garbage-collected, possibly during
     interpreter shutdown ("ImportError: sys.meta_path is None").
     """
-    with console.status(message):
-        try:
-            yield
-        finally:
-            sys.stdout.flush()
-            sys.stderr.flush()
-    console.file.flush()
+    # Both flushes in a `finally`, including the outer one. It sat after the
+    # `with` block until 2026-09-29, where an exception leaving the body skipped
+    # it — the path where a library's partial line matters most, because it is the
+    # run about to print a traceback. SonarCloud's python:S9152 found it; no test
+    # did, because every test exercised the success path.
+    try:
+        with console.status(message):
+            try:
+                yield
+            finally:
+                sys.stdout.flush()
+                sys.stderr.flush()
+    finally:
+        console.file.flush()
 
 
 def _read_urls(path: str) -> list[str]:

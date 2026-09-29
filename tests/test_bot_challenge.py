@@ -26,6 +26,7 @@ from __future__ import annotations
 import pytest
 
 from cookieradar.scanner import (
+    CHALLENGE_HOSTS,
     ScanResult,
     SessionResult,
     bot_challenge,
@@ -147,11 +148,25 @@ def test_a_cookie_corroborates_a_challenge_page_and_is_named():
 
 
 def test_a_host_corroborates_a_challenge_page_and_is_named():
-    found = bot_challenge(
-        scan(status=202, hosts=["geo.captcha-delivery.com"]))
+    """The vendor host is taken from the module's own list rather than typed here.
+
+    A test that hand-copies a constant can drift from it in silence: drop
+    `captcha-delivery.com` from CHALLENGE_HOSTS and a literal here would keep
+    passing against a list that no longer contains it. Deriving it means that
+    removal fails loudly, in `next()`.
+
+    It also happens to remove a CodeQL alert. The rule
+    `py/incomplete-url-substring-sanitization` fires on a hostname literal tested
+    with `in`, and there are two other entries for it in SECURITY-EXCEPTIONS.toml
+    for exactly this shape in exactly this kind of assertion. A third entry was the
+    alternative; this is better, because the reason to write it this way stands on
+    its own.
+    """
+    vendor = next(h for h in CHALLENGE_HOSTS if h.startswith("captcha-"))
+    found = bot_challenge(scan(status=202, hosts=[f"geo.{vendor}"]))
 
     assert found.seen is True
-    assert any("captcha-delivery.com" in s for s in found.signals)
+    assert any(vendor in s for s in found.signals)
 
 
 # ── what it must never do ───────────────────────────────────────────────────
