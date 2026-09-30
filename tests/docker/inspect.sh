@@ -36,9 +36,23 @@
 set -eu
 
 echo "── the packages SECURITY-EXCEPTIONS.toml names ──"
-for pkg in libxml2 libcups2 libexpat1 zlib1g perl-base; do
-    dpkg-query -W -f '  ${Package} ${Version} priority=${Priority}\n' "$pkg" 2>/dev/null \
-        || echo "  $pkg not installed"
+# Patterns, not exact names. The first version asked for `libcups2` and got back a
+# line with no version, which reads as "not installed" and actually meant "that
+# name does not exist here": Debian trixie's 64-bit time_t transition renamed these
+# libraries with a `t64` suffix, so the installed package is libcups2t64. A probe
+# that answers "absent" when it means "I asked the wrong question" is the defect
+# this whole file exists to avoid, and it produced exactly one wrong answer on
+# 2026-09-30 before being caught.
+#
+# A line carrying a version is a real install. A line without one is a virtual
+# package that something else provides, and says nothing about what is on disk.
+for pattern in 'libxml2*' 'libcups*' 'libexpat1*' 'zlib1g*' 'perl-base'; do
+    found=$(dpkg-query -W -f '  ${Package} ${Version} priority=${Priority}\n' "$pattern" 2>/dev/null || true)
+    if [ -n "$found" ]; then
+        echo "$found"
+    else
+        echo "  $pattern matched nothing installed"
+    fi
 done
 
 echo
