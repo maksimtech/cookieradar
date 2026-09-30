@@ -1,34 +1,34 @@
 FROM python:3.12-slim-trixie
-# Metadata OCI
+# OCI metadata
 LABEL maintainer="maksimtech <github@maksimtech.com>"
 LABEL org.opencontainers.image.title="CookieRadar"
 LABEL org.opencontainers.image.description="Cookie compliance auditor — GDPR art.5/6/7 — pre-consent, post-reject, GTM analysis"
 LABEL org.opencontainers.image.source="https://github.com/maksimtech/cookieradar"
 LABEL org.opencontainers.image.licenses="MIT"
-# Patch di sicurezza del sistema base (le dipendenze di Chromium arrivano da
-# `playwright install-deps` più sotto)
+# Security patches for the base system. Chromium's own dependencies arrive
+# through `playwright install-deps` further down.
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-# Ambiente Python
+# Python environment
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 WORKDIR /app
-# Playwright prima del sorgente: gli strati con Chromium restano in cache
-# quando cambia solo il codice di cookieradar
+# Playwright before the source, so the layers holding Chromium stay cached
+# when only cookieradar's own code has changed.
 RUN pip install --no-cache-dir --root-user-action=ignore "playwright>=1.40.0"
-# Dipendenze di sistema di Chromium (richiedono root)
+# Chromium's system dependencies, which need root
 RUN playwright install-deps chromium
-# Crea utente non-root
+# A non-root user to run as
 RUN useradd -m -u 1000 cookieradar
-# Chromium installato come cookieradar, in ~/.cache/ms-playwright
+# Chromium installed as cookieradar, into ~/.cache/ms-playwright
 USER cookieradar
 RUN playwright install chromium
 USER root
-# Sorgente di cookieradar:
-#   local (default, CI) → il codice di questo repository
-#   pypi (release)      → cookieradar==COOKIERADAR_VERSION da PyPI
+# Where cookieradar comes from:
+#   local (default, CI) → the code in this repository
+#   pypi (release)      → cookieradar==COOKIERADAR_VERSION from PyPI
 ARG COOKIERADAR_SOURCE=local
 ARG COOKIERADAR_VERSION=
 COPY pyproject.toml README.md LICENSE /app/src/

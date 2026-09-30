@@ -12,6 +12,34 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Fixed
+
+- **`release.sh` would have refused the version this repository is on.** Its check
+  read `YYYY.MM.N` and the scheme has been `YYYY.count[.fix]` since 2026-09-29, so
+  the documented release path answered
+  `Invalid version: 2026.41 (expected YYYY.MM.N)`. How that went unnoticed is that
+  v2026.41 was tagged by hand on 2026-09-30 and the script was never run —
+  patchradar's `scripts/bump_version.py` had the same defect in the same week, and
+  neither was found by a test, because both tests asserted the old scheme too.
+
+  The check now accepts a count with an optional fix, refuses a leading zero —
+  2026.09.5 sorts *below* 2026.10 under PEP 440, and publishing it would be a
+  downgrade PyPI never lets anybody take back — and refuses a middle segment of
+  twelve or less on its own terms, saying that it reads as a month rather than
+  calling the version malformed.
+
+  `tests/test_release_script.py` gained the test that would have caught it: it
+  reads the version out of `cookieradar/__init__.py` instead of a literal, so the
+  next change of scheme fails there rather than at a release. Measured by mutation:
+  the old check fails twelve of the nineteen cases.
+
+### Changed
+
+- **The Italian comments are in English**, in `Dockerfile`, `release.sh`,
+  `scanner.py`, `cli.py` and two test files, together with the one line of Italian
+  the CLI still printed — the trackerdb size, "domini" and "organizzazioni" in the
+  middle of an English report.
+
 ## [2026.41] - 2026-09-29
 
 ### Added

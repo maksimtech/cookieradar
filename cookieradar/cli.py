@@ -621,13 +621,13 @@ def audit(
 
     console.print(f"\n[dim]Auditing [bold]{escape(url)}[/bold]...[/dim]")
     if trackerdb is not None:
-        # Quanto e' grande la base dati usata: un report arricchito da un
-        # trackerdb vecchio o parziale non si distingue da uno arricchito bene,
-        # se non si dice con cosa.
+        # How large the database being used is. A report enriched from an old or
+        # partial trackerdb looks exactly like one enriched from a good copy,
+        # unless it says which it was.
         console.print(
             f"[dim]trackerdb: {trackerdb.trackers} tracker, "
-            f"{trackerdb.domains} domini, "
-            f"{trackerdb.organizations} organizzazioni[/dim]"
+            f"{trackerdb.domains} domains, "
+            f"{trackerdb.organizations} organizations[/dim]"
         )
 
     try:

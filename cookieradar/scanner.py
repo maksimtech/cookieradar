@@ -112,8 +112,8 @@ def summarise_external(session: "SessionResult") -> ExternalSummary:
         if tracker is None:
             continue
         categories[tracker.category] = categories.get(tracker.category, 0) + 1
-        # 437 pattern reali non hanno una organization: contarli fra gli
-        # identificati e tacerne l'azienda e' corretto, scartarli no.
+        # 437 real patterns carry no organization. Counting them as identified
+        # and saying nothing about the company is right; dropping them is not.
         if tracker.organization is not None:
             name = tracker.organization.name
             organizations[name] = organizations.get(name, 0) + 1
@@ -134,8 +134,8 @@ class SessionResult:
     # playwright's context.cookies() returns list[Cookie], a TypedDict; the
     # annotation said list[dict], which is not the same type.
     cookies: list[Cookie] = field(default_factory=list)
-    # Ogni host esterno contattato, riconosciuto o no. `trackers` sopra resta
-    # il sottoinsieme riconosciuto, e tutto cio' che lo consuma non cambia.
+    # Every external host contacted, recognised or not. `trackers` above stays
+    # the recognised subset, so nothing that reads it has to change.
     external: list[ExternalRequest] = field(default_factory=list)
     banner_found: bool = False
     # The status of the main document. None when the navigation produced no

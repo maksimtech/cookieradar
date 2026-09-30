@@ -17,10 +17,28 @@ fi
 VERSION="$1"
 TAG="v${VERSION}"
 
-# Versione calendario: YYYY.MM.N (il tag v<VERSION> deve coincidere con __init__.py,
-# publish.yml lo verifica)
-if ! [[ "$VERSION" =~ ^[0-9]{4}\.(0[1-9]|1[0-2])\.[0-9]+$ ]]; then
-    fail "Invalid version: ${VERSION} (expected YYYY.MM.N, e.g. 2026.09.3)"
+# CalVer, Apple style: YYYY.count[.fix]. The tag is v<VERSION> and has to match
+# __init__.py; publish.yml checks that.
+#
+# This read YYYY.MM.N until 2026-09-30 and would have refused the version that is
+# in this repository — 2026.41 has no month in it, and the five Radar moved to the
+# generation-and-count scheme on 2026-09-29. So the documented release path was
+# broken by the release before last, and the way that was noticed is that v2026.41
+# went out by hand. patchradar's scripts/bump_version.py had the same defect, found
+# the same week.
+#
+# A leading zero is refused rather than tolerated: 2026.09.5 is the old shape, and
+# it sorts *below* 2026.10 under PEP 440, so publishing it would be a downgrade
+# PyPI never lets anybody take back.
+if ! [[ "$VERSION" =~ ^[0-9]{4}\.([1-9][0-9]*)(\.([1-9][0-9]*))?$ ]]; then
+    fail "Invalid version: ${VERSION} (expected YYYY.count[.fix], e.g. 2026.42 or 2026.42.1)"
+fi
+
+# Three segments with a middle of twelve or less is the old YYYY.MM.N form, and
+# nothing can tell the two apart by looking: the count is past forty for every
+# Radar, so a middle segment that could be a month is refused rather than guessed.
+if [ -n "${BASH_REMATCH[2]}" ] && [ "${BASH_REMATCH[1]}" -le 12 ]; then
+    fail "Ambiguous version: ${VERSION} — a middle segment of ${BASH_REMATCH[1]} reads as a month, not a count"
 fi
 
 echo "🚀 Releasing CookieRadar ${TAG}"
@@ -61,7 +79,7 @@ git commit -m "chore: bump version to ${VERSION}"
 git tag -a "$TAG" -m "CookieRadar ${VERSION}"
 
 echo "📤 Pushing main + tag ${TAG}..."
-# Atomico: o arrivano entrambi o nessuno dei due
+# Atomic: either both arrive or neither does
 git push --atomic origin main "$TAG"
 
 echo "✅ Done! GitHub Actions takes it from here"

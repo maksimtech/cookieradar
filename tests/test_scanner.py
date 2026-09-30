@@ -310,8 +310,8 @@ async def test_scan_continues_when_a_session_crashes():
     browser = AsyncMock()
     browser.new_context = AsyncMock(side_effect=new_context)
 
-    # `trackers` accettato e ignorato: la finta deve reggere la firma
-    # vera, o l'errore che il test provoca non e' quello che misura.
+    # `trackers` accepted and ignored: the stand-in has to carry the real
+    # signature, or the error the test provokes is not the one it measures.
     async def run_session(ctx, url, name, accept=None, timeout_ms=30000,
                           trackers=None):
         if name == "post-accept":

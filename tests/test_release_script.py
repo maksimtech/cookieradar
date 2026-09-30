@@ -1,5 +1,14 @@
 """
 Tests for release.sh against throwaway git repositories (bare remote + clone).
+
+The versions here are the scheme in force: CalVer, `YYYY.count[.fix]`. They were
+`YYYY.MM.N` until 2026-09-30, and so was the check inside the script — which means
+the documented release path would have refused 2026.41, the version this
+repository carries. v2026.41 went out by hand on 2026-09-30 and nothing said why.
+
+`test_the_script_accepts_the_version_this_repository_is_on` is the one that would
+have caught it: it reads `cookieradar/__init__.py` rather than a literal, so the
+next change of scheme fails here instead of at a release.
 """
 import shutil
 import subprocess
@@ -8,7 +17,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parent.parent
-CURRENT = "2026.09.4"
+CURRENT = "2026.41"
 
 # release.sh calls python3 and bash. Git Bash on Windows provides bash but not
 # python3, so the script exits 127 before reaching any of the checks these cases
@@ -63,14 +72,14 @@ def _remote_tags(remote):
 def test_release_bumps_version_and_pushes_commit_and_tag(repo):
     work, remote = repo
 
-    proc = _release(work, "2026.09.5")
+    proc = _release(work, "2026.42")
 
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert (work / "cookieradar" / "__init__.py").read_text(encoding="utf-8") == '__version__ = "2026.09.5"\n'
-    assert _git(remote, "log", "-1", "--format=%s", "main") == "chore: bump version to 2026.09.5"
-    assert _remote_tags(remote) == ["v2026.09.5"]
-    assert _git(remote, "rev-parse", "v2026.09.5^{commit}") == _git(remote, "rev-parse", "main")
-    assert _git(remote, "cat-file", "-t", "v2026.09.5") == "tag"  # annotated
+    assert (work / "cookieradar" / "__init__.py").read_text(encoding="utf-8") == '__version__ = "2026.42"\n'
+    assert _git(remote, "log", "-1", "--format=%s", "main") == "chore: bump version to 2026.42"
+    assert _remote_tags(remote) == ["v2026.42"]
+    assert _git(remote, "rev-parse", "v2026.42^{commit}") == _git(remote, "rev-parse", "main")
+    assert _git(remote, "cat-file", "-t", "v2026.42") == "tag"  # annotated
 
 
 def _assert_refused(proc, remote, message):
@@ -85,10 +94,35 @@ def test_release_requires_argument(repo):
     _assert_refused(_release(work), remote, "Usage:")
 
 
-@pytest.mark.parametrize("version", ["2026.9", "v2026.09.5", "2026.09.5-rc1", "latest", "2026.13.1"])
+@pytest.mark.parametrize(
+    "version",
+    [
+        "v2026.42",        # the tag, not the version
+        "2026.42-rc1",     # not a release
+        "latest",          # not a version at all
+        "2026",            # a year on its own
+        "2026.09.5",       # the old month form, which sorts below 2026.10 under PEP 440
+        "2026.42.0",       # a fix numbered zero is the baseline, which already shipped
+        "2026.0",          # a count of zero is nobody's release
+    ],
+)
 def test_release_rejects_invalid_version(repo, version):
     work, remote = repo
     _assert_refused(_release(work, version), remote, "Invalid version")
+
+
+@pytest.mark.parametrize("version", ["2026.9.5", "2026.12.3", "2026.1.1"])
+def test_release_rejects_a_middle_segment_that_reads_as_a_month(repo, version):
+    """Refused for saying so, rather than refused as malformed.
+
+    2026.9.5 is the shape of both a count with a fix and the old YYYY.M.N, and
+    nothing can tell them apart by looking: the count is past forty for every
+    Radar, so a middle segment of twelve or less is a month by any reasonable
+    reading. Being told which of the two rules refused it is the difference
+    between fixing the version and arguing with the regex.
+    """
+    work, remote = repo
+    _assert_refused(_release(work, version), remote, "Ambiguous version")
 
 
 def test_release_rejects_current_version(repo):
@@ -100,14 +134,14 @@ def test_release_requires_main_branch(repo):
     work, remote = repo
     _git(work, "checkout", "-q", "-b", "feature")
 
-    _assert_refused(_release(work, "2026.09.5"), remote, "Not on main")
+    _assert_refused(_release(work, "2026.42"), remote, "Not on main")
 
 
 def test_release_requires_clean_tree(repo):
     work, remote = repo
     (work / "notes.txt").write_text("wip", encoding="utf-8")
 
-    _assert_refused(_release(work, "2026.09.5"), remote, "Working tree not clean")
+    _assert_refused(_release(work, "2026.42"), remote, "Working tree not clean")
 
 
 def test_release_refuses_when_behind_origin(repo, tmp_path):
@@ -119,7 +153,7 @@ def test_release_refuses_when_behind_origin(repo, tmp_path):
     _git(other, "commit", "-q", "-m", "someone else")
     _git(other, "push", "-q", "origin", "main")
 
-    proc = _release(work, "2026.09.5")
+    proc = _release(work, "2026.42")
 
     assert proc.returncode != 0
     assert "is not aligned with origin/main" in proc.stdout + proc.stderr
@@ -132,15 +166,44 @@ def test_release_refuses_unpushed_commits(repo):
     _git(work, "add", ".")
     _git(work, "commit", "-q", "-m", "local only")
 
-    _assert_refused(_release(work, "2026.09.5"), remote, "is not aligned with origin/main")
+    _assert_refused(_release(work, "2026.42"), remote, "is not aligned with origin/main")
 
 
 def test_release_refuses_tag_existing_only_on_remote(repo, tmp_path):
     work, remote = repo
-    _git(remote, "tag", "v2026.09.5", "main")
+    _git(remote, "tag", "v2026.42", "main")
 
-    proc = _release(work, "2026.09.5")
+    proc = _release(work, "2026.42")
 
     assert proc.returncode != 0
     assert "already exists" in proc.stdout + proc.stderr
     assert _git(remote, "log", "-1", "--format=%s", "main") == "initial"
+
+
+def _current_version() -> str:
+    import re
+
+    text = (ROOT / "cookieradar" / "__init__.py").read_text(encoding="utf-8")
+    match = re.search(r'__version__ = "(.+?)"', text)
+    assert match, "cookieradar/__init__.py has no __version__"
+    return match.group(1)
+
+
+def test_the_script_accepts_the_version_this_repository_is_on(repo):
+    """The check that the release path still fits the scheme in use.
+
+    Read out of `cookieradar/__init__.py` rather than written here: a literal
+    passes for as long as somebody remembers to change it, which is exactly how the
+    old YYYY.MM.N check survived the move to counts. What is released in the
+    throwaway repository is the next count, but it has to get past the same
+    validation the current version would.
+    """
+    work, remote = repo
+    current = _current_version()
+    year, count = current.split(".")[0], int(current.split(".")[1])
+
+    proc = _release(work, f"{year}.{count + 1}")
+
+    assert "Invalid version" not in proc.stderr, proc.stderr
+    assert "Ambiguous version" not in proc.stderr, proc.stderr
+    assert proc.returncode == 0, proc.stderr

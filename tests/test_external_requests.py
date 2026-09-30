@@ -77,7 +77,7 @@ def test_an_empty_host_is_not_the_same_site():
     assert not is_same_site("", "example.it")
 
 
-# ── il riepilogo, che e' il punto ────────────────────────────────────────────
+# ── the summary, which is the point ────────────────────────────────────────────
 
 def _req(host, tracker=None, domain=None):
     return ExternalRequest(url=f"https://{host}/x", host=host, resource_type="script",
