@@ -86,6 +86,13 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Changed
 
+- **ruff now lints `tools/` as well, because it never did.** Every one of the five
+  Radar lints its package and its tests and stops there, which left
+  `tools/security_exceptions.py` outside the check — the script that refuses a build
+  over an unexplained alert had never been seen by the linter that gates the build.
+  Found on 2026-10-02 by running ruff over the whole tree by hand while working on
+  something else, which is not a way of finding things that scales.
+
 - **The Italian comments are in English**, in `Dockerfile`, `release.sh`,
   `scanner.py`, `cli.py` and two test files, together with the one line of Italian
   the CLI still printed — the trackerdb size, "domini" and "organizzazioni" in the
