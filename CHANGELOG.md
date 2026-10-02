@@ -12,6 +12,30 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Removed
+
+- **`CVE-2026-84782` out of `SECURITY-EXCEPTIONS.toml`; `CVE-2026-82560` kept on
+  purpose.** The openssl entry was never an acceptance — it said so — but a
+  rebuild: `patchradar debian CVE-2026-84782` reports it resolved in trixie at
+  `3.5.7-1~deb13u3`, which the Dockerfile's `apt-get upgrade` picks up at the next
+  build. GitHub closed the alert at **2026-09-30T18:32:11Z**, this repository's
+  republish, so the rebuild happened and the entry goes. Its return would mean the
+  upgrade stopped taking, which is worth a build failing over.
+
+  `CVE-2026-82560` stays, and not because its silence is shorter — it is longer.
+  Docker Scout stopped reporting it at 2026-09-29T15:29:03Z, earlier and on its
+  own, with nothing done to the image in between, while
+  `patchradar debian CVE-2026-82560` on 2026-10-02 still reports perl no-dsa in
+  trixie at `5.40.1-6+deb13u1`, no fix in any suite, Debian bug 1148455. perl-base
+  is still installed and still unfixed; only the reporting changed, and Scout has
+  already changed its mind about this exact id once — which is why the gate reads
+  closed alerts at all.
+
+  Checked by running `tools/security_exceptions.py` against this repository's live
+  open and closed alerts rather than by inference: exit 0, with `CVE-2026-82560` the
+  one settled entry it names. Twenty-four entries down to twenty-three. The same
+  decision was taken in exeradar and apkradar the same day.
+
 
 ### Added
 

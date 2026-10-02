@@ -192,6 +192,17 @@ removable `perl` and `perl-base`, which is Essential and which dpkg itself \
 depends on. Measured inside the built patchradar image on 2026-09-29, only \
 `perl-base` is installed; this image is built on the same base, so the finding \
 is ours to record and not ours to close.
+
+Docker Scout stopped reporting it at 2026-09-29T15:29:03Z, so the gate lists this \
+entry as settled. It is kept anyway, and the distinction is the whole point: \
+CVE-2026-84782 left this file on 2026-10-02 because the thing it described left \
+the image. This one went quiet on its own. `patchradar debian CVE-2026-82560` on \
+2026-10-02 still reports perl no-dsa in trixie at 5.40.1-6+deb13u1, no fix in any \
+suite, Debian bug 1148455 — perl-base is still installed and still unfixed, and \
+only the reporting changed. Scout has already changed its mind about this exact id \
+once, which is why the gate reads closed alerts at all. Deleting a flaw that is \
+demonstrably present because a scanner fell silent is the one direction this file \
+must not drift in.
 """
 review_by = "2026-12-31"
 
@@ -277,33 +288,16 @@ review_by = "2026-12-31"
 # ─────────────────────────────────────────────────────────────────────────────
 # Arrived on 2026-09-30, after 2026.41 was prepared: two advisories published
 # overnight against the base image, which the gate refused before the tag. That
-# is the gate working — not a defect introduced here — and the two are in
+# is the gate working — not a defect introduced here — and the two were in
 # different situations, read out of the Debian security tracker with
 # `patchradar debian` rather than from the scanners' one-line summaries.
+#
+# The openssl one, CVE-2026-84782, was never an acceptance but a rebuild, and the
+# rebuild happened: GitHub closed it at 2026-09-30T18:32:11Z, this repository's
+# republish, and the entry was removed on 2026-10-02. Its return would mean the
+# `apt-get upgrade` stopped taking, which is worth a build failing over. The gcc
+# one is below and is still open.
 # ─────────────────────────────────────────────────────────────────────────────
-
-[[exception]]
-id = "CVE-2026-84782"
-source = "Docker Scout"
-where = "openssl 3.5.7-1~deb13u2 in the published image; fixed in Debian 3.5.7-1~deb13u3"
-why = """
-An out-of-bounds read in OpenSSL's DTLS retransmission, advisory published \
-2026-09-29. Debian has already fixed it: `patchradar debian CVE-2026-84782` \
-reports it resolved in trixie at openssl 3.5.7-1~deb13u3, so this is not an \
-acceptance — it is a rebuild.
-
-The Dockerfile runs `apt-get update && apt-get upgrade -y`, so the next image \
-built picks the fix up with no change to this repository. Docker Scout reads the \
-image published on Docker Hub, which is why the alert stays open until then. The \
-short date is the check that the publish happened: if this is still here \
-afterwards, either the image was not republished or the upgrade did not take.
-
-Reachability, for what it is worth: the flaw is in DTLS, and nothing here speaks \
-DTLS. mailradar opens TLS sockets over TCP to check certificates, cookieradar \
-drives Chromium over HTTPS, apkradar fetches store listings over HTTPS. None of \
-that is datagram TLS.
-"""
-review_by = "2026-10-31"
 
 [[exception]]
 id = "SNYK-DEBIAN13-GCC14-20335537"
