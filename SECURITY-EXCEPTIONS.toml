@@ -322,3 +322,55 @@ base image link against. Removing it is not an option the way the full `perl` \
 would have been.
 """
 review_by = "2026-12-31"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# gcc, reported on 2026-10-02 by both scanners under different ids. The gate
+# matches by id, so one flaw needs an entry per scanner — zlib has been in that
+# position since September.
+#
+# Positions read with `patchradar debian` rather than from the scanners' one line:
+# CVE-2026-102010 and CVE-2026-95619 are both open in trixie for gcc-12 (12.4.0-5)
+# and gcc-14 (14.2.0-19), with no fixed version in any suite and no Debian bug
+# recorded. Nothing to wait for and nothing to ask for; evidence goes on the
+# tracker page.
+#
+# What Snyk names is the *source* package gcc-14, and Debian's gcc source produces
+# both the compiler and libstdc++6. A flaw in cc1 needs something to compile and
+# nothing in this image compiles anything; which binary package is installed is a
+# measurement and not an assumption, which is why tests/docker/inspect.sh prints
+# the gcc and libstdc++ packages.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-102010"
+source = "Docker Scout"
+where = "gcc-14 / libstdc++6 14.2.0-19, python slim-trixie base image"
+why = """
+The flaw also reported as SNYK-DEBIAN13-GCC14-20335537, under the other scanner's \
+id. Open in trixie for gcc-12 and gcc-14, no fixed version in any suite, no Debian \
+bug — `patchradar debian CVE-2026-102010`. Evidence goes on \
+https://security-tracker.debian.org/tracker/CVE-2026-102010.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "SNYK-DEBIAN13-GCC14-20386241"
+source = "Snyk Container"
+where = "gcc-14 / libstdc++6 14.2.0-19, python slim-trixie base image"
+why = """
+CVE-2026-95619, an integer overflow in gcc-14, published on 2026-10-02. Read with \
+`patchradar debian CVE-2026-95619`: open in trixie for gcc-12 (12.4.0-5) and \
+gcc-14 (14.2.0-19), no fixed version in any suite, no Debian bug recorded. \
+Evidence goes on https://security-tracker.debian.org/tracker/CVE-2026-95619.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-95619"
+source = "Docker Scout"
+where = "gcc-14 / libstdc++6 14.2.0-19, python slim-trixie base image"
+why = """
+The same flaw as SNYK-DEBIAN13-GCC14-20386241 above, under the other scanner's id.
+"""
+review_by = "2026-12-31"
