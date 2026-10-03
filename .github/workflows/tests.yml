@@ -9,7 +9,7 @@ permissions:
 jobs:
   test:
     name: Tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -42,7 +42,7 @@ jobs:
           fail_ci_if_error: false
   docker:
     name: Docker image (local source)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - name: Set up Docker Buildx
@@ -68,7 +68,7 @@ jobs:
     name: Tests
     needs: [test, docker]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: All test jobs succeeded
         env:
