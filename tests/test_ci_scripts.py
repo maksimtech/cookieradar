@@ -298,3 +298,22 @@ def test_tests_summary_job_for_branch_protection():
 def test_matrix_jobs_are_named_by_python_version():
     job = _workflow("tests.yml")["jobs"]["test"]
     assert job["name"] == "Tests (Python ${{ matrix.python-version }})"
+
+
+def test_the_mutation_run_skips_the_benchmarks() -> None:
+    """A benchmark asserts nothing, so it can kill no mutant — and the runner it
+    needs is installed by codspeed.yml alone and is deliberately not a project
+    dependency, so under mutmut the fixture is missing entirely.
+
+    On 2026-10-03 that killed the Saturday run in the stats phase, before a single
+    mutant was tried. mutmut takes no pytest arguments on its command line, so the
+    exclusion lives in its configuration — which means asserting on the workflow
+    file would not have caught it.
+    """
+    import pathlib
+
+    config = (pathlib.Path(__file__).resolve().parent.parent
+              / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert "[tool.mutmut]" in config, "the mutation configuration moved"
+    assert "--ignore=tests/benchmarks" in config.split("[tool.mutmut]", 1)[1]
