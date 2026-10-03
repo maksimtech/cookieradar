@@ -24,6 +24,31 @@ import pytest
 
 from cookieradar.scanner import bot_challenge, page_not_served, scan
 
+
+@pytest.fixture(scope="module", autouse=True)
+def _chromium_or_skip():
+    """The marker these tests carry promises "skipped if not installed", and until
+    2026-10-03 they did not keep it.
+
+    conftest's `browser` fixture skips when Playwright's browsers are absent, but
+    the three tests below never request it — they reach Chromium through `scan()`,
+    inside the code under test. So on a host without the browsers they *failed*
+    rather than skipped, and the workflows that install it
+    (`tests.yml`, `sonarcloud.yml`, both `playwright install --with-deps chromium`)
+    hid that everywhere except where it mattered: `mutation.yml` installs the dev
+    group and nothing else, and one of these killed the Saturday mutation run in
+    the stats phase, before a single mutant was tried.
+
+    Module-scoped, so the probe costs one browser launch rather than three.
+    """
+    from playwright.sync_api import sync_playwright
+
+    try:
+        with sync_playwright() as play:
+            play.chromium.launch().close()
+    except Exception as unavailable:  # pragma: no cover - depends on environment
+        pytest.skip(f"Chromium not available: {unavailable}")
+
 CHALLENGE = b"""<!DOCTYPE html><html><head><title>Just a moment...</title></head>
 <body><div id="challenge-running">
 <h1>example.com needs to review the security of your connection before proceeding.</h1>
