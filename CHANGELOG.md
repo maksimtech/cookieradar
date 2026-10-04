@@ -12,6 +12,8 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+## [2026.42] - 2026-10-04
+
 ### Removed
 
 - **`CVE-2026-84782` out of `SECURITY-EXCEPTIONS.toml`; `CVE-2026-82560` kept on
