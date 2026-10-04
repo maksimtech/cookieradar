@@ -3,6 +3,7 @@ Tests for CI helper scripts in .github/scripts/.
 """
 import os
 import subprocess
+import time
 import tomllib
 from pathlib import Path
 
@@ -35,11 +36,23 @@ def fake_pip(tmp_path):
         calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
         return proc, calls
 
+    def start(succeed_at, *args):
+        """The same script, left running, for the one case that is about *not* finishing."""
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}",
+               "SUCCEED_AT": str(succeed_at)}
+        return subprocess.Popen(
+            ["bash", str(WAIT_FOR_PYPI), *args],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    run.start = start
     return run
 
 
 def test_wait_for_pypi_succeeds_immediately(fake_pip):
-    proc, calls = fake_pip(1, "cookieradar", "2026.09.5", "5", "0")
+    proc, calls = fake_pip(1, "cookieradar", "2026.09.5", "5", "0", "0")
 
     assert proc.returncode == 0, proc.stderr
     assert len(calls) == 1
@@ -49,7 +62,7 @@ def test_wait_for_pypi_succeeds_immediately(fake_pip):
 
 
 def test_wait_for_pypi_retries_until_available(fake_pip):
-    proc, calls = fake_pip(3, "cookieradar", "2026.09.5", "5", "0")
+    proc, calls = fake_pip(3, "cookieradar", "2026.09.5", "5", "0", "0")
 
     assert proc.returncode == 0, proc.stderr
     assert len(calls) == 3
@@ -69,6 +82,53 @@ def test_wait_for_pypi_requires_arguments(fake_pip):
     assert proc.returncode != 0
     assert calls == []
     assert "Usage" in proc.stderr
+
+
+def test_wait_for_pypi_allows_a_grace_once_the_version_is_there(fake_pip):
+    """The margin is a wait that happens, not a line in the log.
+
+    apkradar 2026.42 built fifteen seconds after this script reported the version
+    available — 16:31:21 against 16:31:36 — because the runner and the buildx
+    container resolve different edges of the index. A grace that is printed and not
+    taken would leave that exactly as it was while looking fixed.
+    """
+    start = time.monotonic()
+    proc, calls = fake_pip(1, "cookieradar", "2026.09.5", "5", "0", "2")
+    elapsed = time.monotonic() - start
+
+    assert proc.returncode == 0, proc.stderr
+    assert elapsed >= 2, f"it reported a grace it did not take ({elapsed:.1f}s)"
+    assert "agree with itself" in proc.stdout, "it waited without saying why"
+
+
+def test_wait_for_pypi_with_no_grace_waits_for_nothing(fake_pip):
+    """Zero has to mean zero, including in the log: a release that did not need the
+    margin should not read as though it used one."""
+    start = time.monotonic()
+    proc, calls = fake_pip(1, "cookieradar", "2026.09.5", "5", "0", "0")
+    elapsed = time.monotonic() - start
+
+    assert proc.returncode == 0, proc.stderr
+    assert elapsed < 2, f"it waited {elapsed:.1f}s after being told not to"
+    assert "agree with itself" not in proc.stdout
+
+
+def test_wait_for_pypi_default_grace_is_a_wait_and_not_zero(fake_pip):
+    """Measured, without the suite paying the whole default for it.
+
+    Started with no grace argument against an index that answers on the first ask,
+    the script must still be running a few seconds later. Remove the default, or set
+    it to zero, and it exits immediately and this fails — which is the point: every
+    other case here passes a grace explicitly, so without this one the default could
+    be deleted and nothing would notice.
+    """
+    proc = fake_pip.start(1, "cookieradar", "2026.09.5", "5", "0")
+    try:
+        with pytest.raises(subprocess.TimeoutExpired):
+            proc.wait(timeout=3)
+    finally:
+        proc.kill()
+        proc.wait(timeout=10)
 
 
 # ─── W1/W2: workflow structure ──────────────────────────────────────────────
