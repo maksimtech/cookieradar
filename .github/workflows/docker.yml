@@ -1,6 +1,9 @@
 name: Build and Push Docker Image
-# Not triggered by tags directly: publish.yml calls this workflow after the
-# PyPI upload, so the image never races with the package it installs.
+# Not triggered by tags directly: publish.yml calls this workflow after the PyPI
+# upload. It used to have to — the image installed the package from the index, so it
+# raced with the upload running beside it — and the sequencing is kept because the
+# version it is handed is the one that was published. The race itself is gone: the
+# image is built from the tag's source and asks the index nothing about this package.
 on:
   workflow_call:
     inputs:
@@ -19,8 +22,13 @@ jobs:
   docker:
     runs-on: ubuntu-26.04
     steps:
+      # The tag being built, not the default branch. The image is built from this
+      # checkout now, so where the job stands decides what ships. `version` is a
+      # required input of both triggers, so there is no case where it is absent.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.version }}
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
@@ -41,10 +49,6 @@ jobs:
         run: |
           echo "VERSION=v${RAW#v}" >> "$GITHUB_OUTPUT"
           echo "PIP_VERSION=${RAW#v}" >> "$GITHUB_OUTPUT"
-      - name: Wait for cookieradar on PyPI
-        env:
-          PIP_VERSION: ${{ steps.version.outputs.PIP_VERSION }}
-        run: bash .github/scripts/wait_for_pypi.sh cookieradar "$PIP_VERSION"
       - name: Build image for smoke test
         uses: docker/build-push-action@v7
         with:
@@ -52,8 +56,7 @@ jobs:
           load: true
           tags: cookieradar:smoke
           build-args: |
-            COOKIERADAR_SOURCE=pypi
-            COOKIERADAR_VERSION=${{ steps.version.outputs.PIP_VERSION }}
+            COOKIERADAR_SOURCE=local
       - name: Smoke test (Chromium launches as non-root user, version matches)
         env:
           PIP_VERSION: ${{ steps.version.outputs.PIP_VERSION }}
@@ -68,5 +71,4 @@ jobs:
             maksimtech/cookieradar:latest
             maksimtech/cookieradar:${{ steps.version.outputs.VERSION }}
           build-args: |
-            COOKIERADAR_SOURCE=pypi
-            COOKIERADAR_VERSION=${{ steps.version.outputs.PIP_VERSION }}
+            COOKIERADAR_SOURCE=local

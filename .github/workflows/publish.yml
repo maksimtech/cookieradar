@@ -39,9 +39,32 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verify-metadata: false
+      # That the file on PyPI can be installed used to be proved by accident, by the
+      # image installing it. The image now builds from the tag's source and never asks
+      # the index, so the check is made here, on purpose, and after the upload — where
+      # a slow index delays a check instead of failing a build that had nothing to do
+      # with it.
+      #
+      # No margin: the grace in that script exists for the case of two resolvers, the
+      # runner and the buildx container. Here there is only the runner, which is what
+      # the poll just asked, so a margin would buy nothing.
+      - name: Wait for the index to catch up
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash .github/scripts/wait_for_pypi.sh cookieradar "$VERSION" 30 20 0
+
+      - name: Check the published wheel installs and runs
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python -m venv "${RUNNER_TEMP}/verify"
+          "${RUNNER_TEMP}/verify/bin/pip" install --no-cache-dir "cookieradar==${VERSION}"
+          "${RUNNER_TEMP}/verify/bin/cookieradar" --version
   docker:
     name: Docker image
-    # Runs only after the package is on PyPI (docker.yml also waits for it)
+    # Runs only after the package is on PyPI. The image no longer installs it from
+    # there — it is built from the tag's source — but the version handed to it is the
+    # one this job published, so the order still means something.
     needs: build-and-publish
     permissions:
       contents: read

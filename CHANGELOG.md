@@ -11,6 +11,28 @@ no version in this file has ever matched — 40 is not a month, and
 `tests/test_version_contract.py` has been enforcing the real form all along.
 
 ## [Unreleased]
+### Added
+
+- **The files the build is told to include are checked to be there.** apkradar lost its
+  `LICENSE` out of the working tree on 2026-10-04 and the loss reached `main`: pyproject
+  names the file, so `python -m build` failed with `License file does not exist: LICENSE`,
+  and the PyPI publish and the image went down with it. cookieradar lost its own a few
+  hours later, during a run of the suite. Neither suite noticed, because neither looked.
+
+  What removes them is still not known, and these cases do not explain it. They stop it
+  reaching a commit, which is the part that can be fixed without knowing.
+
+  The expectation is read out of the declarations rather than written down as `LICENSE`,
+  because the five Radar do not declare it the same way: patchradar states its licence as
+  text and only its Dockerfile names the file, the other four name it in pyproject, and of
+  those apkradar and mailradar do not copy it into the image. So two cases — every file
+  pyproject names, and every path the Dockerfile copies — and between them each repository
+  is covered, three of them twice.
+
+  Checked by moving the file aside in all five: it fails where it should and passes where
+  the declaration genuinely does not name it, and pointing pyproject at a file that is not
+  there fails too.
+
 ### Fixed
 
 - **Two defences in `release.sh` that the tests did not actually measure.** Found by
@@ -65,6 +87,37 @@ no version in this file has ever matched — 40 is not a month, and
   guard removed so zero waits anyway.
 
 ### Changed
+
+- **The race with PyPI is closed rather than narrowed: the released image no longer asks
+  the index.** `docker.yml` installed `cookieradar==<the new version>` from PyPI and
+  polled the index first to make that work. The poll is not wrong and not enough: it runs
+  on the runner, while the multi-platform build resolves the index again, per platform,
+  from whichever edge answers — apkradar lost that race on 2026-10-03 **fifteen seconds
+  after** its poll had succeeded. Nothing that waits can close it. Not asking does, so the
+  image is built from the source the tag points at.
+
+  `local` is also the branch `tests.yml` already builds on every run, with the smoke test
+  behind it, so the release moves onto the better exercised of the two paths rather than
+  onto an untried one. This repository is the only one of the five where that was already
+  true; in the other four the only thing that built the image automatically was the
+  workflow that publishes it.
+
+  Two things follow. A dispatched rebuild now checks out the tag it was given: while the
+  image installed that version from the index, where the job stood in the tree did not
+  matter, and built from the checkout it decides what ships. And that the file on PyPI can
+  be installed, which the old arrangement proved by accident, is now checked on purpose in
+  `publish.yml` after the upload — where a slow index delays a check instead of failing a
+  build that had nothing to do with it, and with no margin, because there is a single
+  resolver there.
+
+  Five mutations hold it, and all five fail: the image back on the index, the checkout off
+  the tag, a wait returning before the build, the published file unchecked, and a margin
+  where there is one resolver.
+
+  Not included, and worth doing separately: neither branch of this Dockerfile passes
+  `--only-binary :all:`, so a dependency without an aarch64 wheel would be compiled under
+  QEMU. patchradar's `pypi` branch had that guarantee and keeping it was part of its move;
+  here there is nothing to keep, and adding it is a change of its own.
 
 - **`release.sh` runs the suite after the bump, and refuses before committing.**
   The version is written as the script's first act, so a suite run *before* a

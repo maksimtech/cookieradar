@@ -181,19 +181,72 @@ def test_publish_runs_docker_after_pypi_upload():
     assert "version" in jobs["build-and-publish"]["outputs"]
 
 
-def test_docker_release_waits_for_pypi_before_building():
-    steps = _workflow("docker.yml")["jobs"]["docker"]["steps"]
-    names = [s.get("name", "") for s in steps]
-    wait = next(i for i, s in enumerate(steps) if "wait_for_pypi.sh" in s.get("run", ""))
-    first_build = next(i for i, s in enumerate(steps) if "build-push-action" in s.get("uses", ""))
+def test_the_release_image_is_built_from_the_tag_and_not_from_the_index():
+    """What closes the race instead of narrowing it.
 
-    assert wait < first_build, names
+    This workflow installed `cookieradar==<the new version>` from PyPI while
+    publish.yml was still uploading it, and waited on the index first to make that
+    work. The wait is not wrong and not enough: it runs on the runner, while the
+    multi-platform build resolves the index again, per platform, from whichever edge
+    answers. apkradar lost that race on 2026-10-03 fifteen seconds *after* its poll
+    had succeeded. Nothing that waits can close it; not asking does.
 
-
-def test_docker_release_installs_from_pypi():
+    `local` is also the branch tests.yml already builds on every run, with the smoke
+    test behind it, so this moves the release onto the better exercised of the two
+    paths rather than onto an untried one.
+    """
     job = _workflow("docker.yml")["jobs"]["docker"]
+    text = _steps_text(job)
 
-    assert "COOKIERADAR_SOURCE=pypi" in _steps_text(job)
+    assert "COOKIERADAR_SOURCE=local" in text
+    assert "COOKIERADAR_SOURCE=pypi" not in text
+    assert "wait_for_pypi.sh" not in text, (
+        "nothing here needs the index now, so nothing here should wait for it"
+    )
+
+
+def test_a_rebuild_stands_on_the_tag_it_was_asked_for():
+    """Dispatched with the version of a published release, this has to check that
+    release out.
+
+    While the image installed that version from the index, where the job stood in the
+    tree did not matter. Built from the checkout it decides what ships — and the smoke
+    test, which compares the version in the image against the tag, would turn a
+    rebuild from the default branch into a version mismatch rather than into a
+    publish. Either way the feature does not work; this makes it work.
+    """
+    steps = _workflow("docker.yml")["jobs"]["docker"]["steps"]
+    checkout = next(s for s in steps if "actions/checkout" in s.get("uses", ""))
+
+    assert "inputs.version" in checkout.get("with", {}).get("ref", "")
+
+
+def test_the_published_file_is_still_checked_where_it_was_published():
+    """Taking the image off the index loses the one thing that arrangement proved by
+    accident: that what lands on PyPI can be installed. publish.yml says it on
+    purpose now, after the upload, where a slow index delays a check instead of
+    failing a build that had nothing to do with it."""
+    steps = _workflow("publish.yml")["jobs"]["build-and-publish"]["steps"]
+    names = [s.get("name", s.get("uses", "")) for s in steps]
+
+    upload = next(i for i, s in enumerate(steps) if "gh-action-pypi-publish" in s.get("uses", ""))
+    wait = next(i for i, s in enumerate(steps) if "wait_for_pypi.sh" in s.get("run", ""))
+    verify = next(i for i, s in enumerate(steps) if "--version" in s.get("run", ""))
+
+    assert upload < wait < verify, names
+    assert "cookieradar==" in steps[verify]["run"], "it has to be the version just uploaded"
+
+
+def test_the_check_asks_for_no_margin_because_there_is_one_resolver():
+    """The grace exists because the runner and the buildx container ask different
+    edges of the index. Here there is only the runner, which has just had
+    `pip download` answer, so a margin would buy nothing — and a wait that buys
+    nothing is what this script was rewritten to stop doing."""
+    steps = _workflow("publish.yml")["jobs"]["build-and-publish"]["steps"]
+    wait = next(s for s in steps if "wait_for_pypi.sh" in s.get("run", ""))
+    arguments = wait["run"].split("wait_for_pypi.sh", 1)[1].split()
+
+    assert arguments[-1] == "0", wait["run"]
 
 
 def test_ci_builds_docker_image_from_local_source():
