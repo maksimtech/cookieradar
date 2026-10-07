@@ -229,7 +229,7 @@ def _not_the_site(kind):
     return result
 
 
-def test_law_notes_do_not_blame_the_banner_when_a_challenge_answered(cache, online):
+def test_law_notes_do_not_blame_the_banner_when_a_challenge_answered(cache):
     """`notes_of` looked only at `page_not_served` (status >= 400). With a
     challenge served with 200 the report said NOT MEASURED and, under the
     provisions, "UNVERIFIED: no cookie banner was found": a statement about a
@@ -241,7 +241,7 @@ def test_law_notes_do_not_blame_the_banner_when_a_challenge_answered(cache, onli
 
 
 @pytest.mark.parametrize("kind", ["403", "challenge"])
-def test_no_finding_is_drawn_from_a_page_that_is_not_the_site(cache, online, kind):
+def test_no_finding_is_drawn_from_a_page_that_is_not_the_site(cache, kind):
     """`notes_of` said NOT MEASURED, but `findings_of` did not look at the same
     fact: with an error page (or a challenge) carrying a reject button and a
     tracker after the reload, the report said NOT MEASURED and cited the
@@ -251,8 +251,12 @@ def test_no_finding_is_drawn_from_a_page_that_is_not_the_site(cache, online, kin
     result.post_reject.trackers = [TrackerRequest("https://x.doubleclick.net/", "doubleclick.net", "script", 0.0)]
 
     assert findings_of(result) == {}
-    assert check(result, cache=cache, now=DAY1).citations == []
-    assert online == []
+    law = check(result, cache=cache, now=DAY1)
+    assert law.citations == []
+    # Nothing to cite, so no act was even looked up: nothing downloaded, and
+    # nothing written to the cache.
+    assert law.acts == []
+    assert not cache.path.exists()
 
 
 def test_one_act_offline_other_online(cache, monkeypatch):
