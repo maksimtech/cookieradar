@@ -565,3 +565,44 @@ async def test_tracker_timestamp_is_capture_time():
     stamps = [t.timestamp for t in result.trackers]
     assert all(before <= s <= time.time() for s in stamps)
     assert stamps == sorted(stamps)
+
+
+# ─── the audited site's own requests are first-party ────────────────────────
+
+async def test_first_party_requests_of_an_idn_site_are_not_external():
+    """`page_host` came from the address typed, in Unicode (müller.de), while
+    Chromium sends the requests in punycode (xn--mller-kva.de — checked against
+    real Chromium). Every resource of the site itself ended up among the
+    unknown "external hosts"."""
+    context, page = make_mock_context()
+
+    async def goto(*args, **kwargs):
+        page.handlers["request"](fake_request("https://xn--mller-kva.de/", "document"))
+        page.handlers["request"](fake_request("https://xn--mller-kva.de/style.css", "stylesheet"))
+
+    page.goto = AsyncMock(side_effect=goto)
+
+    result = await _run_session(context, "https://müller.de/", "pre-consent")
+
+    assert [r.host for r in result.external] == []
+
+
+async def test_the_audited_sites_own_document_is_not_a_tracker():
+    """Auditing linkedin.com (or facebook.com, bing.com, tiktok.com…) the main
+    document's request was classified as the tracker "linkedin.com": the site
+    was always a VIOLATION "persists from pre-consent" for the mere fact of
+    being loaded. The README puts first-party tracking out of scope."""
+    context, page = make_mock_context()
+
+    async def goto(*args, **kwargs):
+        page.handlers["request"](fake_request("https://www.linkedin.com/", "document"))
+        page.handlers["request"](fake_request("https://static.linkedin.com/app.js", "script"))
+        # The guard: a third-party tracker on the same page is still a tracker.
+        page.handlers["request"](fake_request("https://connect.facebook.net/fbevents.js", "script"))
+
+    page.goto = AsyncMock(side_effect=goto)
+
+    result = await _run_session(context, "https://www.linkedin.com/", "pre-consent")
+
+    assert [t.domain for t in result.trackers] == ["facebook.net"]
+    assert [r.host for r in result.external] == ["connect.facebook.net"]

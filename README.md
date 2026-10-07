@@ -135,7 +135,10 @@ cookieradar batch urls.txt -o reports/
 ```
 
 An invalid address or a site that fails to load is reported and skipped;
-the other sites are still audited.
+the other sites are still audited. A site that answers with an error status
+(e.g. 403) or with a bot-management challenge instead of its own page is
+reported as `⛔ NOT MEASURED`, without tracker counts, and counts as not
+audited for the exit code.
 
 ## Reading the report
 
@@ -248,7 +251,9 @@ LinkedIn, TikTok, Microsoft Bing and Clarity, Hotjar, Adobe, Amazon Ads.
 It does not detect:
 - services that are not on the list;
 - tracking through the site's own domain (first-party or server-side
-  tracking, e.g. a tag manager proxied through `metrics.example.com`);
+  tracking, e.g. a tag manager proxied through `metrics.example.com`).
+  This holds for the listed services too: auditing `linkedin.com` does not
+  count `linkedin.com` as a tracker of itself;
 - what data a request contains, or whether a cookie is "necessary".
 
 A VIOLATION is therefore reliable for the services listed; an OK means

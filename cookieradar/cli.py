@@ -701,12 +701,20 @@ def batch(
                 ExitCode.OK: "✅ OK",
                 ExitCode.VIOLATION: "🔴 VIOLATION",
                 ExitCode.UNVERIFIED: "⚠️  UNVERIFIED",
+                ExitCode.ERROR: "⛔ NOT MEASURED",
             }[verdict]
-            console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
-            if verdict is not ExitCode.UNVERIFIED:
-                _print_violations(console, find_violations(result), "    ")
+            # A site never seen gets no counts, as in `audit`: zero trackers on
+            # an error page or a challenge are facts about that page.
+            reason = _why_not_the_site(result)
+            if reason:
+                console.print(f"  {status}")
+                console.print(f"    [yellow]{escape(reason)}[/yellow]")
             else:
-                console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
+                console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
+                if verdict is ExitCode.UNVERIFIED:
+                    console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
+                else:
+                    _print_violations(console, find_violations(result), "    ")
             for s in _session_errors(result):
                 console.print(f"    [yellow]⚠️  {s.session}: {escape(s.error)}[/yellow]")
             if output:

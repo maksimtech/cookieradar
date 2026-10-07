@@ -428,6 +428,36 @@ def test_batch_reject_not_applied_is_unverified(tmp_path):
     assert "reject button not found" in res.output
 
 
+@pytest.mark.parametrize("kind", ["403", "challenge"])
+def test_batch_reports_a_site_not_served_without_crashing_on_the_verdict(tmp_path, kind):
+    """`batch` turned the verdict into a label through a table with no entry for
+    ExitCode.ERROR: for a site answering 403, or with a challenge, the KeyError
+    landed in the `except Exception` and the user read
+    "Error: <ExitCode.ERROR: 3>" — and the report asked for with -o was never
+    written."""
+    urls = tmp_path / "urls.txt"
+    urls.write_text("example.com\n", encoding="utf-8")
+    out_dir = tmp_path / "reports"
+
+    def build(r):
+        r.post_accept.consent_clicked = r.post_reject.consent_clicked = False
+        if kind == "403":
+            for session in (r.pre_consent, r.post_accept, r.post_reject):
+                session.status = 403
+        else:  # a challenge served with 200
+            r.pre_consent.status = 200
+            r.pre_consent.title = "Just a moment..."
+
+    res = _invoke(["batch", str(urls), "-o", str(out_dir)], build)
+
+    assert res.exit_code == 3, res.output
+    assert "ExitCode" not in res.output, res.output
+    assert "NOT MEASURED" in res.output, res.output
+    # As in `audit`: no counts next to a site that was never seen.
+    assert "0 trackers" not in res.output, res.output
+    assert list(out_dir.glob("*.txt")), "the per-URL report was not written"
+
+
 # ─── L4: real cookies shown in the report ───────────────────────────────────
 
 def test_audit_shows_cookies():

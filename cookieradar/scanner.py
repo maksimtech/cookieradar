@@ -89,6 +89,21 @@ def is_same_site(page_host: str, request_host: str) -> bool:
     return a == b or a.endswith("." + b) or b.endswith("." + a)
 
 
+def _ascii_host(host: str) -> str:
+    """`host` spelled the way Chromium writes it in requests: IDNA, not Unicode.
+
+    The address typed is `müller.de` and every request the page makes goes to
+    `xn--mller-kva.de`; compared as written, the site's own resources all came
+    out as unknown external hosts. A host the codec refuses — a label over 63
+    characters, say — is returned as it was: no worse than before.
+    """
+    host = (host or "").rstrip(".")
+    try:
+        return host.encode("idna").decode("ascii")
+    except UnicodeError:
+        return host
+
+
 def summarise_external(session: "SessionResult") -> ExternalSummary:
     """The summary per host, not per request.
 
@@ -378,7 +393,10 @@ ACCEPT_SELECTORS = [
     "#onetrust-accept-btn-handler",
     "button[id*='accept-all']",
     "button[class*='accept-all']",
-    "button[id*='agree']",
+    # A substring match, so "disagree" has to be excluded by name: Didomi puts
+    # `didomi-notice-agree-button` and `didomi-notice-disagree-button` side by
+    # side, and the selectors are tried before the labels.
+    "button[id*='agree']:not([id*='disagree'])",
 ]
 REJECT_SELECTORS = [
     "#onetrust-reject-all-handler",
@@ -432,6 +450,15 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
     return False
 
 
+def _is_main_document(request) -> bool:
+    """A navigation of the page itself, as opposed to one of its frames."""
+    try:
+        return bool(request.is_navigation_request()) and request.frame.parent_frame is None
+    except PlaywrightError:
+        # A service worker's request has no frame, and asking for it raises.
+        return False
+
+
 def _add_error(result: SessionResult, error: Exception) -> None:
     message = str(error).splitlines()[0] if str(error) else type(error).__name__
     result.error = f"{result.error}; {message}" if result.error else message
@@ -452,11 +479,25 @@ async def _run_session(
     """
     result = SessionResult(session=session_name)
     page = await context.new_page()
-    page_host = (urlparse(url).hostname or "").rstrip(".")
+    page_host = _ascii_host(urlparse(url).hostname or "")
 
     # Intercept requests
     def handle_request(request):
+        nonlocal page_host
         now = time.time()
+        host = (urlparse(request.url).hostname or "").rstrip(".")
+        if host and _is_main_document(request):
+            # The site is where the navigation lands, not what was typed: when
+            # example.com redirected to example.it, every resource of
+            # example.it came out as an unknown external host.
+            page_host = host
+        if is_same_site(page_host, host):
+            # The site's own requests are first-party, which the README puts out
+            # of scope. Without this, auditing linkedin.com found linkedin.com a
+            # tracker of itself — its own document, in every session, so always
+            # a VIOLATION "persists from pre-consent".
+            return
+
         domain = tracker_domain(request.url)
         if domain:
             result.trackers.append(TrackerRequest(
@@ -469,8 +510,7 @@ async def _run_session(
         # Every external host, recognised or not. Before this line everything
         # that was not among the 34 built-in domains disappeared, and the report
         # could not say out of how many hosts its counts had been chosen.
-        host = (urlparse(request.url).hostname or "").rstrip(".")
-        if host and not is_same_site(page_host, host):
+        if host:
             result.external.append(ExternalRequest(
                 url=request.url,
                 host=host,
