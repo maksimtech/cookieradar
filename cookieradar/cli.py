@@ -10,6 +10,7 @@ from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
 from enum import IntEnum
 from pathlib import Path
+from urllib.parse import urlparse
 
 import typer
 from rich import box
@@ -132,9 +133,13 @@ def normalize_url(url: str) -> str:
         raise ValueError("Empty URL")
     match = _SCHEME_URL.match(url) or _SCHEME_ONLY.match(url)
     if not match:
-        return f"https://{url}"
-    if match.group(1).lower() not in ("http", "https"):
+        url = f"https://{url}"
+    elif match.group(1).lower() not in ("http", "https"):
         raise ValueError(f"Unsupported URL scheme: {match.group(1)}")
+    # "https://" alone used to pass: the browser then refused to navigate, and
+    # an invalid address came out as UNVERIFIED (2) instead of an error (3).
+    if not urlparse(url).hostname:
+        raise ValueError(f"No host in URL: {url}")
     return url
 
 
@@ -523,9 +528,11 @@ def _report_filename(url: str, used: set[str]) -> str:
     base = _SCHEME_URL.sub("", url)
     base = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("._")[:100] or "report"
     name, n = base, 2
-    while name in used:
+    # Compared without case: on Windows and macOS Example.com.txt and
+    # example.com.txt are one file, and the second report overwrote the first.
+    while name.casefold() in used:
         name, n = f"{base}-{n}", n + 1
-    used.add(name)
+    used.add(name.casefold())
     return f"{name}.txt"
 
 
@@ -615,7 +622,9 @@ def audit(
 
     try:
         trackerdb = _load_trackers(trackers)
-    except ValueError as e:
+    except (ValueError, OSError) as e:
+        # OSError too: a .eno that cannot be read escaped as a traceback, and
+        # its exit status 1 reads as VIOLATION to a pipeline.
         console.print(f"[red]{escape(str(e))}[/red]")
         raise typer.Exit(ExitCode.ERROR) from None
 
@@ -701,12 +710,20 @@ def batch(
                 ExitCode.OK: "✅ OK",
                 ExitCode.VIOLATION: "🔴 VIOLATION",
                 ExitCode.UNVERIFIED: "⚠️  UNVERIFIED",
+                ExitCode.ERROR: "⛔ NOT MEASURED",
             }[verdict]
-            console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
-            if verdict is not ExitCode.UNVERIFIED:
-                _print_violations(console, find_violations(result), "    ")
+            # A site never seen gets no counts, as in `audit`: zero trackers on
+            # an error page or a challenge are facts about that page.
+            reason = _why_not_the_site(result)
+            if reason:
+                console.print(f"  {status}")
+                console.print(f"    [yellow]{escape(reason)}[/yellow]")
             else:
-                console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
+                console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
+                if verdict is ExitCode.UNVERIFIED:
+                    console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
+                else:
+                    _print_violations(console, find_violations(result), "    ")
             for s in _session_errors(result):
                 console.print(f"    [yellow]⚠️  {s.session}: {escape(s.error)}[/yellow]")
             if output:

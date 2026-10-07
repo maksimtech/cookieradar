@@ -86,6 +86,64 @@ no version in this file has ever matched — 40 is not a month, and
   while the log still claims it, the log removed while the wait still happens, and the
   guard removed so zero waits anyway.
 
+- **`batch` no longer crashes on a site it could not see.** The verdict was turned into
+  a label through a table with no entry for ERROR, so a site answering 403, or a
+  bot-management challenge answering 200, ended in `❌ Error: <ExitCode.ERROR: 3>`, and
+  the report asked for with `-o` was never written. It now reads `⛔ NOT MEASURED` with
+  the reason and no tracker counts — as `audit` already did — and the report is saved.
+
+- **Auditing a site that is itself on the tracker list no longer finds it a tracker of
+  itself.** `linkedin.com`, `facebook.com`, `bing.com`, `tiktok.com`: the site's own
+  document was counted as the tracker `linkedin.com` in every session, so the verdict
+  was always VIOLATION "persists from pre-consent". Requests to the audited site are
+  first-party, which the README already put out of scope, and `trackers` is again the
+  subset of `external` that its own comment says it is.
+
+- **The accept selector `button[id*='agree']` no longer clicks "disagree".** A substring
+  match: Didomi's `didomi-notice-disagree-button` sits next to its agree button, and
+  the selectors are tried before the labels, so the post-accept session rejected and
+  was recorded as accepted.
+
+- **The site is the one the browser landed on, spelled as the browser spells it.** The
+  host compared against every request came from the address typed: `müller.de` against
+  requests to `xn--mller-kva.de`, or `example.com` against a redirect to `example.it`,
+  and every resource of the site came out as an unknown external host. The typed host
+  is now converted to IDNA, and the main frame's navigation — redirects included —
+  decides the site, in Chromium's own spelling (which also covers `ß`, where Python's
+  IDNA 2003 codec and Chromium disagree). Checked against real Chromium on local pages.
+
+- **No provision is cited for a challenge page.** `notes_of` knew that an error page is
+  not the site and did not know the same of a challenge served with 200, so the report
+  said NOT MEASURED and, under the provisions, "no cookie banner was found". Both now get
+  their own NOT MEASURED note, and `findings_of` draws no finding from either: a reject
+  button on a page that is not the site no longer leads to citing a violation.
+
+- **`normalize_url` refuses an address with no host.** `https://` passed, the browser
+  refused to navigate, and an invalid address exited 2 (UNVERIFIED) instead of 3.
+
+- **An unreadable `--trackers` database exits 3, not 1.** Only `ValueError` was caught,
+  so a `.eno` that could not be read escaped as a traceback with exit status 1 — which
+  a pipeline reads as VIOLATION.
+
+- **`batch -o` report names no longer collide where the filesystem ignores case.**
+  `Example.com.txt` and `example.com.txt` are one file on Windows and macOS, and the
+  second report overwrote the first.
+
+- **A trackerdb block left open is kept when another block follows it**, not only at the
+  end of the file, as the parser's docstring already promised.
+
+- **Shell scripts are checked out with LF everywhere** (`.gitattributes`). With
+  `core.autocrlf=true` a Windows checkout wrote `release.sh` and `wait_for_pypi.sh` with
+  CRLF, and bash stopped at `set: pipefail\r: invalid option name`.
+
+- **`pytest`, as the README says to run it, no longer ends in three errors.** The
+  benchmarks need the CodSpeed runner, which only `codspeed.yml` installs; without it
+  they are now skipped with that reason. And `pyproject.toml` no longer sends the reader
+  to `tests/test_benchmark_contract.py`, a file that never existed.
+
+- **README:** `audit --trackers` is in the command reference, the version examples use
+  the current scheme, and `batch`'s NOT MEASURED is described.
+
 ### Changed
 
 - **The race with PyPI is closed rather than narrowed: the released image no longer asks

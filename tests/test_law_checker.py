@@ -6,6 +6,7 @@ import pytest
 from cookieradar import law_fetcher
 from cookieradar.law_cache import LawCache
 from cookieradar.law_checker import (
+    CHALLENGED_NOTE,
     FINDING_ARTICLES,
     FINDING_TITLES,
     UNVERIFIED_NOTE,
@@ -212,6 +213,45 @@ def test_unverified_downloads_nothing(cache, online):
     law = check(scan_result(rejected=["doubleclick.net"], clicked=False), cache=cache, now=DAY1)
     assert law.citations == []
     assert law.notes == [UNVERIFIED_NOTE]
+    assert online == []
+
+
+def _not_the_site(kind):
+    """A result whose pages were not the site: an error status, or a challenge
+    served with 200."""
+    result = ScanResult(url="https://example.com")
+    if kind == "403":
+        for session in (result.pre_consent, result.post_accept, result.post_reject):
+            session.status = 403
+    else:
+        result.pre_consent.status = 200
+        result.pre_consent.title = "Just a moment..."
+    return result
+
+
+def test_law_notes_do_not_blame_the_banner_when_a_challenge_answered(cache, online):
+    """`notes_of` looked only at `page_not_served` (status >= 400). With a
+    challenge served with 200 the report said NOT MEASURED and, under the
+    provisions, "UNVERIFIED: no cookie banner was found": a statement about a
+    site nobody saw, exactly what the tests already rule out for a 403."""
+    law = check(_not_the_site("challenge"), cache=cache, now=DAY1)
+
+    assert UNVERIFIED_NOTE not in law.notes
+    assert law.notes == [CHALLENGED_NOTE]
+
+
+@pytest.mark.parametrize("kind", ["403", "challenge"])
+def test_no_finding_is_drawn_from_a_page_that_is_not_the_site(cache, online, kind):
+    """`notes_of` said NOT MEASURED, but `findings_of` did not look at the same
+    fact: with an error page (or a challenge) carrying a reject button and a
+    tracker after the reload, the report said NOT MEASURED and cited the
+    provisions of the violation alongside."""
+    result = _not_the_site(kind)
+    result.post_reject.consent_clicked = True
+    result.post_reject.trackers = [TrackerRequest("https://x.doubleclick.net/", "doubleclick.net", "script", 0.0)]
+
+    assert findings_of(result) == {}
+    assert check(result, cache=cache, now=DAY1).citations == []
     assert online == []
 
 

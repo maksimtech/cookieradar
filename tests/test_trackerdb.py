@@ -104,6 +104,16 @@ def test_block_lines_are_not_parsed_as_keys():
     assert doc["filters"] == ["||x.com^$3p,domain:y.com"]
 
 
+def test_parse_eno_keeps_an_unclosed_block_followed_by_another_block():
+    """The docstring promises not to lose data over someone else's typo, an
+    unclosed block, but kept that promise only at the end of the file: when an
+    unclosed `--- domains` was followed by `--- filters`, the domains were
+    dropped and the tracker no longer matched any host."""
+    doc = parse_eno("name: X\n--- domains\na.com\n--- filters\n||x^\n--- filters\n")
+
+    assert doc.get("domains") == ["a.com"]
+
+
 # ── la base dati ─────────────────────────────────────────────────────────────
 
 @pytest.fixture

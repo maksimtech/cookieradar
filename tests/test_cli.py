@@ -4,6 +4,7 @@ CLI tests with a mocked scanner (no browser).
 import os
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -13,9 +14,10 @@ from typer.testing import CliRunner
 import cookieradar
 import cookieradar.cli as cli
 import cookieradar.scanner as scanner
-from cookieradar.cli import app, normalize_url
+from cookieradar.cli import _report_filename, app, normalize_url
 from cookieradar.scanner import ScanResult, TrackerRequest
 
+README = Path(__file__).resolve().parents[1] / "README.md"
 runner = CliRunner()
 
 
@@ -428,6 +430,36 @@ def test_batch_reject_not_applied_is_unverified(tmp_path):
     assert "reject button not found" in res.output
 
 
+@pytest.mark.parametrize("kind", ["403", "challenge"])
+def test_batch_reports_a_site_not_served_without_crashing_on_the_verdict(tmp_path, kind):
+    """`batch` turned the verdict into a label through a table with no entry for
+    ExitCode.ERROR: for a site answering 403, or with a challenge, the KeyError
+    landed in the `except Exception` and the user read
+    "Error: <ExitCode.ERROR: 3>" — and the report asked for with -o was never
+    written."""
+    urls = tmp_path / "urls.txt"
+    urls.write_text("example.com\n", encoding="utf-8")
+    out_dir = tmp_path / "reports"
+
+    def build(r):
+        r.post_accept.consent_clicked = r.post_reject.consent_clicked = False
+        if kind == "403":
+            for session in (r.pre_consent, r.post_accept, r.post_reject):
+                session.status = 403
+        else:  # a challenge served with 200
+            r.pre_consent.status = 200
+            r.pre_consent.title = "Just a moment..."
+
+    res = _invoke(["batch", str(urls), "-o", str(out_dir)], build)
+
+    assert res.exit_code == 3, res.output
+    assert "ExitCode" not in res.output, res.output
+    assert "NOT MEASURED" in res.output, res.output
+    # As in `audit`: no counts next to a site that was never seen.
+    assert "0 trackers" not in res.output, res.output
+    assert list(out_dir.glob("*.txt")), "the per-URL report was not written"
+
+
 # ─── L4: real cookies shown in the report ───────────────────────────────────
 
 def test_audit_shows_cookies():
@@ -469,6 +501,15 @@ def test_normalize_url_rejects_other_schemes(raw):
         normalize_url(raw)
 
 
+@pytest.mark.parametrize("url", ["https://", "http://", "https:///path", "http://:8080", "/path"])
+def test_normalize_url_rejects_a_url_without_host(url):
+    """"https://" passed the gate; the browser then failed to navigate, the
+    error went into session.error and the exit code was 2 (UNVERIFIED) instead
+    of 3 — "invalid address", as the README puts it."""
+    with pytest.raises(ValueError):
+        normalize_url(url)
+
+
 def _recording_scan(seen):
     async def scan(url, **kwargs):
         seen.append(url)
@@ -491,6 +532,17 @@ def test_audit_rejects_file_url():
     assert res.exit_code == 3
     assert seen == []
     assert "Unsupported URL scheme" in res.output
+
+
+def test_audit_of_a_url_without_host_exits_as_an_error():
+    """The README's case: an invalid address is 3, not 2, and the browser is
+    never even started."""
+    seen = []
+    res = _invoke(["audit", "https://"], scan=_recording_scan(seen))
+
+    assert res.exit_code == 3, res.output
+    assert seen == []
+    assert "No host" in res.output
 
 
 def test_batch_skips_invalid_url_and_continues(tmp_path):
@@ -582,6 +634,21 @@ def test_batch_utf8_bom_is_ignored(tmp_path):
 
     assert res.exit_code == 2, res.output  # _recording_scan: reject not clicked
     assert seen == ["https://example.com"]
+
+
+def test_unreadable_trackerdb_file_is_an_error_not_a_violation(tmp_path):
+    """`audit` caught only ValueError from `_load_trackers`. An OSError while
+    reading the .eno files — here an entry `broken.eno` that is a directory,
+    standing in for a file without read permission — escaped as an unhandled
+    exception with exit code 1, which for this tool means VIOLATION."""
+    db = tmp_path / "trackerdb"
+    (db / "patterns" / "broken.eno").mkdir(parents=True)
+    seen = []
+
+    res = _invoke(["audit", "example.com", "--trackers", str(db)], scan=_recording_scan(seen))
+
+    _assert_clean_failure(res, "broken.eno")  # and it says which file
+    assert seen == []
 
 
 # ─── M7: single entry point for `python -m cookieradar` ─────────────────────
@@ -704,6 +771,17 @@ def test_batch_output_names_do_not_collide(tmp_path):
     assert sorted(p.name for p in out_dir.iterdir()) == ["example.com_a-2.txt", "example.com_a.txt"]
 
 
+def test_report_names_do_not_collide_on_case_insensitive_filesystems():
+    """`used` compared names case-sensitively, but on Windows and macOS
+    "Example.com.txt" and "example.com.txt" are the same file: the second
+    report overwrote the first."""
+    used: set[str] = set()
+    a = _report_filename("https://example.com", used)
+    b = _report_filename("https://Example.com", used)
+
+    assert a.lower() != b.lower()
+
+
 # ─── Shutdown: Rich FileProxy must be flushed before interpreter teardown ───
 
 _SHUTDOWN_SCRIPT = """
@@ -822,3 +900,28 @@ def test_batch_exit_code_reflects_worst_verdict(tmp_path, kinds, code):
     res = _invoke(["batch", str(f)], scan=_scan_by_host(outcomes))
 
     assert res.exit_code == code, res.output
+
+
+# ─── README: the command reference names every option ──────────────────────
+
+def test_every_audit_option_is_in_the_readme_command_reference():
+    """`audit --trackers` existed and the "Command reference" did not name it."""
+    import typer.main
+
+    command = typer.main.get_command(app)
+    text = README.read_text(encoding="utf-8")
+    reference = text.split("## Command reference", 1)[1].split("\n## ", 1)[0]
+
+    checked = []
+    for name in ("audit", "batch"):
+        sub = command.commands[name]  # type: ignore[attr-defined]
+        for param in sub.params:
+            # The click Typer uses may be the one bundled with Typer: look at
+            # the kind of parameter, not at its class.
+            if param.param_type_name == "option":
+                # --headless/--no-headless: either spelling is enough.
+                spellings = [o for o in param.opts + param.secondary_opts if o.startswith("--")]
+                checked.extend(spellings)
+                assert any(o in reference for o in spellings), \
+                    f"{name} {'/'.join(spellings)} is missing from the Command reference"
+    assert "--output" in checked, "no option was checked: the test does not see the CLI"

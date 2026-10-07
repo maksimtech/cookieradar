@@ -58,7 +58,7 @@ Check the installation:
 
 ```bash
 cookieradar --version
-# CookieRadar 2026.09.7
+# CookieRadar 2026.42
 ```
 
 Prefer not to install Python? Use the [Docker image](#docker).
@@ -135,7 +135,10 @@ cookieradar batch urls.txt -o reports/
 ```
 
 An invalid address or a site that fails to load is reported and skipped;
-the other sites are still audited.
+the other sites are still audited. A site that answers with an error status
+(e.g. 403) or with a bot-management challenge instead of its own page is
+reported as `⛔ NOT MEASURED`, without tracker counts, and counts as not
+audited for the exit code.
 
 ## Reading the report
 
@@ -248,7 +251,9 @@ LinkedIn, TikTok, Microsoft Bing and Clarity, Hotjar, Adobe, Amazon Ads.
 It does not detect:
 - services that are not on the list;
 - tracking through the site's own domain (first-party or server-side
-  tracking, e.g. a tag manager proxied through `metrics.example.com`);
+  tracking, e.g. a tag manager proxied through `metrics.example.com`).
+  This holds for the listed services too: auditing `linkedin.com` does not
+  count `linkedin.com` as a tracker of itself;
 - what data a request contains, or whether a cookie is "necessary".
 
 A VIOLATION is therefore reliable for the services listed; an OK means
@@ -279,7 +284,7 @@ docker run --rm maksimtech/cookieradar audit https://example.com
 ```
 
 Images are published for `linux/amd64` and `linux/arm64`, tagged `latest`
-and with each version, e.g. `maksimtech/cookieradar:v2026.09.7`.
+and with each version, e.g. `maksimtech/cookieradar:v2026.42`.
 
 To save reports or read a URL list, mount a folder from your computer.
 The container works in `/home/cookieradar` and runs as user ID 1000, which
@@ -309,7 +314,7 @@ docker run --rm cookieradar audit https://example.com
 
 ```
 cookieradar --version
-cookieradar audit URL [--no-headless] [-o FILE]
+cookieradar audit URL [--no-headless] [-o FILE] [--trackers DIRECTORY]
 cookieradar batch FILE [-o DIRECTORY]
 ```
 
@@ -317,6 +322,7 @@ cookieradar batch FILE [-o DIRECTORY]
 |---|---|---|
 | `-o`, `--output FILE` | `audit` | Save the report: HTML if the name ends in `.html`/`.htm`, plain text otherwise |
 | `--no-headless` | `audit` | Show the browser window while auditing |
+| `--trackers DIRECTORY` | `audit` | Name the companies and purposes behind the external hosts contacted, from a copy of [ghostery/trackerdb](https://github.com/ghostery/trackerdb) you obtained yourself (its `db/` folder or the clone root). Not distributed with CookieRadar: it is CC-BY-NC-SA-4.0. A path that is not a trackerdb, or cannot be read, exits with 3 |
 | `-o`, `--output DIRECTORY` | `batch` | Save one text report per site in this folder (created if missing) |
 | `--help` | any | Show help |
 
