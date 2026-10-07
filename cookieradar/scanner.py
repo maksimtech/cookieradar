@@ -452,11 +452,12 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
 
 def _is_main_document(request) -> bool:
     """A navigation of the page itself, as opposed to one of its frames."""
-    try:
-        return bool(request.is_navigation_request()) and request.frame.parent_frame is None
-    except PlaywrightError:
-        # A service worker's request has no frame, and asking for it raises.
-        return False
+    # `request.frame` raises on a service worker's request, which has no frame,
+    # but none gets here: Playwright hands them to the context alone, never to
+    # `page.on("request")`, and none is a navigation, so the `and` would stop
+    # first anyway. Measured with 1.63 on Windows and Linux; the integration test
+    # with a fetching service worker keeps it so.
+    return bool(request.is_navigation_request()) and request.frame.parent_frame is None
 
 
 def _add_error(result: SessionResult, error: Exception) -> None:

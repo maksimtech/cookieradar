@@ -93,6 +93,26 @@ async def test_banner_and_button_first_visible_match(browser, site_url):
     assert clicked == "visible"
 
 
+# ─── a service worker's requests never reach the page's listener ────────────
+
+@pytest.mark.integration
+async def test_a_service_worker_that_fetches_does_not_disturb_the_session(browser, site_url):
+    """A service worker's request has no frame, and asking for one raises. The
+    scanner listens on the page, where Chromium never delivers them — they go to
+    the context alone — so the session neither fails on them nor counts them.
+
+    The worker fetches from another host while installing and again to answer a
+    request of the page; the title it writes proves both happened."""
+    ctx = await browser.new_context()
+    result = await _run_session(ctx, f"{site_url}/service_worker.html", "pre-consent")
+    await ctx.close()
+
+    assert result.error is None
+    assert result.status == 200
+    assert result.title == "answered by the service worker (opaque)"
+    assert result.external == []
+
+
 # ─── accept selectors: "agree" without "disagree" ───────────────────────────
 
 _RECORD_CLICKS = (
