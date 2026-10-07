@@ -18,6 +18,7 @@ from cookieradar.scanner import (
     ScanResult,
     SessionResult,
     TrackerRequest,
+    _ascii_host,
     _run_session,
     find_violations,
     is_tracker,
@@ -585,6 +586,20 @@ async def test_first_party_requests_of_an_idn_site_are_not_external():
     result = await _run_session(context, "https://müller.de/", "pre-consent")
 
     assert [r.host for r in result.external] == []
+
+
+@pytest.mark.parametrize("host", [
+    "a" * 64 + ".example.it",  # a label over 63 characters: "label too long"
+    "www..example.it",         # an empty label: "label empty"
+])
+def test_a_host_the_idna_codec_refuses_is_kept_as_written(host):
+    """Python's `idna` codec raises on these hosts rather than spelling them.
+    The session must not die on an address it cannot convert: the host is
+    compared as it was typed, which is what happened before the conversion."""
+    with pytest.raises(UnicodeError):
+        host.encode("idna")
+
+    assert _ascii_host(host) == host
 
 
 async def test_the_audited_sites_own_document_is_not_a_tracker():
