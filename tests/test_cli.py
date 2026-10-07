@@ -13,7 +13,7 @@ from typer.testing import CliRunner
 import cookieradar
 import cookieradar.cli as cli
 import cookieradar.scanner as scanner
-from cookieradar.cli import app, normalize_url
+from cookieradar.cli import _report_filename, app, normalize_url
 from cookieradar.scanner import ScanResult, TrackerRequest
 
 runner = CliRunner()
@@ -499,6 +499,15 @@ def test_normalize_url_rejects_other_schemes(raw):
         normalize_url(raw)
 
 
+@pytest.mark.parametrize("url", ["https://", "http://", "https:///path", "http://:8080", "/path"])
+def test_normalize_url_rejects_a_url_without_host(url):
+    """"https://" passed the gate; the browser then failed to navigate, the
+    error went into session.error and the exit code was 2 (UNVERIFIED) instead
+    of 3 — "invalid address", as the README puts it."""
+    with pytest.raises(ValueError):
+        normalize_url(url)
+
+
 def _recording_scan(seen):
     async def scan(url, **kwargs):
         seen.append(url)
@@ -521,6 +530,17 @@ def test_audit_rejects_file_url():
     assert res.exit_code == 3
     assert seen == []
     assert "Unsupported URL scheme" in res.output
+
+
+def test_audit_of_a_url_without_host_exits_as_an_error():
+    """The README's case: an invalid address is 3, not 2, and the browser is
+    never even started."""
+    seen = []
+    res = _invoke(["audit", "https://"], scan=_recording_scan(seen))
+
+    assert res.exit_code == 3, res.output
+    assert seen == []
+    assert "No host" in res.output
 
 
 def test_batch_skips_invalid_url_and_continues(tmp_path):
@@ -612,6 +632,21 @@ def test_batch_utf8_bom_is_ignored(tmp_path):
 
     assert res.exit_code == 2, res.output  # _recording_scan: reject not clicked
     assert seen == ["https://example.com"]
+
+
+def test_unreadable_trackerdb_file_is_an_error_not_a_violation(tmp_path):
+    """`audit` caught only ValueError from `_load_trackers`. An OSError while
+    reading the .eno files — here an entry `broken.eno` that is a directory,
+    standing in for a file without read permission — escaped as an unhandled
+    exception with exit code 1, which for this tool means VIOLATION."""
+    db = tmp_path / "trackerdb"
+    (db / "patterns" / "broken.eno").mkdir(parents=True)
+    seen = []
+
+    res = _invoke(["audit", "example.com", "--trackers", str(db)], scan=_recording_scan(seen))
+
+    _assert_clean_failure(res, "broken.eno")  # and it says which file
+    assert seen == []
 
 
 # ─── M7: single entry point for `python -m cookieradar` ─────────────────────
@@ -732,6 +767,17 @@ def test_batch_output_names_do_not_collide(tmp_path):
 
     assert res.exit_code == 0, res.output
     assert sorted(p.name for p in out_dir.iterdir()) == ["example.com_a-2.txt", "example.com_a.txt"]
+
+
+def test_report_names_do_not_collide_on_case_insensitive_filesystems():
+    """`used` compared names case-sensitively, but on Windows and macOS
+    "Example.com.txt" and "example.com.txt" are the same file: the second
+    report overwrote the first."""
+    used: set[str] = set()
+    a = _report_filename("https://example.com", used)
+    b = _report_filename("https://Example.com", used)
+
+    assert a.lower() != b.lower()
 
 
 # ─── Shutdown: Rich FileProxy must be flushed before interpreter teardown ───

@@ -57,6 +57,13 @@ NOT_SERVED_NOTE = (
     "cited — there is nothing here to apply one to"
 )
 
+# The same reason in its other shape: a challenge served with 200, which has no
+# banner because it is not the site.
+CHALLENGED_NOTE = (
+    "NOT MEASURED: a bot-management challenge answered instead of the site, so "
+    "no provision is cited — there is nothing here to apply one to"
+)
+
 NO_REFUSAL_NOTE = (
     "UNVERIFIED: the banner was found and accepted, and no refusal control was "
     "found on it, so no provision is cited for the post-reject session — the "
@@ -85,6 +92,17 @@ def refusal_not_offered(result) -> bool:
         and result.post_accept.consent_clicked
         and not result.post_reject.consent_clicked
     )
+
+
+def _not_the_site(result) -> str | None:
+    """The note that stands for the whole audit when the site was never seen."""
+    from cookieradar.scanner import bot_challenge, page_not_served
+
+    if page_not_served(result):
+        return NOT_SERVED_NOTE
+    if bot_challenge(result).seen:
+        return CHALLENGED_NOTE
+    return None
 
 
 def findings_of(result) -> dict[str, list[str]]:
@@ -124,12 +142,12 @@ def findings_of(result) -> dict[str, list[str]]:
 
 
 def notes_of(result) -> list[str]:
-    from cookieradar.scanner import page_not_served
-
-    if page_not_served(result):
+    not_the_site = _not_the_site(result)
+    if not_the_site:
         # Before anything else: "no banner was found" is a statement about a
-        # site, and on an error page there is no site to make it about.
-        return [NOT_SERVED_NOTE]
+        # site, and on an error page or a challenge there is no site to make
+        # it about.
+        return [not_the_site]
     if _rejected(result):
         return []
     return [NO_REFUSAL_NOTE if refusal_not_offered(result) else UNVERIFIED_NOTE]

@@ -6,6 +6,7 @@ import pytest
 from cookieradar import law_fetcher
 from cookieradar.law_cache import LawCache
 from cookieradar.law_checker import (
+    CHALLENGED_NOTE,
     FINDING_ARTICLES,
     FINDING_TITLES,
     UNVERIFIED_NOTE,
@@ -213,6 +214,30 @@ def test_unverified_downloads_nothing(cache, online):
     assert law.citations == []
     assert law.notes == [UNVERIFIED_NOTE]
     assert online == []
+
+
+def _not_the_site(kind):
+    """A result whose pages were not the site: an error status, or a challenge
+    served with 200."""
+    result = ScanResult(url="https://example.com")
+    if kind == "403":
+        for session in (result.pre_consent, result.post_accept, result.post_reject):
+            session.status = 403
+    else:
+        result.pre_consent.status = 200
+        result.pre_consent.title = "Just a moment..."
+    return result
+
+
+def test_law_notes_do_not_blame_the_banner_when_a_challenge_answered(cache, online):
+    """`notes_of` looked only at `page_not_served` (status >= 400). With a
+    challenge served with 200 the report said NOT MEASURED and, under the
+    provisions, "UNVERIFIED: no cookie banner was found": a statement about a
+    site nobody saw, exactly what the tests already rule out for a 403."""
+    law = check(_not_the_site("challenge"), cache=cache, now=DAY1)
+
+    assert UNVERIFIED_NOTE not in law.notes
+    assert law.notes == [CHALLENGED_NOTE]
 
 
 def test_one_act_offline_other_online(cache, monkeypatch):

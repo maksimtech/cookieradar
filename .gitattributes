@@ -1,0 +1,4 @@
+# Shell scripts are run by bash, which reads a carriage return as part of the
+# command: a Windows checkout with core.autocrlf=true wrote them with CRLF and
+# bash stopped at "set: pipefail\r: invalid option name".
+*.sh text eol=lf

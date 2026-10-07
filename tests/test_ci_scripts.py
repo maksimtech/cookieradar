@@ -445,3 +445,29 @@ def test_the_mutation_run_skips_the_benchmarks() -> None:
 
     assert "[tool.mutmut]" in config, "the mutation configuration moved"
     assert "--ignore=tests/benchmarks" in config.split("[tool.mutmut]", 1)[1]
+
+
+# ─── Line endings: bash reads a carriage return as part of the command ──────
+
+def test_shell_scripts_are_pinned_to_lf_line_endings():
+    """Without `.gitattributes` (`*.sh text eol=lf`) a Windows clone with
+    core.autocrlf=true got release.sh and wait_for_pypi.sh with CRLF, and bash
+    stopped at "set: pipefail\\r: invalid option name".
+
+    Asked of git rather than searched for in the file: what counts is that the
+    rule applies to every tracked script, not that the text contains certain
+    words."""
+    def git(*args):
+        try:
+            done = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace", timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            pytest.skip("git not available")
+        if done.returncode != 0:
+            pytest.skip(f"git cannot answer here: {done.stderr.strip()}")
+        return done.stdout
+
+    scripts = git("ls-files", "*.sh").split()
+    assert scripts, "no tracked .sh script: the test would check nothing"
+    for line in git("check-attr", "eol", "--", *scripts).splitlines():
+        assert line.endswith(": eol: lf"), line

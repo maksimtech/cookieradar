@@ -59,6 +59,10 @@ def parse_eno(text: str) -> dict[str, str | list[str]]:
                 doc[name] = lines
                 block, lines = None, []
             else:
+                # Another block opening while one is still open: the open one
+                # is kept, for the same reason as at the end of the file.
+                if block is not None:
+                    doc[block] = lines
                 block, lines = name, []
             continue
         if block is not None:

@@ -112,6 +112,29 @@ no version in this file has ever matched — 40 is not a month, and
   decides the site, in Chromium's own spelling (which also covers `ß`, where Python's
   IDNA 2003 codec and Chromium disagree). Checked against real Chromium on local pages.
 
+- **No provision is cited for a challenge page.** `notes_of` knew that an error page is
+  not the site and did not know the same of a challenge served with 200, so the report
+  said NOT MEASURED and, under the provisions, "no cookie banner was found". Both now get
+  their own NOT MEASURED note.
+
+- **`normalize_url` refuses an address with no host.** `https://` passed, the browser
+  refused to navigate, and an invalid address exited 2 (UNVERIFIED) instead of 3.
+
+- **An unreadable `--trackers` database exits 3, not 1.** Only `ValueError` was caught,
+  so a `.eno` that could not be read escaped as a traceback with exit status 1 — which
+  a pipeline reads as VIOLATION.
+
+- **`batch -o` report names no longer collide where the filesystem ignores case.**
+  `Example.com.txt` and `example.com.txt` are one file on Windows and macOS, and the
+  second report overwrote the first.
+
+- **A trackerdb block left open is kept when another block follows it**, not only at the
+  end of the file, as the parser's docstring already promised.
+
+- **Shell scripts are checked out with LF everywhere** (`.gitattributes`). With
+  `core.autocrlf=true` a Windows checkout wrote `release.sh` and `wait_for_pypi.sh` with
+  CRLF, and bash stopped at `set: pipefail\r: invalid option name`.
+
 ### Changed
 
 - **The race with PyPI is closed rather than narrowed: the released image no longer asks

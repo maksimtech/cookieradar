@@ -21,10 +21,13 @@ from cookieradar.law_fetcher import normalize_text
 
 # ── The gate every URL passes through ───────────────────────────────────────
 
+# A host, possibly followed by a path or a query. One that *starts* with "/" or
+# "?" has no host at all, and normalize_url refuses it: "https://?" is an
+# invalid address, not a URL to hand the browser.
 _HOST = st.text(
     alphabet="abcdefghijklmnopqrstuvwxyz0123456789.-/?=&_",
     min_size=1, max_size=40,
-).filter(lambda s: s.strip() and ":" not in s)
+).filter(lambda s: s.strip() and ":" not in s and s[0] not in "/?")
 
 
 @given(_HOST)
