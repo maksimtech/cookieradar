@@ -115,7 +115,8 @@ no version in this file has ever matched — 40 is not a month, and
 - **No provision is cited for a challenge page.** `notes_of` knew that an error page is
   not the site and did not know the same of a challenge served with 200, so the report
   said NOT MEASURED and, under the provisions, "no cookie banner was found". Both now get
-  their own NOT MEASURED note.
+  their own NOT MEASURED note, and `findings_of` draws no finding from either: a reject
+  button on a page that is not the site no longer leads to citing a violation.
 
 - **`normalize_url` refuses an address with no host.** `https://` passed, the browser
   refused to navigate, and an invalid address exited 2 (UNVERIFIED) instead of 3.
@@ -134,6 +135,14 @@ no version in this file has ever matched — 40 is not a month, and
 - **Shell scripts are checked out with LF everywhere** (`.gitattributes`). With
   `core.autocrlf=true` a Windows checkout wrote `release.sh` and `wait_for_pypi.sh` with
   CRLF, and bash stopped at `set: pipefail\r: invalid option name`.
+
+- **`pytest`, as the README says to run it, no longer ends in three errors.** The
+  benchmarks need the CodSpeed runner, which only `codspeed.yml` installs; without it
+  they are now skipped with that reason. And `pyproject.toml` no longer sends the reader
+  to `tests/test_benchmark_contract.py`, a file that never existed.
+
+- **README:** `audit --trackers` is in the command reference, the version examples use
+  the current scheme, and `batch`'s NOT MEASURED is described.
 
 ### Changed
 

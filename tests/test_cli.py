@@ -4,6 +4,7 @@ CLI tests with a mocked scanner (no browser).
 import os
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -16,6 +17,7 @@ import cookieradar.scanner as scanner
 from cookieradar.cli import _report_filename, app, normalize_url
 from cookieradar.scanner import ScanResult, TrackerRequest
 
+README = Path(__file__).resolve().parents[1] / "README.md"
 runner = CliRunner()
 
 
@@ -898,3 +900,28 @@ def test_batch_exit_code_reflects_worst_verdict(tmp_path, kinds, code):
     res = _invoke(["batch", str(f)], scan=_scan_by_host(outcomes))
 
     assert res.exit_code == code, res.output
+
+
+# ─── README: the command reference names every option ──────────────────────
+
+def test_every_audit_option_is_in_the_readme_command_reference():
+    """`audit --trackers` existed and the "Command reference" did not name it."""
+    import typer.main
+
+    command = typer.main.get_command(app)
+    text = README.read_text(encoding="utf-8")
+    reference = text.split("## Command reference", 1)[1].split("\n## ", 1)[0]
+
+    checked = []
+    for name in ("audit", "batch"):
+        sub = command.commands[name]  # type: ignore[attr-defined]
+        for param in sub.params:
+            # The click Typer uses may be the one bundled with Typer: look at
+            # the kind of parameter, not at its class.
+            if param.param_type_name == "option":
+                # --headless/--no-headless: either spelling is enough.
+                spellings = [o for o in param.opts + param.secondary_opts if o.startswith("--")]
+                checked.extend(spellings)
+                assert any(o in reference for o in spellings), \
+                    f"{name} {'/'.join(spellings)} is missing from the Command reference"
+    assert "--output" in checked, "no option was checked: the test does not see the CLI"

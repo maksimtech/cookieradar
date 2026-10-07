@@ -143,3 +143,14 @@ def test_a_fix_on_top_of_a_baseline_never_starts_at_zero():
         return
 
     assert int(parts[2]) >= 1, f"{VERSION} spells a fix that is not a fix"
+
+
+def test_the_readme_version_examples_use_the_current_scheme():
+    """`--version` showed "CookieRadar 2026.09.7" and the Docker tag
+    "v2026.09.7": the YYYY.MM.N form given up on 2026-09-29. Not the exact
+    number, which would age with every release, but the form."""
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    shown = re.findall(r"CookieRadar (\d[\d.]*\d)", text) + re.findall(r"cookieradar:v(\d[\d.]*\d)", text)
+
+    assert shown, "the README shows no version any more: the check is empty"
+    assert [v for v in shown if not GENERATION_FORM.match(v)] == []

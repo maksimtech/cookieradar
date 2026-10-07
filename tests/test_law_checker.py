@@ -240,6 +240,21 @@ def test_law_notes_do_not_blame_the_banner_when_a_challenge_answered(cache, onli
     assert law.notes == [CHALLENGED_NOTE]
 
 
+@pytest.mark.parametrize("kind", ["403", "challenge"])
+def test_no_finding_is_drawn_from_a_page_that_is_not_the_site(cache, online, kind):
+    """`notes_of` said NOT MEASURED, but `findings_of` did not look at the same
+    fact: with an error page (or a challenge) carrying a reject button and a
+    tracker after the reload, the report said NOT MEASURED and cited the
+    provisions of the violation alongside."""
+    result = _not_the_site(kind)
+    result.post_reject.consent_clicked = True
+    result.post_reject.trackers = [TrackerRequest("https://x.doubleclick.net/", "doubleclick.net", "script", 0.0)]
+
+    assert findings_of(result) == {}
+    assert check(result, cache=cache, now=DAY1).citations == []
+    assert online == []
+
+
 def test_one_act_offline_other_online(cache, monkeypatch):
     online = _fake_fetch()
 

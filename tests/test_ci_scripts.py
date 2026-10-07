@@ -447,6 +447,40 @@ def test_the_mutation_run_skips_the_benchmarks() -> None:
     assert "--ignore=tests/benchmarks" in config.split("[tool.mutmut]", 1)[1]
 
 
+def test_the_benchmarks_are_skipped_not_errors_without_their_runner():
+    """The runner (pytest-codspeed) is installed by codspeed.yml alone, on
+    purpose: "the suite must not need a benchmark runner to check correctness"
+    (test_declared_imports.py). Yet `pytest`, as the README says to run it,
+    ended in three `fixture 'benchmark' not found` errors. Without the runner
+    they must be skipped, with the reason; `-p no:codspeed` stands in for the
+    missing runner where it is installed."""
+    import sys
+
+    done = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/benchmarks", "-q", "-rs",
+         "-p", "no:codspeed", "-p", "no:cacheprovider"],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+    )
+
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "3 skipped" in done.stdout, done.stdout
+    assert "codspeed" in done.stdout.lower(), "the skip reason must name the runner"
+
+
+def test_every_test_file_pyproject_points_to_exists():
+    """The [tool.mutmut] comment said the arrangement about the benchmark runner
+    was written down in `tests/test_benchmark_contract.py`: a file that never
+    existed in this repository's history. Whoever looked for it found nothing,
+    and the rule seemed written down nowhere."""
+    import re
+
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    named = set(re.findall(r"tests/[\w/]+\.py", text))
+
+    assert named, "pyproject.toml names no test file any more: the check is empty"
+    assert sorted(p for p in named if not (ROOT / p).is_file()) == []
+
+
 # ─── Line endings: bash reads a carriage return as part of the command ──────
 
 def test_shell_scripts_are_pinned_to_lf_line_endings():

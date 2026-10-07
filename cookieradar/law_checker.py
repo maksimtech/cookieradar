@@ -116,6 +116,10 @@ def findings_of(result) -> dict[str, list[str]]:
     """
     from cookieradar.scanner import find_violations
 
+    if _not_the_site(result):
+        # A reject button on an error page, or on a challenge, is not the
+        # site's: the report says NOT MEASURED and must not cite a violation.
+        return {}
     if not _rejected(result):
         if refusal_not_offered(result):
             accepted = len({t.domain for t in result.post_accept.trackers})

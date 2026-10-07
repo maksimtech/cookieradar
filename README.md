@@ -58,7 +58,7 @@ Check the installation:
 
 ```bash
 cookieradar --version
-# CookieRadar 2026.09.7
+# CookieRadar 2026.42
 ```
 
 Prefer not to install Python? Use the [Docker image](#docker).
@@ -284,7 +284,7 @@ docker run --rm maksimtech/cookieradar audit https://example.com
 ```
 
 Images are published for `linux/amd64` and `linux/arm64`, tagged `latest`
-and with each version, e.g. `maksimtech/cookieradar:v2026.09.7`.
+and with each version, e.g. `maksimtech/cookieradar:v2026.42`.
 
 To save reports or read a URL list, mount a folder from your computer.
 The container works in `/home/cookieradar` and runs as user ID 1000, which
@@ -314,7 +314,7 @@ docker run --rm cookieradar audit https://example.com
 
 ```
 cookieradar --version
-cookieradar audit URL [--no-headless] [-o FILE]
+cookieradar audit URL [--no-headless] [-o FILE] [--trackers DIRECTORY]
 cookieradar batch FILE [-o DIRECTORY]
 ```
 
@@ -322,6 +322,7 @@ cookieradar batch FILE [-o DIRECTORY]
 |---|---|---|
 | `-o`, `--output FILE` | `audit` | Save the report: HTML if the name ends in `.html`/`.htm`, plain text otherwise |
 | `--no-headless` | `audit` | Show the browser window while auditing |
+| `--trackers DIRECTORY` | `audit` | Name the companies and purposes behind the external hosts contacted, from a copy of [ghostery/trackerdb](https://github.com/ghostery/trackerdb) you obtained yourself (its `db/` folder or the clone root). Not distributed with CookieRadar: it is CC-BY-NC-SA-4.0. A path that is not a trackerdb, or cannot be read, exits with 3 |
 | `-o`, `--output DIRECTORY` | `batch` | Save one text report per site in this folder (created if missing) |
 | `--help` | any | Show help |
 
