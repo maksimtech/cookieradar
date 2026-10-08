@@ -405,6 +405,29 @@ def test_tests_run_on_every_supported_python():
     assert classifiers[0] == minimum
 
 
+def test_the_next_python_runs_as_an_experimental_row():
+    """The release after the last supported one runs too, and may fail.
+
+    3.15.0 final is due 2026-10-09 (PEP 790); `actions/setup-python` resolves
+    `3.15-dev` to the newest pre-release today and to the final tomorrow, so the
+    suite meets the new interpreter before the classifier promises it. The row is
+    an `include`, not a member of `python-version`: that list is the classifiers
+    (test above) and the ruleset needs only the "Tests" summary. `continue-on-error`
+    taken from the matrix keeps a red experimental row from failing the run —
+    and from failing `summary`, which sees the job as succeeded.
+    """
+    _pyproject, classifiers = _classifier_pythons()
+    major, minor = map(int, classifiers[-1].split("."))
+    expected = f"{major}.{minor + 1}-dev"
+
+    job = _workflow("tests.yml")["jobs"]["test"]
+    matrix = job["strategy"]["matrix"]
+
+    assert matrix["experimental"] == [False]
+    assert matrix["include"] == [{"python-version": expected, "experimental": True}]
+    assert job["continue-on-error"] == "${{ matrix.experimental }}"
+
+
 def test_sonar_version_comes_from_the_package():
     properties = (ROOT / "sonar-project.properties").read_text(encoding="utf-8")
     step = next(s for s in _all_steps(_workflow("sonarcloud.yml")) if "sonarqube-scan-action" in s.get("uses", ""))

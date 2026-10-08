@@ -12,6 +12,16 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Changed
+
+- **The test matrix runs on `3.15-dev` too, as an experimental row.** 3.15.0 final is
+  due 2026-10-09 (PEP 790) and the dependencies the suite stands on already ship
+  cp315 wheels; `actions/setup-python` resolves `3.15-dev` to the newest build, rc.3
+  today and the final once it is out. The row is an `include` with
+  `continue-on-error`, so it may fail without failing the run or the required
+  `Tests` check; the classifiers still stop at 3.14 until 3.15 is final. patchradar
+  has had the same row since 2026-08-20.
+
 ## [2026.43] - 2026-10-08
 
 ### Added
