@@ -21,6 +21,26 @@ README = Path(__file__).resolve().parents[1] / "README.md"
 runner = CliRunner()
 
 
+def _run(args):
+    """The command as a user runs it: the real scanner, no stand-in.
+
+    COLUMNS is the one thing set, so that Rich does not wrap the values under
+    test at 80 columns.
+    """
+    return runner.invoke(app, args, env={"COLUMNS": "250"})
+
+
+@pytest.fixture
+def chromium():
+    """The commands below launch a real Chromium; skipped when it is not installed."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        executable = Path(p.chromium.executable_path)
+    if not executable.is_file():  # pragma: no cover - depends on environment
+        pytest.skip(f"Chromium not available: {executable}")
+
+
 def _tracker(domain, url=None):
     return TrackerRequest(url=url or f"https://{domain}/x", domain=domain, resource_type="script", timestamp=0.0)
 
@@ -430,27 +450,23 @@ def test_batch_reject_not_applied_is_unverified(tmp_path):
     assert "reject button not found" in res.output
 
 
-@pytest.mark.parametrize("kind", ["403", "challenge"])
-def test_batch_reports_a_site_not_served_without_crashing_on_the_verdict(tmp_path, kind):
+@pytest.mark.integration
+@pytest.mark.parametrize("page", ["no-such-page.html", "challenge.html"])
+def test_batch_reports_a_site_not_served_without_crashing_on_the_verdict(tmp_path, chromium, site_url, page):
     """`batch` turned the verdict into a label through a table with no entry for
     ExitCode.ERROR: for a site answering 403, or with a challenge, the KeyError
     landed in the `except Exception` and the user read
     "Error: <ExitCode.ERROR: 3>" — and the report asked for with -o was never
-    written."""
+    written.
+
+    A real scan of the local site: a page that is not there answers 404, which
+    takes the 403's path (any status from 400 up), and challenge.html is a
+    challenge served with 200."""
     urls = tmp_path / "urls.txt"
-    urls.write_text("example.com\n", encoding="utf-8")
+    urls.write_text(f"{site_url}/{page}\n", encoding="utf-8")
     out_dir = tmp_path / "reports"
 
-    def build(r):
-        r.post_accept.consent_clicked = r.post_reject.consent_clicked = False
-        if kind == "403":
-            for session in (r.pre_consent, r.post_accept, r.post_reject):
-                session.status = 403
-        else:  # a challenge served with 200
-            r.pre_consent.status = 200
-            r.pre_consent.title = "Just a moment..."
-
-    res = _invoke(["batch", str(urls), "-o", str(out_dir)], build)
+    res = _run(["batch", str(urls), "-o", str(out_dir)])
 
     assert res.exit_code == 3, res.output
     assert "ExitCode" not in res.output, res.output
@@ -536,12 +552,11 @@ def test_audit_rejects_file_url():
 
 def test_audit_of_a_url_without_host_exits_as_an_error():
     """The README's case: an invalid address is 3, not 2, and the browser is
-    never even started."""
-    seen = []
-    res = _invoke(["audit", "https://"], scan=_recording_scan(seen))
+    never even started — had it been, the real scanner would have failed to
+    navigate and the verdict would be 2."""
+    res = _run(["audit", "https://"])
 
     assert res.exit_code == 3, res.output
-    assert seen == []
     assert "No host" in res.output
 
 
@@ -643,12 +658,12 @@ def test_unreadable_trackerdb_file_is_an_error_not_a_violation(tmp_path):
     exception with exit code 1, which for this tool means VIOLATION."""
     db = tmp_path / "trackerdb"
     (db / "patterns" / "broken.eno").mkdir(parents=True)
-    seen = []
 
-    res = _invoke(["audit", "example.com", "--trackers", str(db)], scan=_recording_scan(seen))
+    # The real scanner: the trackerdb is read before it, so it never runs. A
+    # closed local port all the same, so that a regression costs no network.
+    res = _run(["audit", "http://127.0.0.1:9/", "--trackers", str(db)])
 
     _assert_clean_failure(res, "broken.eno")  # and it says which file
-    assert seen == []
 
 
 # ─── M7: single entry point for `python -m cookieradar` ─────────────────────
