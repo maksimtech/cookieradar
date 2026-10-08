@@ -11,7 +11,18 @@ no version in this file has ever matched — 40 is not a month, and
 `tests/test_version_contract.py` has been enforcing the real form all along.
 
 ## [Unreleased]
+
+## [2026.43] - 2026-10-08
+
 ### Added
+
+- **`CVE-2026-77214` recorded in `SECURITY-EXCEPTIONS.toml`.** Docker Scout and Snyk
+  report the heap over-read in expat's `XML_ParseBuffer`; `patchradar debian` on
+  2026-10-08 says fixed in sid only (`2.9.0-1`), open in trixie, bookworm and forky, no
+  Debian bug yet. Recorded the way the other expat entries are, to be reviewed by
+  2026-11-30, with who loads the system `libexpat1` in the image: fontconfig and Mesa,
+  for their own configuration files. CPython's `pyexpat` carries its own copy, and
+  cookieradar parses no XML.
 
 - **The files the build is told to include are checked to be there.** apkradar lost its
   `LICENSE` out of the working tree on 2026-10-04 and the loss reached `main`: pyproject
@@ -176,6 +187,16 @@ no version in this file has ever matched — 40 is not a month, and
   `--only-binary :all:`, so a dependency without an aarch64 wheel would be compiled under
   QEMU. patchradar's `pypi` branch had that guarantee and keeping it was part of its move;
   here there is nothing to keep, and adding it is a change of its own.
+
+- **The scanner no longer guards against a service-worker request it never receives.**
+  `_is_main_document` caught the error that `request.frame` raises for a service
+  worker's request, which has no frame. Playwright hands those to the context alone,
+  never to `page.on("request")`, the scanner's only listener, and none is a navigation,
+  so the check stopped before asking for the frame anyway. Measured with Playwright 1.63
+  on Windows and Linux; an integration test with a fetching service worker, on real
+  Chromium, keeps it so. The tests that #23 had written against mocks of the scanner,
+  Playwright and the law fetcher run on real inputs now as well: local sites scanned by
+  Chromium with the host resolver mapped to `127.0.0.1`.
 
 - **`release.sh` runs the suite after the bump, and refuses before committing.**
   The version is written as the script's first act, so a suite run *before* a
@@ -673,7 +694,13 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.09.10...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.43...HEAD
+[2026.43]: https://github.com/maksimtech/cookieradar/compare/v2026.42...v2026.43
+[2026.42]: https://github.com/maksimtech/cookieradar/compare/v2026.41...v2026.42
+[2026.41]: https://github.com/maksimtech/cookieradar/compare/v2026.40.1...v2026.41
+[2026.40.1]: https://github.com/maksimtech/cookieradar/compare/v2026.40...v2026.40.1
+[2026.40]: https://github.com/maksimtech/cookieradar/compare/v2026.09.11...v2026.40
+[2026.09.11]: https://github.com/maksimtech/cookieradar/compare/v2026.09.10...v2026.09.11
 [2026.09.10]: https://github.com/maksimtech/cookieradar/compare/v2026.09.9...v2026.09.10
 [2026.09.9]: https://github.com/maksimtech/cookieradar/compare/v2026.09.8...v2026.09.9
 [2026.09.8]: https://github.com/maksimtech/cookieradar/compare/v2026.09.7...v2026.09.8
