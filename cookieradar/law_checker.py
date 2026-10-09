@@ -50,6 +50,19 @@ UNVERIFIED_NOTE = (
     "post-reject session"
 )
 
+# The same outcome when a session did see something that looked like a banner.
+# Measured on 2026-10-09 on it.wikipedia.org, www.subito.it and www.muenchen.de:
+# every session printed "Banner found" and this section then said "no cookie
+# banner was found", two sentences from one result and one of them false. The
+# heuristic cannot tell a Didomi notice from a site notice with "banner" in its
+# class name, and the note must not pretend it can: what it knows is that no
+# refusal control was recognised.
+UNRECOGNISED_BANNER_NOTE = (
+    "UNVERIFIED: something that looks like a cookie banner was found, but no "
+    "refusal control was recognised on it, so no provision is cited for the "
+    "post-reject session"
+)
+
 # The other way a session can go unverified, and the one that is not about this
 # tool's reach: the banner was there and it was used.
 NOT_SERVED_NOTE = (
@@ -154,7 +167,12 @@ def notes_of(result) -> list[str]:
         return [not_the_site]
     if _rejected(result):
         return []
-    return [NO_REFUSAL_NOTE if refusal_not_offered(result) else UNVERIFIED_NOTE]
+    if refusal_not_offered(result):
+        return [NO_REFUSAL_NOTE]
+    sessions = (result.pre_consent, result.post_accept, result.post_reject)
+    if any(s.banner_found for s in sessions):
+        return [UNRECOGNISED_BANNER_NOTE]
+    return [UNVERIFIED_NOTE]
 
 
 # ─── Citations ────────────────────────────────────────────────────────────────

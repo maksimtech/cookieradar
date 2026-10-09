@@ -2,6 +2,7 @@
 Shared fixtures: Playwright page mocks and a local HTTP test site.
 """
 import http.server
+import pathlib
 import threading
 import time
 from pathlib import Path
@@ -42,6 +43,28 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path.startswith("/forbidden/"):
+            # The page under tests/site/, served with 403: an edge refusing the
+            # request with a full page, as zalando.it did on 2026-10-09.
+            #
+            # Resolved by `translate_path`, the same way SimpleHTTPRequestHandler
+            # resolves every other path: unquoted, query stripped, `..` dropped,
+            # rooted at `directory`. CodeQL #99 (py/path-injection) on PR #28
+            # was right: joined to SITE_DIR as written, `/forbidden/../conftest.py`
+            # read this very file. The containment check after it is belt and
+            # braces, and a path that resolves to nothing under tests/site/ is
+            # a 404 and not a traceback in the server thread.
+            page = pathlib.Path(self.translate_path("/" + self.path[len("/forbidden/"):])).resolve()
+            if not page.is_relative_to(SITE_DIR.resolve()) or not page.is_file():
+                self.send_error(404)
+                return
+            body = page.read_bytes()
+            self.send_response(403)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path.startswith("/hang"):
             time.sleep(10)
         if self.path.startswith(("/hang", "/beacon")):

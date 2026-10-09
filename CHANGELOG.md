@@ -12,6 +12,58 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Fixed
+
+- **The report says when it was made and by what.** The README calls it "evidence of
+  what the site did on a given day", and the file saved on 2026-10-09 for
+  www.repubblica.it carried no day: the only dates in it were the "Version of:" lines
+  under the legal citations, which exist only when something is cited, and nothing
+  named the CookieRadar that produced it. Every report now opens with
+  `Audited on 2026-10-09 12:37 UTC with CookieRadar 2026.43`, and the HTML file has a
+  `<title>` with the site's host — Rich's export template has none, so ten reports
+  open side by side were ten tabs called `report.html`.
+
+- **The law section no longer says "no cookie banner was found" under a report that
+  says "Banner found".** Measured on 2026-10-09 on it.wikipedia.org, www.subito.it and
+  www.muenchen.de: every session printed the tick, neither button was clicked, and the
+  UNVERIFIED note denied the banner. Both lines came from one result. The heuristic
+  cannot tell a Didomi notice from a footer link called "Dichiarazione sui cookie"
+  (Wikipedia's match), and the note now says what it knows: something that looks like
+  a banner was found, and no refusal control was recognised on it.
+
+- **A page that never goes idle keeps its HTTP status.** `page.goto(wait_until=
+  "networkidle")` returns the response only when the wait succeeds; when the page keeps
+  the network busy it raises a timeout and the status, which had arrived in the first
+  second, was lost with it. Measured on 2026-10-09: zalando.it answered 403 from its
+  edge with a full page whose scripts never went quiet, so the status was None,
+  `page_not_served` saw nothing wrong, and the audit said "0 trackers before consent,
+  UNVERIFIED" about an error page it never had; enel.it and poste.it, served with 200
+  and never idle, showed no status in any session. The status is now taken from the
+  main document's response as it arrives, last hop of a redirect, and `goto` only
+  confirms it. `tests/site/forbidden_busy.html`, served with 403 by the test server
+  under `/forbidden/`, reproduces the zalando.it case.
+
+- **TrustArc and Usercentrics refusals are clicked, and so are "Non accetto",
+  "Continua senza accettare" and "Solo gli essenziali".** Measured on 2026-10-09:
+  enel.it and poste.it (TrustArc) offer refusal in one click — `#truste-consent-required`
+  "Continua senza accettare", whose banner says it leaves only technical cookies, and
+  `#truste-consent-required2` "Non accetto" — and the audit clicked "Accetta", found no
+  refusal, and reported *"Accept was applied and no refusal control was found"* with
+  GDPR art. 4(11) cited against both. zalando.it (Usercentrics) renders its banner in a
+  shadow root with no ids; the refusal is `[data-testid="uc-deny-all-button"]` "Solo gli
+  essenziali". The three banners are in `tests/site/`, captured from the real pages
+  that day, and the sessions now click the refusal on each and the acceptance on none.
+
+- **An error page in any of the three sessions means NOT MEASURED.** `page_not_served`
+  read the pre-consent status only. In the batch run of 2026-10-09 www.zalando.it got no
+  response at all in the pre-consent session and the edge's 403 page in the post-reject
+  one — with a Usercentrics banner over it and Google Tag Manager loading once "Solo gli
+  essenziali" was clicked — and the verdict came out as *VIOLATION, 2 trackers new after
+  rejection*, assembled from one session that saw nothing and one that saw an error page.
+  The verdict rests on session 3; an error page there leaves it nothing to rest on. The
+  report now names the session that got the error page, and the other sessions' tables
+  say that no verdict rests on them.
+
 ### Changed
 
 - **The test matrix runs on `3.15-dev` too, as an experimental row.** 3.15.0 final is

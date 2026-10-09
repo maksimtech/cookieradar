@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  Modelled on what https://www.zalando.it/ answered on 2026-10-09 to a headless
+  Chromium: HTTP 403 from the Akamai edge carrying a full page — "Impossibile
+  raggiungere il sito", a reload button, Google Tag Manager, and the Usercentrics
+  banner over it — whose scripts kept the network busy, so that `networkidle`
+  never came and `page.goto` raised a timeout instead of returning the response.
+
+  The test server serves this file with status 403 under /forbidden/. The script
+  below keeps fetching so that the session times out the way the real one did.
+  With the status lost, the audit said "0 trackers before consent, UNVERIFIED";
+  with it kept, the audit says NOT MEASURED, which is what happened.
+-->
+<html lang="it-IT">
+<head><meta charset="utf-8"><title></title></head>
+<body>
+<main>
+  <h1>Impossibile raggiungere il sito</h1>
+  <p>Prova ad aggiornare la pagina tra qualche minuto. Se continua a non funzionare,
+    inviaci una segnalazione di errore e analizzeremo il problema.</p>
+  <button id="reload-button" type="button">Aggiorna</button>
+  <button id="send-email-button" type="button">Invia segnalazione di errore</button>
+</main>
+<script>
+  // The edge's page never goes quiet: a request every 300 ms, forever.
+  setInterval(() => fetch('/beacon?' + Date.now()).catch(() => {}), 300);
+</script>
+</body>
+</html>

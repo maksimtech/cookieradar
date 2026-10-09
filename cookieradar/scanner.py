@@ -6,6 +6,7 @@ import re
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from playwright.async_api import BrowserContext, Cookie, Page, async_playwright
@@ -173,6 +174,11 @@ class ScanResult:
     pre_consent: SessionResult = field(default_factory=lambda: SessionResult("pre-consent"))
     post_accept: SessionResult = field(default_factory=lambda: SessionResult("post-accept"))
     post_reject: SessionResult = field(default_factory=lambda: SessionResult("post-reject"))
+    # When the audit was made, in UTC. The README calls the report "evidence of
+    # what the site did on a given day", and until 2026-10-09 the file saved
+    # said no day at all: the only dates in it were the "Version of:" lines
+    # under the legal citations, which appear only when something is cited.
+    scanned_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -198,9 +204,23 @@ def page_not_served(result: ScanResult) -> bool:
 
     A status of None is not a failure: the navigation produced no response,
     which is a timeout, and the session already carries that as an error.
+
+    Any of the three sessions, not the first alone. Measured on www.zalando.it
+    on 2026-10-09, in a batch run: the pre-consent session got no response at
+    all, the post-reject session got the edge's 403 page with a banner on it,
+    and the verdict came out as VIOLATION "new after rejection" — assembled
+    from one session that saw nothing and one that saw an error page. The
+    verdict rests on session 3; an error page there leaves it nothing to rest on.
     """
-    status = result.pre_consent.status
-    return status is not None and status >= 400
+    return not_served(result) is not None
+
+
+def not_served(result: ScanResult) -> tuple[str, int] | None:
+    """The first session whose document was an error page, as (name, status)."""
+    for session in (result.pre_consent, result.post_accept, result.post_reject):
+        if session.status is not None and session.status >= 400:
+            return session.session, session.status
+    return None
 
 
 # A bot-management edge refuses in two ways, and only one of them looks like a
@@ -397,12 +417,24 @@ ACCEPT_SELECTORS = [
     # `didomi-notice-agree-button` and `didomi-notice-disagree-button` side by
     # side, and the selectors are tried before the labels.
     "button[id*='agree']:not([id*='disagree'])",
+    # Usercentrics renders its banner inside a shadow root with no ids on the
+    # buttons; `data-testid` is the one stable handle. Playwright's selectors
+    # pierce open shadow roots. Measured on zalando.it, 2026-10-09.
+    "[data-testid='uc-accept-all-button']",
 ]
 REJECT_SELECTORS = [
     "#onetrust-reject-all-handler",
     ".ot-pc-refuse-all-handler",
     "button[id*='reject-all']",
     "button[class*='refuse-all']",
+    # TrustArc's "required cookies only": `#truste-consent-required` on enel.it
+    # ("Continua senza accettare"), `#truste-consent-required2` on poste.it ("Non
+    # accetto", with the close icon `#truste-consent-required` after it in the
+    # DOM, an <a> without href). Prefix match, any tag, first visible in DOM
+    # order: the button a person would click comes first on both. Measured
+    # 2026-10-09, when both sites were reported as offering no refusal.
+    "[id^='truste-consent-required']",
+    "[data-testid='uc-deny-all-button']",
 ]
 
 # Whole accessible names, case-insensitive: "OK" must not match "Cookie settings",
@@ -416,6 +448,16 @@ REJECT_LABELS = [
     re.compile(r"^\s*rifiuta(\s+tutt[oi])?(\s+i\s+cookie)?\s*$", re.I),
     re.compile(r"^\s*reject(\s+all)?(\s+cookies)?\s*$", re.I),
     re.compile(r"^\s*decline(\s+all)?\s*$", re.I),
+    # The refusals Italian banners actually carry, measured on 2026-10-09:
+    # "Non accetto" (poste.it), "Continua senza accettare" (enel.it, whose
+    # banner says it leaves only technical cookies), "Solo gli essenziali"
+    # (zalando.it). Whole names, so "accetto" inside "non accetto" cannot be
+    # read as acceptance — ACCEPT_LABELS anchor on "accett" at the start.
+    re.compile(r"^\s*non\s+accett[ao]\s*$", re.I),
+    re.compile(r"^\s*continua\s+senza\s+accettare\s*$", re.I),
+    re.compile(r"^\s*continue\s+without\s+accepting\s*$", re.I),
+    re.compile(r"^\s*solo\s+(i\s+|gli\s+)?(cookie\s+)?(tecnici|necessari|essenziali)\s*$", re.I),
+    re.compile(r"^\s*(only\s+)?(the\s+)?(essential|necessary)(\s+cookies)?(\s+only)?\s*$", re.I),
 ]
 
 
@@ -523,6 +565,23 @@ async def _run_session(
 
     page.on("request", handle_request)
 
+    # The main document's status as it arrives, independently of `goto`.
+    # `goto` returns the response only when the wait for `networkidle` succeeds;
+    # when the page keeps the network busy it raises instead, and the status that
+    # had arrived in the first second was lost with it. Measured on 2026-10-09:
+    # zalando.it answered 403 from its edge with a page whose scripts never went
+    # quiet, so the status was None, `page_not_served` saw nothing wrong, and the
+    # audit said "0 trackers before consent, UNVERIFIED" about an error page.
+    # enel.it and poste.it, served with 200 and never idle, lost theirs the same
+    # way. A redirect answers once per hop, and the document is the last one.
+    served: list[int] = []
+
+    def handle_response(response):
+        if _is_main_document(response.request):
+            served.append(response.status)
+
+    page.on("response", handle_response)
+
     try:
         try:
             response = await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
@@ -532,6 +591,9 @@ async def _run_session(
             result.status = response.status if response is not None else None
         except PlaywrightTimeoutError as e:
             _add_error(result, e)
+            # None only when no document ever answered: that is the timeout the
+            # error already describes. A document that did answer keeps its status.
+            result.status = served[-1] if served else None
         await page.wait_for_timeout(3000)
 
         # The document's own identity, for `bot_challenge`. Taken after the wait

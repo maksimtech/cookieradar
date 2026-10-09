@@ -3,6 +3,7 @@ CookieRadar — Cookie compliance auditor.
 GDPR art.5/6/7 — pre-consent, post-reject, GTM analysis
 """
 import asyncio
+import html
 import io
 import re
 import sys
@@ -20,7 +21,8 @@ from rich.table import Table
 from rich.text import Text
 from typer.core import TyperGroup
 
-from cookieradar.scanner import Violations, bot_challenge, find_violations, page_not_served
+import cookieradar
+from cookieradar.scanner import Violations, bot_challenge, find_violations, not_served, page_not_served
 
 
 def enable_utf8_output() -> None:
@@ -345,10 +347,25 @@ def _why_not_the_site(result) -> str | None:
     both fire — but reading the status first means that if they ever could, the
     report would not suggest changing the browser for a refused address.
     """
-    if page_not_served(result):
-        return _not_served(result.pre_consent.status)
+    unserved = not_served(result)
+    if unserved:
+        return _not_served_in(result.pre_consent, *unserved)
     challenge = bot_challenge(result)
     return _challenged(challenge) if challenge.seen else None
+
+
+def _not_served_in(session, where: str, status: int) -> str:
+    """What this session's table says when a session — this one or another —
+    got an error page instead of the site.
+
+    The session that got it is told so in its own words; the others are told
+    which session did, because a table of trackers measured on the site next to
+    a verdict withheld for an error page needs the link spelled out. Measured on
+    www.zalando.it, 2026-10-09: the post-reject session alone answered 403."""
+    if session.status is not None and session.status >= 400:
+        return _not_served(session.status)
+    return (f"the site answered HTTP {status} in the {where} session: "
+            f"no verdict rests on this one")
 
 
 def _unique_domains(session) -> set[str]:
@@ -401,7 +418,14 @@ def _verdict(result) -> ExitCode:
 def _render_report(out: Console, url: str, result, law=None):
     """Full report of the three sessions and the verdict, then the provisions
     applied when `law` (a law_checker result) is given."""
-    out.print(f"\n[bold]📊 CookieRadar Report — {escape(url)}[/bold]\n")
+    out.print(f"\n[bold]📊 CookieRadar Report — {escape(url)}[/bold]")
+    # Who made this file and when. A report is kept and forwarded; without
+    # these two facts it cannot be placed in time or reproduced with the same
+    # tool. The hour matters too: a site changes its banner during the day.
+    out.print(
+        f"[dim]Audited on {result.scanned_at.astimezone(UTC):%Y-%m-%d %H:%M} UTC "
+        f"with CookieRadar {cookieradar.__version__}[/dim]\n"
+    )
 
     # Pre-consent
     pre = result.pre_consent
@@ -414,9 +438,10 @@ def _render_report(out: Console, url: str, result, law=None):
     # Post-accept
     post_acc = result.post_accept
     _print_consent_header(out, "🟡 Session 2 — Post-accept", "yellow", post_acc, ACCEPT_NOT_APPLIED)
+    unserved = not_served(result)
     _print_session(
         out, "Post-accept trackers", post_acc,
-        _not_served(post_acc.status) if page_not_served(result)
+        _not_served_in(post_acc, *unserved) if unserved
         else None if post_acc.consent_clicked else NOTHING_ACCEPTED,
     )
 
@@ -425,7 +450,7 @@ def _render_report(out: Console, url: str, result, law=None):
     _print_consent_header(out, "🟢 Session 3 — Post-reject", "green", post_rej, REJECT_NOT_APPLIED)
     _print_session(
         out, "Post-reject trackers", post_rej,
-        _not_served(post_rej.status) if page_not_served(result)
+        _not_served_in(post_rej, *unserved) if unserved
         else None if post_rej.consent_clicked else NOTHING_REJECTED,
     )
 
@@ -434,11 +459,11 @@ def _render_report(out: Console, url: str, result, law=None):
     verdict = _verdict(result)
 
     challenge = bot_challenge(result)
-    if page_not_served(result):
-        status = result.pre_consent.status
+    if unserved:
+        where, status = unserved
         out.print(
-            f"[bold red]⛔ NOT MEASURED — the site answered HTTP {status}, so "
-            f"nothing above describes it[/bold red]"
+            f"[bold red]⛔ NOT MEASURED — the site answered HTTP {status} in the "
+            f"{where} session, so nothing above describes it[/bold red]"
         )
         out.print(
             "[red]   No trackers, no banner and no cookies on an error page are "
@@ -518,9 +543,43 @@ def _save_report(url: str, result, path: Path, law=None):
     recorder = Console(file=io.StringIO(), record=True, width=120, force_terminal=True)
     _render_report(recorder, url, result, law)
     if path.suffix.lower() in (".html", ".htm"):
-        recorder.save_html(str(path))
+        recorder.save_html(str(path), code_format=_html_format(url))
     else:
         recorder.save_text(str(path))
+
+
+# Rich's own export template with one addition, a <title>. Without it a browser
+# tab, a bookmark and a mail client's attachment preview all show the file name,
+# and ten reports open side by side are ten tabs called "report.html".
+_HTML_FORMAT = """\
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>CookieRadar — {title}</title>
+<style>
+{{stylesheet}}
+body {{{{
+    color: {{foreground}};
+    background-color: {{background}};
+}}}}
+</style>
+</head>
+<body>
+    <pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><code \
+style="font-family:inherit">{{code}}</code></pre>
+</body>
+</html>
+"""
+
+
+def _html_format(url: str) -> str:
+    """The HTML page template for a report of `url`, titled with its host.
+
+    The host and not the whole address: the title is read in a tab a few
+    centimetres wide. HTML-escaped, since the address is whatever was typed."""
+    title = urlparse(url).hostname or url
+    return _HTML_FORMAT.format(title=html.escape(title, quote=True))
 
 
 def _report_filename(url: str, used: set[str]) -> str:
