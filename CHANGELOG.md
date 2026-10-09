@@ -23,6 +23,14 @@ no version in this file has ever matched — 40 is not a month, and
   `<title>` with the site's host — Rich's export template has none, so ten reports
   open side by side were ten tabs called `report.html`.
 
+- **The law section no longer says "no cookie banner was found" under a report that
+  says "Banner found".** Measured on 2026-10-09 on it.wikipedia.org, www.subito.it and
+  www.muenchen.de: every session printed the tick, neither button was clicked, and the
+  UNVERIFIED note denied the banner. Both lines came from one result. The heuristic
+  cannot tell a Didomi notice from a footer link called "Dichiarazione sui cookie"
+  (Wikipedia's match), and the note now says what it knows: something that looks like
+  a banner was found, and no refusal control was recognised on it.
+
 ### Changed
 
 - **The test matrix runs on `3.15-dev` too, as an experimental row.** 3.15.0 final is
