@@ -183,6 +183,16 @@ jobs:
       # code-scanning configuration per run and never found any of them again —
       # apkradar reached 32, and its pull requests could no longer be told which
       # alerts they introduced.
+      # Before the build, so the pull of the base image counts against this
+      # account and not against the runner address's anonymous allowance, which
+      # ran out on 2026-10-09 (429 on python:3.12-slim-trixie). continue-on-error:
+      # a fork has no secrets and still has to build.
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        continue-on-error: true
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build the image for scanning
         id: image
         if: ${{ env.SNYK_ENABLED == 'true' && hashFiles('Dockerfile') != '' }}

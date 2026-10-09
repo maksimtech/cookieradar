@@ -552,3 +552,34 @@ def test_shell_scripts_are_pinned_to_lf_line_endings():
     assert scripts, "no tracked .sh script: the test would check nothing"
     for line in git("check-attr", "eol", "--", *scripts).splitlines():
         assert line.endswith(": eol: lf"), line
+
+
+def _build_steps(job):
+    """Indexes of the steps that build an image: build-push-action or a bare docker build."""
+    return [i for i, step in enumerate(job.get("steps", []))
+            if "docker/build-push-action" in step.get("uses", "") or "docker build" in step.get("run", "")]
+
+
+def test_every_image_build_logs_in_to_docker_hub_first():
+    """An anonymous pull of the base image from a GitHub runner shares one rate
+    limit with every other anonymous pull from that address. On 2026-10-09 a day
+    of builds across the five Radar ended in `429 Too Many Requests` on
+    python:3.12-slim-trixie, in this repository's Tests and Snyk jobs, three
+    reruns in a row. Logging in first puts the pull under the account's own
+    limit. `continue-on-error`, because a fork has no secrets and must still
+    build anonymously."""
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        wf = _workflow(path.name)
+        for job_name, job in wf["jobs"].items():
+            builds = _build_steps(job)
+            if not builds:
+                continue
+            steps = job["steps"]
+            logins = [i for i, step in enumerate(steps) if "docker/login-action" in step.get("uses", "")]
+            assert logins and logins[0] < builds[0], f"{path.name}:{job_name} builds an image before logging in"
+            pushes = any(step.get("with", {}).get("push") is True for step in steps)
+            if not pushes:
+                # A job that pushes needs the login to succeed; one that only
+                # builds must still work on a fork, where the secrets are absent.
+                lenient = steps[logins[0]].get("continue-on-error") is True
+                assert lenient, f"{path.name}:{job_name}: a fork without secrets must still build"

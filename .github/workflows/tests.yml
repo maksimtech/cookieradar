@@ -56,6 +56,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+      # Before the build, so the pull of the base image counts against this
+      # account and not against the runner address's anonymous allowance, which
+      # ran out on 2026-10-09 (429 on python:3.12-slim-trixie). continue-on-error:
+      # a fork has no secrets and still has to build.
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        continue-on-error: true
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build image from local source
         uses: docker/build-push-action@v7
         with:
