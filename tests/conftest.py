@@ -42,6 +42,16 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path.startswith("/forbidden/"):
+            # The page under tests/site/, served with 403: an edge refusing the
+            # request with a full page, as zalando.it did on 2026-10-09.
+            body = (SITE_DIR / self.path[len("/forbidden/"):].split("?")[0]).read_bytes()
+            self.send_response(403)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path.startswith("/hang"):
             time.sleep(10)
         if self.path.startswith(("/hang", "/beacon")):

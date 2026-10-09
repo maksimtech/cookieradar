@@ -529,6 +529,23 @@ async def _run_session(
 
     page.on("request", handle_request)
 
+    # The main document's status as it arrives, independently of `goto`.
+    # `goto` returns the response only when the wait for `networkidle` succeeds;
+    # when the page keeps the network busy it raises instead, and the status that
+    # had arrived in the first second was lost with it. Measured on 2026-10-09:
+    # zalando.it answered 403 from its edge with a page whose scripts never went
+    # quiet, so the status was None, `page_not_served` saw nothing wrong, and the
+    # audit said "0 trackers before consent, UNVERIFIED" about an error page.
+    # enel.it and poste.it, served with 200 and never idle, lost theirs the same
+    # way. A redirect answers once per hop, and the document is the last one.
+    served: list[int] = []
+
+    def handle_response(response):
+        if _is_main_document(response.request):
+            served.append(response.status)
+
+    page.on("response", handle_response)
+
     try:
         try:
             response = await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
@@ -538,6 +555,9 @@ async def _run_session(
             result.status = response.status if response is not None else None
         except PlaywrightTimeoutError as e:
             _add_error(result, e)
+            # None only when no document ever answered: that is the timeout the
+            # error already describes. A document that did answer keeps its status.
+            result.status = served[-1] if served else None
         await page.wait_for_timeout(3000)
 
         # The document's own identity, for `bot_challenge`. Taken after the wait

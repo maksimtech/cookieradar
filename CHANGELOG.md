@@ -31,6 +31,18 @@ no version in this file has ever matched — 40 is not a month, and
   (Wikipedia's match), and the note now says what it knows: something that looks like
   a banner was found, and no refusal control was recognised on it.
 
+- **A page that never goes idle keeps its HTTP status.** `page.goto(wait_until=
+  "networkidle")` returns the response only when the wait succeeds; when the page keeps
+  the network busy it raises a timeout and the status, which had arrived in the first
+  second, was lost with it. Measured on 2026-10-09: zalando.it answered 403 from its
+  edge with a full page whose scripts never went quiet, so the status was None,
+  `page_not_served` saw nothing wrong, and the audit said "0 trackers before consent,
+  UNVERIFIED" about an error page it never had; enel.it and poste.it, served with 200
+  and never idle, showed no status in any session. The status is now taken from the
+  main document's response as it arrives, last hop of a redirect, and `goto` only
+  confirms it. `tests/site/forbidden_busy.html`, served with 403 by the test server
+  under `/forbidden/`, reproduces the zalando.it case.
+
 ### Changed
 
 - **The test matrix runs on `3.15-dev` too, as an experimental row.** 3.15.0 final is
