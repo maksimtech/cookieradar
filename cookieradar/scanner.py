@@ -6,6 +6,7 @@ import re
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from playwright.async_api import BrowserContext, Cookie, Page, async_playwright
@@ -173,6 +174,11 @@ class ScanResult:
     pre_consent: SessionResult = field(default_factory=lambda: SessionResult("pre-consent"))
     post_accept: SessionResult = field(default_factory=lambda: SessionResult("post-accept"))
     post_reject: SessionResult = field(default_factory=lambda: SessionResult("post-reject"))
+    # When the audit was made, in UTC. The README calls the report "evidence of
+    # what the site did on a given day", and until 2026-10-09 the file saved
+    # said no day at all: the only dates in it were the "Version of:" lines
+    # under the legal citations, which appear only when something is cited.
+    scanned_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass

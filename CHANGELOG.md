@@ -12,6 +12,17 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Fixed
+
+- **The report says when it was made and by what.** The README calls it "evidence of
+  what the site did on a given day", and the file saved on 2026-10-09 for
+  www.repubblica.it carried no day: the only dates in it were the "Version of:" lines
+  under the legal citations, which exist only when something is cited, and nothing
+  named the CookieRadar that produced it. Every report now opens with
+  `Audited on 2026-10-09 12:37 UTC with CookieRadar 2026.43`, and the HTML file has a
+  `<title>` with the site's host — Rich's export template has none, so ten reports
+  open side by side were ten tabs called `report.html`.
+
 ### Changed
 
 - **The test matrix runs on `3.15-dev` too, as an experimental row.** 3.15.0 final is

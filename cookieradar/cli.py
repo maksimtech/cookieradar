@@ -3,6 +3,7 @@ CookieRadar — Cookie compliance auditor.
 GDPR art.5/6/7 — pre-consent, post-reject, GTM analysis
 """
 import asyncio
+import html
 import io
 import re
 import sys
@@ -20,6 +21,7 @@ from rich.table import Table
 from rich.text import Text
 from typer.core import TyperGroup
 
+import cookieradar
 from cookieradar.scanner import Violations, bot_challenge, find_violations, page_not_served
 
 
@@ -401,7 +403,14 @@ def _verdict(result) -> ExitCode:
 def _render_report(out: Console, url: str, result, law=None):
     """Full report of the three sessions and the verdict, then the provisions
     applied when `law` (a law_checker result) is given."""
-    out.print(f"\n[bold]📊 CookieRadar Report — {escape(url)}[/bold]\n")
+    out.print(f"\n[bold]📊 CookieRadar Report — {escape(url)}[/bold]")
+    # Who made this file and when. A report is kept and forwarded; without
+    # these two facts it cannot be placed in time or reproduced with the same
+    # tool. The hour matters too: a site changes its banner during the day.
+    out.print(
+        f"[dim]Audited on {result.scanned_at.astimezone(UTC):%Y-%m-%d %H:%M} UTC "
+        f"with CookieRadar {cookieradar.__version__}[/dim]\n"
+    )
 
     # Pre-consent
     pre = result.pre_consent
@@ -518,9 +527,43 @@ def _save_report(url: str, result, path: Path, law=None):
     recorder = Console(file=io.StringIO(), record=True, width=120, force_terminal=True)
     _render_report(recorder, url, result, law)
     if path.suffix.lower() in (".html", ".htm"):
-        recorder.save_html(str(path))
+        recorder.save_html(str(path), code_format=_html_format(url))
     else:
         recorder.save_text(str(path))
+
+
+# Rich's own export template with one addition, a <title>. Without it a browser
+# tab, a bookmark and a mail client's attachment preview all show the file name,
+# and ten reports open side by side are ten tabs called "report.html".
+_HTML_FORMAT = """\
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>CookieRadar — {title}</title>
+<style>
+{{stylesheet}}
+body {{{{
+    color: {{foreground}};
+    background-color: {{background}};
+}}}}
+</style>
+</head>
+<body>
+    <pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><code \
+style="font-family:inherit">{{code}}</code></pre>
+</body>
+</html>
+"""
+
+
+def _html_format(url: str) -> str:
+    """The HTML page template for a report of `url`, titled with its host.
+
+    The host and not the whole address: the title is read in a tab a few
+    centimetres wide. HTML-escaped, since the address is whatever was typed."""
+    title = urlparse(url).hostname or url
+    return _HTML_FORMAT.format(title=html.escape(title, quote=True))
 
 
 def _report_filename(url: str, used: set[str]) -> str:
