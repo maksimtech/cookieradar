@@ -204,9 +204,23 @@ def page_not_served(result: ScanResult) -> bool:
 
     A status of None is not a failure: the navigation produced no response,
     which is a timeout, and the session already carries that as an error.
+
+    Any of the three sessions, not the first alone. Measured on www.zalando.it
+    on 2026-10-09, in a batch run: the pre-consent session got no response at
+    all, the post-reject session got the edge's 403 page with a banner on it,
+    and the verdict came out as VIOLATION "new after rejection" — assembled
+    from one session that saw nothing and one that saw an error page. The
+    verdict rests on session 3; an error page there leaves it nothing to rest on.
     """
-    status = result.pre_consent.status
-    return status is not None and status >= 400
+    return not_served(result) is not None
+
+
+def not_served(result: ScanResult) -> tuple[str, int] | None:
+    """The first session whose document was an error page, as (name, status)."""
+    for session in (result.pre_consent, result.post_accept, result.post_reject):
+        if session.status is not None and session.status >= 400:
+            return session.session, session.status
+    return None
 
 
 # A bot-management edge refuses in two ways, and only one of them looks like a

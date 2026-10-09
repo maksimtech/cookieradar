@@ -22,7 +22,7 @@ from rich.text import Text
 from typer.core import TyperGroup
 
 import cookieradar
-from cookieradar.scanner import Violations, bot_challenge, find_violations, page_not_served
+from cookieradar.scanner import Violations, bot_challenge, find_violations, not_served, page_not_served
 
 
 def enable_utf8_output() -> None:
@@ -347,10 +347,25 @@ def _why_not_the_site(result) -> str | None:
     both fire — but reading the status first means that if they ever could, the
     report would not suggest changing the browser for a refused address.
     """
-    if page_not_served(result):
-        return _not_served(result.pre_consent.status)
+    unserved = not_served(result)
+    if unserved:
+        return _not_served_in(result.pre_consent, *unserved)
     challenge = bot_challenge(result)
     return _challenged(challenge) if challenge.seen else None
+
+
+def _not_served_in(session, where: str, status: int) -> str:
+    """What this session's table says when a session — this one or another —
+    got an error page instead of the site.
+
+    The session that got it is told so in its own words; the others are told
+    which session did, because a table of trackers measured on the site next to
+    a verdict withheld for an error page needs the link spelled out. Measured on
+    www.zalando.it, 2026-10-09: the post-reject session alone answered 403."""
+    if session.status is not None and session.status >= 400:
+        return _not_served(session.status)
+    return (f"the site answered HTTP {status} in the {where} session: "
+            f"no verdict rests on this one")
 
 
 def _unique_domains(session) -> set[str]:
@@ -423,9 +438,10 @@ def _render_report(out: Console, url: str, result, law=None):
     # Post-accept
     post_acc = result.post_accept
     _print_consent_header(out, "🟡 Session 2 — Post-accept", "yellow", post_acc, ACCEPT_NOT_APPLIED)
+    unserved = not_served(result)
     _print_session(
         out, "Post-accept trackers", post_acc,
-        _not_served(post_acc.status) if page_not_served(result)
+        _not_served_in(post_acc, *unserved) if unserved
         else None if post_acc.consent_clicked else NOTHING_ACCEPTED,
     )
 
@@ -434,7 +450,7 @@ def _render_report(out: Console, url: str, result, law=None):
     _print_consent_header(out, "🟢 Session 3 — Post-reject", "green", post_rej, REJECT_NOT_APPLIED)
     _print_session(
         out, "Post-reject trackers", post_rej,
-        _not_served(post_rej.status) if page_not_served(result)
+        _not_served_in(post_rej, *unserved) if unserved
         else None if post_rej.consent_clicked else NOTHING_REJECTED,
     )
 
@@ -443,11 +459,11 @@ def _render_report(out: Console, url: str, result, law=None):
     verdict = _verdict(result)
 
     challenge = bot_challenge(result)
-    if page_not_served(result):
-        status = result.pre_consent.status
+    if unserved:
+        where, status = unserved
         out.print(
-            f"[bold red]⛔ NOT MEASURED — the site answered HTTP {status}, so "
-            f"nothing above describes it[/bold red]"
+            f"[bold red]⛔ NOT MEASURED — the site answered HTTP {status} in the "
+            f"{where} session, so nothing above describes it[/bold red]"
         )
         out.print(
             "[red]   No trackers, no banner and no cookies on an error page are "

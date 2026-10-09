@@ -54,6 +54,16 @@ no version in this file has ever matched — 40 is not a month, and
   essenziali". The three banners are in `tests/site/`, captured from the real pages
   that day, and the sessions now click the refusal on each and the acceptance on none.
 
+- **An error page in any of the three sessions means NOT MEASURED.** `page_not_served`
+  read the pre-consent status only. In the batch run of 2026-10-09 www.zalando.it got no
+  response at all in the pre-consent session and the edge's 403 page in the post-reject
+  one — with a Usercentrics banner over it and Google Tag Manager loading once "Solo gli
+  essenziali" was clicked — and the verdict came out as *VIOLATION, 2 trackers new after
+  rejection*, assembled from one session that saw nothing and one that saw an error page.
+  The verdict rests on session 3; an error page there leaves it nothing to rest on. The
+  report now names the session that got the error page, and the other sessions' tables
+  say that no verdict rests on them.
+
 ### Changed
 
 - **The test matrix runs on `3.15-dev` too, as an experimental row.** 3.15.0 final is
