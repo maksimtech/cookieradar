@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  TrustArc banner as served on https://www.enel.it/it-it on 2026-10-09 ("enel.com
+  banner v11"), captured from a real headless Chromium and trimmed to the banner.
+  Text shortened, links made local; the ids, the tags and the order of the
+  controls are the site's.
+
+  The refusal control is `#truste-consent-required`, labelled "Continua senza
+  accettare", and the banner's own text says what it does: "consenti l'utilizzo
+  dei soli cookie tecnici". CookieRadar clicked "Accetta" in the post-accept
+  session and reported "Accept was applied and no refusal control was found",
+  citing GDPR art. 4(11) against the site.
+
+  Each button records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>Enel offerte Luce, Gas, Fibra e Prodotti</title></head>
+<body>
+<h1>Offerte in primo piano</h1>
+<p>Luce, Gas e Fibra</p>
+<div id="truste-consent-track" style="background-color:#F0F2F6;" class="ta-show ta-display-block">
+  <div id="trustarc-banner-overlay"></div>
+  <div class="truste-consent-track-class">
+    <div id="truste-consent-content" class="truste-banner" style="overflow:hidden; max-width:100%;">
+      <div id="truste-consent-text" class="truste-messageColumn">
+        <h2 class="truste-header">Cookie Policy</h2>
+        <p>Usiamo cookies e web tracker per migliorare la tua esperienza online sul nostro sito.
+          <span class="truste-pp-text">Puoi leggere la nostra
+            <a href="#cookie-policy" id="truste-cookie-button" class="truste-cookie-link">Cookie Policy qui.</a></span>
+          Chiudendo il banner con il pulsane “Continua senza accettare”, consenti l’utilizzo dei soli cookie tecnici.
+        </p>
+      </div>
+      <button id="truste-consent-required" style="cursor:pointer" type="button"
+              onclick="document.cookie='clicked=continua-senza-accettare'">Continua senza accettare<span id="truste-close"></span></button>
+      <div id="truste-consent-buttons" class="truste-buttonsColumn">
+        <button id="truste-show-consent" type="button" class="truste-button2" aria-haspopup="dialog"
+                onclick="document.cookie='clicked=gestisci-preferenze'">Gestisci preferenze</button>
+        <button id="truste-consent-button" type="button" class="truste-button1"
+                onclick="document.cookie='clicked=accetta'">Accetta </button>
+      </div>
+      <p style="display:none;">enel.com banner v11</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

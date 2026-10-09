@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  TrustArc banner as served on https://www.poste.it/ on 2026-10-09, captured from
+  a real headless Chromium and trimmed to the banner. Text shortened, the close
+  icon's remote image replaced by a glyph so that the fixture loads nothing from
+  outside; the ids, the tags and the order of the controls are the site's.
+
+  Two refusal controls, both TrustArc's "required cookies only": the button
+  `#truste-consent-required2` labelled "Non accetto", and the close icon
+  `#truste-consent-required`, an <a> without href. CookieRadar clicked "Accetto"
+  and reported "Accept was applied and no refusal control was found".
+
+  Each control records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>Poste Italiane - Servizi postali, finanziari e assicurativi</title></head>
+<body>
+<h1>Poste Italiane</h1>
+<div id="truste-consent-track" class="trustarc-banner truste-responsive ta-show ta-display-block" style="display:block;" role="dialog" aria-modal="true">
+  <div id="trustarc-banner-overlay"></div>
+  <div class="truste-consent-content">
+    <div class="truste-consent-track-class">
+      <div id="truste-consent-text" class="truste-text">
+        <p class="truste-title">Poste Italiane dà valore alla tua privacy</p>
+        <p>Questo sito web utilizza cookie tecnici, anche di terze parti e, previa la tua accettazione
+          selezionando "Accetto", quelli di profilazione. Chiudendo il presente banner o selezionando
+          "Non accetto", procederai con la navigazione con l’uso dei soli cookie tecnici. Per maggiori
+          informazioni consulta la nostra <a id="truste-cookie-button" href="#cookie-policy">cookie policy</a>.</p>
+        <p><a id="truste-show-consent" class="truste-buttontext" tabindex="0" aria-haspopup="dialog"
+              onclick="document.cookie='clicked=gestisci-preferenze'">Gestisci preferenze</a></p>
+        <div id="truste-consent-buttons">
+          <button id="truste-consent-button" class="truste-close" type="button"
+                  onclick="document.cookie='clicked=accetto'">Accetto</button>
+          <button id="truste-consent-required2" type="button" class="truste-button truste-required-btn"
+                  onclick="document.cookie='clicked=non-accetto'">Non accetto</button>
+        </div>
+      </div>
+      <a id="truste-consent-required" type="button" class="truste-close-icon truste-required-btn"
+         onclick="document.cookie='clicked=close-icon'"><span role="img" aria-label="Close and Accept Required Cookies only">×</span></a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

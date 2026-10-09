@@ -43,6 +43,17 @@ no version in this file has ever matched — 40 is not a month, and
   confirms it. `tests/site/forbidden_busy.html`, served with 403 by the test server
   under `/forbidden/`, reproduces the zalando.it case.
 
+- **TrustArc and Usercentrics refusals are clicked, and so are "Non accetto",
+  "Continua senza accettare" and "Solo gli essenziali".** Measured on 2026-10-09:
+  enel.it and poste.it (TrustArc) offer refusal in one click — `#truste-consent-required`
+  "Continua senza accettare", whose banner says it leaves only technical cookies, and
+  `#truste-consent-required2` "Non accetto" — and the audit clicked "Accetta", found no
+  refusal, and reported *"Accept was applied and no refusal control was found"* with
+  GDPR art. 4(11) cited against both. zalando.it (Usercentrics) renders its banner in a
+  shadow root with no ids; the refusal is `[data-testid="uc-deny-all-button"]` "Solo gli
+  essenziali". The three banners are in `tests/site/`, captured from the real pages
+  that day, and the sessions now click the refusal on each and the acceptance on none.
+
 ### Changed
 
 - **The test matrix runs on `3.15-dev` too, as an experimental row.** 3.15.0 final is

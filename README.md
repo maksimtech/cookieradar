@@ -231,11 +231,13 @@ spots a quick manual check has. Keep these in mind before relying on a result.
 
 **The banner is not always detected or clicked.**
 - Buttons are recognised by the most common consent platform codes
-  (e.g. OneTrust, including its two-step "Preferences → Reject all" flow) and
-  by labels in **English and Italian** only: "Accept", "Accept all",
-  "Accetta tutto", "OK", "Reject", "Reject all", "Decline", "Rifiuta tutto"
-  and similar. A banner in another language, or with wording like "Continue
-  without accepting", results in **UNVERIFIED**.
+  (OneTrust, including its two-step "Preferences → Reject all" flow; TrustArc;
+  Usercentrics, whose banner lives in a shadow root; Didomi's "agree" button)
+  and by labels in **English and Italian** only: "Accept", "Accept all",
+  "Accetta tutto", "OK", "Reject", "Reject all", "Decline", "Rifiuta tutto",
+  "Non accetto", "Continua senza accettare", "Solo gli essenziali",
+  "Essential only" and similar. A banner in another language, or with other
+  wording, results in **UNVERIFIED**.
 - Banners displayed inside an embedded frame (`iframe`), which some consent
   platforms use, are not clicked.
 - Banners that only offer "Settings" with individual switches to turn off

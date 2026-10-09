@@ -1,0 +1,48 @@
+<!doctype html>
+<!--
+  Usercentrics banner (browser-sdk 4.65.0) as served on https://www.zalando.it/ on
+  2026-10-09, captured from a real headless Chromium. Usercentrics renders its
+  whole UI inside an open shadow root on `#usercentrics-root`, with no ids on the
+  buttons: they are told apart by `data-testid`. The styled-components class
+  names (sc-gsFSXq kPBIP, ...) change with every build and are left out.
+
+  The refusal control is `[data-testid="uc-deny-all-button"]`, labelled "Solo
+  gli essenziali". CookieRadar found "Accetta tutti" by its label and reported
+  the refusal as not found.
+
+  Each button records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it-IT">
+<head><meta charset="utf-8"><title>Zalando</title></head>
+<body>
+<h1>Scarpe e Moda online</h1>
+<div id="usercentrics-root" data-created-at="1791039530000"></div>
+<script>
+  const root = document.getElementById('usercentrics-root').attachShadow({mode: 'open'});
+  root.innerHTML = `
+    <div data-nosnippet="1" data-testid="uc-app-container">
+      <div role="dialog" aria-modal="true" aria-label="Impostazioni della privacy" data-testid="uc-default-banner"
+           style="position:fixed;bottom:0;left:0;right:0;background:#fff;padding:16px;box-shadow:0 3px 7px rgba(0,0,0,.8)">
+        <div data-testid="uc-default-wall">
+          <h2 id="uc-privacy-title">Impostazioni della privacy</h2>
+          <div id="uc-privacy-description" data-testid="uc-message-container">
+            Utilizziamo cookie e tecnologie simili per offrirti la migliore esperienza possibile.
+          </div>
+          <div data-testid="uc-buttons-container" style="display:flex;gap:8px">
+            <button data-testid="uc-more-button">Imposta preferenze</button>
+            <button data-testid="uc-deny-all-button">Solo gli essenziali</button>
+            <button data-testid="uc-accept-all-button">Accetta tutti</button>
+          </div>
+        </div>
+      </div>
+      <button data-testid="uc-privacy-button" aria-label="Apri Impostazioni della privacy"
+              style="position:fixed;bottom:40px;left:40px;width:64px;height:64px;border-radius:50%">
+        <span aria-hidden="true">i</span>
+      </button>
+    </div>`;
+  root.querySelectorAll('button').forEach(b => {
+    b.onclick = () => { document.cookie = 'clicked=' + b.dataset.testid; };
+  });
+</script>
+</body>
+</html>

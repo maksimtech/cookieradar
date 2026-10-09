@@ -403,12 +403,24 @@ ACCEPT_SELECTORS = [
     # `didomi-notice-agree-button` and `didomi-notice-disagree-button` side by
     # side, and the selectors are tried before the labels.
     "button[id*='agree']:not([id*='disagree'])",
+    # Usercentrics renders its banner inside a shadow root with no ids on the
+    # buttons; `data-testid` is the one stable handle. Playwright's selectors
+    # pierce open shadow roots. Measured on zalando.it, 2026-10-09.
+    "[data-testid='uc-accept-all-button']",
 ]
 REJECT_SELECTORS = [
     "#onetrust-reject-all-handler",
     ".ot-pc-refuse-all-handler",
     "button[id*='reject-all']",
     "button[class*='refuse-all']",
+    # TrustArc's "required cookies only": `#truste-consent-required` on enel.it
+    # ("Continua senza accettare"), `#truste-consent-required2` on poste.it ("Non
+    # accetto", with the close icon `#truste-consent-required` after it in the
+    # DOM, an <a> without href). Prefix match, any tag, first visible in DOM
+    # order: the button a person would click comes first on both. Measured
+    # 2026-10-09, when both sites were reported as offering no refusal.
+    "[id^='truste-consent-required']",
+    "[data-testid='uc-deny-all-button']",
 ]
 
 # Whole accessible names, case-insensitive: "OK" must not match "Cookie settings",
@@ -422,6 +434,16 @@ REJECT_LABELS = [
     re.compile(r"^\s*rifiuta(\s+tutt[oi])?(\s+i\s+cookie)?\s*$", re.I),
     re.compile(r"^\s*reject(\s+all)?(\s+cookies)?\s*$", re.I),
     re.compile(r"^\s*decline(\s+all)?\s*$", re.I),
+    # The refusals Italian banners actually carry, measured on 2026-10-09:
+    # "Non accetto" (poste.it), "Continua senza accettare" (enel.it, whose
+    # banner says it leaves only technical cookies), "Solo gli essenziali"
+    # (zalando.it). Whole names, so "accetto" inside "non accetto" cannot be
+    # read as acceptance — ACCEPT_LABELS anchor on "accett" at the start.
+    re.compile(r"^\s*non\s+accett[ao]\s*$", re.I),
+    re.compile(r"^\s*continua\s+senza\s+accettare\s*$", re.I),
+    re.compile(r"^\s*continue\s+without\s+accepting\s*$", re.I),
+    re.compile(r"^\s*solo\s+(i\s+|gli\s+)?(cookie\s+)?(tecnici|necessari|essenziali)\s*$", re.I),
+    re.compile(r"^\s*(only\s+)?(the\s+)?(essential|necessary)(\s+cookies)?(\s+only)?\s*$", re.I),
 ]
 
 
