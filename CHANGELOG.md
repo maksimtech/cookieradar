@@ -12,6 +12,20 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Security
+
+- **`CVE-2026-95210`, `CVE-2026-95209`, `CVE-2026-95184`, `CVE-2026-67693` (gnutls28) and
+  `CVE-2026-107778` (krb5) recorded in `SECURITY-EXCEPTIONS.toml`.** Docker Scout opened
+  the five against 2026.43 on 2026-10-09, one of them critical; `patchradar debian` the
+  same day says open in trixie, no fix in any suite, no Debian bug, and the tracker still
+  asks whether the four gnutls reports are valid. Neither library is in the base image:
+  `playwright install-deps chromium` brings them in for libcups2t64, which is the only
+  package depending on them. Measured in the published image, Playwright's full `chrome`
+  links cups and so loads both; the `chrome-headless-shell` that cookieradar runs — the
+  only mode that works in an image with no display — maps none of gnutls, krb5 or cups.
+  No TLS here goes through gnutls (httpx uses OpenSSL via `_ssl`, Chromium its BoringSSL)
+  and nothing uses Kerberos. Reviewed with the other Chromium dependencies by 2026-11-30.
+
 ### Fixed
 
 - **The report says when it was made and by what.** The README calls it "evidence of

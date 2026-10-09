@@ -172,6 +172,115 @@ why = "The same expat flaw as SNYK-DEBIAN13-EXPAT-20514789, reported by the othe
 review_by = "2026-11-30"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# gnutls28 and krb5, reported by Docker Scout on 2026-10-09 against 2026.43, five
+# ids and no Snyk twin. Neither library is in python:3.12-slim-trixie: both come
+# in with `playwright install-deps chromium`, as dependencies of libcups2t64,
+# which Chromium wants for printing. Measured in maksimtech/cookieradar:latest
+# the same day: `apt-cache rdepends --installed` names libcups2t64 as the only
+# package depending on libgnutls30t64 and on libgssapi-krb5-2, nothing depends
+# on libcups2t64, and libcups.so.2 is the only ELF file in the image whose `ldd`
+# reaches either library.
+#
+# Playwright 1.63.0 ships two Chromium builds (chromium-1243). The full `chrome`
+# links libcups.so.2 and so loads gnutls and krb5 at start; `chrome-headless-
+# shell` does not link cups at all. cookieradar calls
+# `p.chromium.launch(headless=headless)` with no channel, and headless — the
+# default, and the only mode that runs in the image, which has no display — is
+# the headless shell: launched inside the image, the process is
+# chrome-headless-shell and its /proc maps hold none of libgnutls, libkrb5,
+# libgssapi or libcups. Both binaries carry the string `libgssapi_krb5` once:
+# Chromium's HTTP Negotiate code dlopen()s it only when a server answers 401
+# with `WWW-Authenticate: Negotiate`, and cookieradar authenticates to nothing.
+#
+# TLS in this image does not go through gnutls. httpx reaches Python's `_ssl`,
+# which `ldd` shows on libssl.so.3 (OpenSSL 3.5.7); Chromium carries BoringSSL
+# statically and exports no gnutls_ symbol. Kerberos is used by nothing.
+#
+# Debian, read with `patchradar debian` on 2026-10-09: all five open in trixie,
+# urgency not yet assigned, no fixed version in any suite, no no-dsa and no
+# Debian bug. The tracker's own note on the four gnutls ids is still "TODO:
+# check if <gist> reported upstream, valid?" — Debian has not confirmed them
+# yet. Nothing to wait for and nothing to ask for; evidence goes on the tracker
+# pages. Reviewed with the other Chromium dependencies on 2026-11-30.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-95210"
+source = "Docker Scout"
+where = "gnutls28 / libgnutls30t64 3.8.9-3+deb13u4, Chromium dependency via libcups2t64"
+why = """
+Improper certificate validation in gnutls 3.8.13: an application that verifies a \
+chain with it accepts certificates containing invalid extensions (NVD; Scout \
+rates it critical). `patchradar debian` on 2026-10-09: open in trixie at \
+3.8.9-3+deb13u4, no fix in any suite, no no-dsa, no Debian bug, tracker note \
+"TODO: check if reported upstream, valid?". In this image libgnutls30t64 is \
+required only by libcups2t64 and loaded only by Playwright's full `chrome`, not \
+by the chrome-headless-shell cookieradar runs; no TLS here is gnutls — httpx \
+uses OpenSSL through Python's `_ssl`, Chromium its own BoringSSL. Measured in \
+maksimtech/cookieradar:latest (2026.43) on 2026-10-09.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-95209"
+source = "Docker Scout"
+where = "gnutls28 / libgnutls30t64 3.8.9-3+deb13u4, Chromium dependency via libcups2t64"
+why = """
+gnutls 3.8.13 rejects legitimate CA certificates, a denial of service for \
+whatever verifies with it (NVD). Same Debian position as CVE-2026-95210 above on \
+2026-10-09 — open in trixie, no fix in any suite, no Debian bug, validity still \
+a tracker TODO — and the same chain: libcups2t64 is the only dependant, the \
+headless shell cookieradar runs does not load it, and nothing in the image \
+verifies TLS with gnutls.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-95184"
+source = "Docker Scout"
+where = "gnutls28 / libgnutls30t64 3.8.9-3+deb13u4, Chromium dependency via libcups2t64"
+why = """
+Improper certificate validation in gnutls 3.8.13 rejects legitimate certificates \
+of valid users, a denial of service (NVD). Same Debian position as \
+CVE-2026-95210 above on 2026-10-09 and the same chain: present for libcups2t64, \
+not loaded by chrome-headless-shell, not used for any TLS in this image.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-67693"
+source = "Docker Scout"
+where = "gnutls28 / libgnutls30t64 3.8.9-3+deb13u4, Chromium dependency via libcups2t64"
+why = """
+gnutls 3.8.13 fails to reject an end-entity X.509 certificate whose Key Usage \
+and Extended Key Usage contradict each other, so a relying application may \
+disclose information to its holder (NVD). Same Debian position as CVE-2026-95210 \
+above on 2026-10-09 and the same chain: present for libcups2t64, not loaded by \
+chrome-headless-shell, not used for any TLS in this image.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-107778"
+source = "Docker Scout"
+where = "krb5 / libkrb5-3, libgssapi-krb5-2, libkrb5support0 1.21.3-5+deb13u1, Chromium dependency via libcups2t64"
+why = """
+MIT krb5 through 1.22.2: a NULL pointer dereference in make_cred_list() in \
+rd_cred.c lets an authenticated Kerberos client crash a GSS-API *acceptor* by \
+forwarding credentials with more tickets than ticket_info entries through \
+gss_accept_sec_context() (NVD; fixed upstream in krb5 PR 1511, master). \
+`patchradar debian` on 2026-10-09: open in trixie at 1.21.3-5+deb13u1, no fix \
+in any suite, no no-dsa, no Debian bug. In this image libgssapi-krb5-2 is \
+required only by libcups2t64 and loaded only by Playwright's full `chrome`, not \
+by the chrome-headless-shell cookieradar runs; Chromium would dlopen() it for \
+HTTP Negotiate only on a 401 with `WWW-Authenticate: Negotiate`, as an \
+initiator and never as the acceptor the flaw is in. cookieradar authenticates \
+to nothing and no service in the image accepts Kerberos. Measured in \
+maksimtech/cookieradar:latest (2026.43) on 2026-10-09.
+"""
+review_by = "2026-11-30"
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Debian 13 (trixie) packages of the base image, shared with the other four
 # Radar. Two different cases, which every scanner prints identically:
 #
