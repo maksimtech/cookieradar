@@ -58,7 +58,7 @@ Check the installation:
 
 ```bash
 cookieradar --version
-# CookieRadar 2026.43
+# CookieRadar 2026.44
 ```
 
 Prefer not to install Python? Use the [Docker image](#docker).
@@ -286,7 +286,7 @@ docker run --rm maksimtech/cookieradar audit https://example.com
 ```
 
 Images are published for `linux/amd64` and `linux/arm64`, tagged `latest`
-and with each version, e.g. `maksimtech/cookieradar:v2026.43`.
+and with each version, e.g. `maksimtech/cookieradar:v2026.44`.
 
 To save reports or read a URL list, mount a folder from your computer.
 The container works in `/home/cookieradar` and runs as user ID 1000, which

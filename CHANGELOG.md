@@ -12,6 +12,9 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+
+## [2026.44] - 2026-10-10
+
 ### Security
 
 - **`CVE-2026-95210`, `CVE-2026-95209`, `CVE-2026-95184`, `CVE-2026-67693` (gnutls28) and
@@ -770,7 +773,8 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.43...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.44...HEAD
+[2026.44]: https://github.com/maksimtech/cookieradar/compare/v2026.43...v2026.44
 [2026.43]: https://github.com/maksimtech/cookieradar/compare/v2026.42...v2026.43
 [2026.42]: https://github.com/maksimtech/cookieradar/compare/v2026.41...v2026.42
 [2026.41]: https://github.com/maksimtech/cookieradar/compare/v2026.40.1...v2026.41
