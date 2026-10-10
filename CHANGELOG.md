@@ -23,6 +23,9 @@ no version in this file has ever matched — 40 is not a month, and
   Debian's own packages (trixie 3.8.9-3+deb13u4, sid 3.8.13-1) and had no upstream issue \
   anywhere on 2026-10-10; CVE-2026-107778 in krb5 gained Debian bug 1150461, a no-dsa for \
   trixie and a fix on the upstream 1.22 branch the same day.
+- **The six gnutls CVEs are now reported, not only recorded.** GnuTLS confidential issue \
+  1965 and Debian bug 1150522 (src:gnutls28, found in 3.8.13-1 and 3.8.9-3+deb13u4), both \
+  filed on 2026-10-10 with the reproduction transcripts; the exceptions name them.
 
 
 ## [2026.44] - 2026-10-10
