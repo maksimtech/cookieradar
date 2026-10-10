@@ -222,6 +222,24 @@ maksimtech/cookieradar:latest (2026.43) on 2026-10-09.
 review_by = "2026-11-30"
 
 [[exception]]
+id = "CVE-2026-88647"
+source = "Docker Scout"
+where = "gnutls28 / libgnutls30t64 3.8.9-3+deb13u4, Chromium dependency via libcups2t64"
+why = """
+Hostname verification bypass in gnutls 3.8.13: a crafted certificate circumvents \
+the Common Name fallback, so a verifier that relies on it can be made to accept \
+the wrong host (NVD, published 2026-10-08; Scout rates it critical). `patchradar \
+debian` on 2026-10-10: open in trixie at 3.8.9-3+deb13u4, no fix in any suite, \
+no no-dsa, no Debian bug. Same library, same chain and same reasoning as \
+CVE-2026-95210 above: in this image libgnutls30t64 is required only by \
+libcups2t64 and loaded only by Playwright's full `chrome`, not by the \
+chrome-headless-shell cookieradar runs; no TLS here is gnutls — httpx uses \
+OpenSSL through Python's `_ssl`, Chromium its own BoringSSL. Surfaced by the \
+scan of maksimtech/cookieradar:latest (2026.44) on 2026-10-10.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
 id = "CVE-2026-95209"
 source = "Docker Scout"
 where = "gnutls28 / libgnutls30t64 3.8.9-3+deb13u4, Chromium dependency via libcups2t64"
