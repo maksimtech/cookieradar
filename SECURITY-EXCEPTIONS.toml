@@ -198,10 +198,20 @@ review_by = "2026-11-30"
 #
 # Debian, read with `patchradar debian` on 2026-10-09: all five open in trixie,
 # urgency not yet assigned, no fixed version in any suite, no no-dsa and no
-# Debian bug. The tracker's own note on the four gnutls ids is still "TODO:
-# check if <gist> reported upstream, valid?" — Debian has not confirmed them
-# yet. Nothing to wait for and nothing to ask for; evidence goes on the tracker
-# pages. Reviewed with the other Chromium dependencies on 2026-11-30.
+# Debian bug. The tracker's own note on the gnutls ids is "check if <gist>
+# reported upstream, valid?" — Debian has not confirmed them yet.
+#
+# Checked on 2026-10-10, so that note is answered here rather than guessed at.
+# Valid: all five gnutls ids (and CVE-2026-88648, same batch, not reported by
+# Scout against this image) reproduce with the researcher's public PEM files
+# (https://github.com/lkloliver/poc) against the Debian packages themselves —
+# gnutls-bin 3.8.9-3+deb13u4 in debian:trixie-slim and 3.8.13-1 in
+# debian:sid-slim, certtool / gnutls-cli / gnutls-serv only, no PoC script run,
+# negative controls behaving as expected; transcripts kept outside the repo.
+# Reported upstream: no GnuTLS GitLab issue existed for any of them, no
+# gnutls-devel or oss-security post, Red Hat bugzilla entries (2548057, 2548190)
+# auto-imported and NEW, SUSE "pending". krb5 moved on the same day: see its
+# entry. Reviewed with the other Chromium dependencies on 2026-11-30.
 # ─────────────────────────────────────────────────────────────────────────────
 
 [[exception]]
@@ -230,7 +240,12 @@ Hostname verification bypass in gnutls 3.8.13: a crafted certificate circumvents
 the Common Name fallback, so a verifier that relies on it can be made to accept \
 the wrong host (NVD, published 2026-10-08; Scout rates it critical). `patchradar \
 debian` on 2026-10-10: open in trixie at 3.8.9-3+deb13u4, no fix in any suite, \
-no no-dsa, no Debian bug. Same library, same chain and same reasoning as \
+no no-dsa, no Debian bug. Reproduced the same day against trixie's own \
+3.8.9-3+deb13u4: the PoC certificate (CN=target.example, SAN = SRV otherName \
+with an OCTET STRING value) is accepted by gnutls-cli with handshake \
+completed, while the well-formed SRV control is rejected — so the \
+CVE-2026-42012 fix that trixie carries is indeed bypassed. Same library, same \
+chain and same reasoning as \
 CVE-2026-95210 above: in this image libgnutls30t64 is required only by \
 libcups2t64 and loaded only by Playwright's full `chrome`, not by the \
 chrome-headless-shell cookieradar runs; no TLS here is gnutls — httpx uses \
@@ -288,7 +303,12 @@ rd_cred.c lets an authenticated Kerberos client crash a GSS-API *acceptor* by \
 forwarding credentials with more tickets than ticket_info entries through \
 gss_accept_sec_context() (NVD; fixed upstream in krb5 PR 1511, master). \
 `patchradar debian` on 2026-10-09: open in trixie at 1.21.3-5+deb13u1, no fix \
-in any suite, no no-dsa, no Debian bug. In this image libgssapi-krb5-2 is \
+in any suite, no no-dsa, no Debian bug. On 2026-10-10 the picture changed: \
+Debian bug 1150461 (filed by the security team on 2026-10-09, together with \
+CVE-2026-107708), trixie marked no-dsa "Minor issue", and the fix is on the \
+upstream krb5-1.22 branch as commit 62196e2b (not yet in a release — 1.22.2 \
+is the latest). Nothing to ask for: the request already exists and has a \
+patch attached. In this image libgssapi-krb5-2 is \
 required only by libcups2t64 and loaded only by Playwright's full `chrome`, not \
 by the chrome-headless-shell cookieradar runs; Chromium would dlopen() it for \
 HTTP Negotiate only on a 401 with `WWW-Authenticate: Negotiate`, as an \

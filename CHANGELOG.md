@@ -18,6 +18,11 @@ no version in this file has ever matched — 40 is not a month, and
   verification bypass with no fix in any Debian suite, found by the scan of the 2026.44 \
   image; same chain as the five gnutls/krb5 entries of 2026-10-09 (libcups2t64, not \
   loaded by the headless shell), reviewed on 2026-11-30.
+- **The gnutls28 and krb5 entries now say what was checked, not only what was read.** The \
+  six gnutls CVEs of 2026-10-08 were reproduced with the public PoC certificates against \
+  Debian's own packages (trixie 3.8.9-3+deb13u4, sid 3.8.13-1) and had no upstream issue \
+  anywhere on 2026-10-10; CVE-2026-107778 in krb5 gained Debian bug 1150461, a no-dsa for \
+  trixie and a fix on the upstream 1.22 branch the same day.
 
 
 ## [2026.44] - 2026-10-10
