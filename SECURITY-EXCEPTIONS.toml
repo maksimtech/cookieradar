@@ -210,8 +210,15 @@ review_by = "2026-11-30"
 # negative controls behaving as expected; transcripts kept outside the repo.
 # Reported upstream: no GnuTLS GitLab issue existed for any of them, no
 # gnutls-devel or oss-security post, Red Hat bugzilla entries (2548057, 2548190)
-# auto-imported and NEW, SUSE "pending". krb5 moved on the same day: see its
-# entry. Reviewed with the other Chromium dependencies on 2026-11-30.
+# auto-imported and NEW, SUSE "pending". So both halves of Debian's question
+# were answered the same day, 2026-10-10: reported to GnuTLS as confidential
+# issue 1965 (https://gitlab.com/gnutls/gnutls/-/issues/1965, visible to
+# project members only until they lift it), and filed as Debian bug 1150522
+# against src:gnutls28 (severity important, tags security upstream, found in
+# 3.8.13-1 and 3.8.9-3+deb13u4, forwarded to team@security.debian.org and the
+# GnuTLS maintainers) with the transcripts attached. krb5 moved on the same
+# day: see its entry. Reviewed with the other Chromium dependencies on
+# 2026-11-30, or earlier if either report moves.
 # ─────────────────────────────────────────────────────────────────────────────
 
 [[exception]]
@@ -244,7 +251,9 @@ no no-dsa, no Debian bug. Reproduced the same day against trixie's own \
 3.8.9-3+deb13u4: the PoC certificate (CN=target.example, SAN = SRV otherName \
 with an OCTET STRING value) is accepted by gnutls-cli with handshake \
 completed, while the well-formed SRV control is rejected — so the \
-CVE-2026-42012 fix that trixie carries is indeed bypassed. Same library, same \
+CVE-2026-42012 fix that trixie carries is indeed bypassed. Reported upstream \
+as GnuTLS confidential issue 1965 and to Debian as bug 1150522, both on \
+2026-10-10, together with the other five. Same library, same \
 chain and same reasoning as \
 CVE-2026-95210 above: in this image libgnutls30t64 is required only by \
 libcups2t64 and loaded only by Playwright's full `chrome`, not by the \
