@@ -12,6 +12,13 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Security
+
+- **CVE-2026-88647 in gnutls28 recorded in `SECURITY-EXCEPTIONS.toml`.** A hostname \
+  verification bypass with no fix in any Debian suite, found by the scan of the 2026.44 \
+  image; same chain as the five gnutls/krb5 entries of 2026-10-09 (libcups2t64, not \
+  loaded by the headless shell), reviewed on 2026-11-30.
+
 
 ## [2026.44] - 2026-10-10
 
