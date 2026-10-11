@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install dependencies
@@ -31,3 +31,10 @@ jobs:
         run: ruff check cookieradar tests tools
       - name: Type check (mypy)
         run: mypy cookieradar
+      # docs/nis2-compliance.md points a customer to uv.lock as a complete
+      # resolution of the dependencies, so it has to be the current one. The uv
+      # pinned here is the one that wrote the file.
+      - name: Lockfile matches pyproject.toml (uv)
+        run: |
+          python -m pip install "uv==0.12.18"
+          uv lock --check

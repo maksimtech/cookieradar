@@ -12,6 +12,45 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Added
+
+- **`docs/nis2-compliance.md`: the answers to the seven questions a customer subject to NIS2
+  asks a software supplier, with only what the repository can back.** Written in Italian, for
+  customers under d.lgs. 138/2024. Where the answer is "no" it says no: there is no penetration
+  test, no second reviewer, no access control because a CLI has no users, and the maintainer
+  can bypass the branch rules. It says what leaves the machine: the audited page and every
+  third party it loads, three times, from the operator's own address; the CELEX number of a
+  cited act to publications.europa.eu (eur-lex.europa.eu as the fallback) and the article of
+  the Consumer Code to Normattiva, only when `audit` cites a provision. It says what Chromium
+  runs without (its sandbox, as Playwright starts it) and what was measured of its own traffic
+  on 2026-10-11: nothing but the page. `tests/test_nis2_evidence.py` compares the hosts in the
+  document with those named in the modules that import httpx or Playwright, and holds the
+  cache, the report, the browser state, the image user, the release files and the scanners to
+  what the document says; it refuses "NIS2-ready", "no data sent to third parties" and similar
+  claims anywhere in it, in `SECURITY.md` or in the README.
+- **Every release carries SBOMs and dated scans** (`.github/workflows/sbom.yml`): CycloneDX 1.5
+  of the image, Debian packages included (Syft), and of the Python environment
+  (cyclonedx-py), plus Trivy reports of the image and of the repository at the tag, and a
+  note saying which commit and image digest they describe and that a CVE scan is not a
+  penetration test. It runs after "Publish to PyPI" has pushed the image of the tag, and on
+  demand for a release that is already out.
+- **`SECURITY.md` says how vulnerabilities are found, how fast they are answered, how
+  customers are told and how to roll back.** A fix ships with the next release; for CVSS 9.0
+  or more, customers who gave a security contact hear within 48 hours. The paragraph on
+  "Known Open CVEs", last reviewed on 2026-09-10, is gone: it blamed Debian Bookworm, and the
+  image has been built on Trixie since 2026-09-20; `SECURITY-EXCEPTIONS.toml` is where the accepted ones
+  are, each with a review date.
+- **`uv.lock`**, written with uv 0.12.18, and a Quality step that fails when it falls behind
+  `pyproject.toml`.
+
+### Fixed
+
+- **The licence gate had never refused anything.** `pip-licenses --fail-on="GPL;AGPL;LGPL"`
+  compares whole licence strings, and no package declares just "GPL": they declare "GNU
+  Lesser General Public License v2 or later (LGPLv2+)" and the like. Measured on 2026-10-11
+  with chardet 5.2.0 installed next to cookieradar: exit 0 without `--partial-match`, exit 1
+  with it. The flag is there now; CookieRadar's own runtime dependencies pass it.
+
 ### Security
 
 - **CVE-2026-88647 in gnutls28 recorded in `SECURITY-EXCEPTIONS.toml`.** A hostname \

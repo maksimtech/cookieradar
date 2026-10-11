@@ -1,25 +1,72 @@
 # Security Policy
 
-## Supported Versions
+## Reporting a vulnerability
 
-| Version | Supported |
-|---------|-----------|
-| 2026.09.x | ✅ |
+Write to <security@maksimtech.com>; the GPG key for that address is on
+keys.openpgp.org. Please do not open a public issue for a vulnerability.
 
-## Reporting Vulnerabilities
+CookieRadar has a single maintainer, Massimo Moretti, who reads that address.
 
-Please report security issues to **security@maksimtech.com**  
-GPG public key: https://keys.openpgp.org/search?q=security@maksimtech.com
+## Supported versions
 
-Do not open public GitHub issues for security vulnerabilities.
+Only the latest release receives fixes. Versions follow CalVer (`YYYY.count[.fix]`):
+a fix ships as the next release, never as a patch to an older one.
 
-## Known Open CVEs
+## How vulnerabilities are found
 
-All currently open CVEs affect Debian Bookworm system packages
-(OpenSSL, Perl, util-linux, zlib, Playwright Chromium dependencies).
-These are unrelated to CookieRadar's Python codebase and are
-pending Debian security backports.
-They will be automatically patched on the next Docker build
-after Debian releases the fixes.
+- **CodeQL, Bandit and Trivy** (repository files) run on every pull request, on
+  every push to `main` and weekly.
+- **Snyk** checks the code, the Python dependencies and an image built from the
+  source on every pull request and push to `main`.
+- **Docker Scout** checks the published `latest` image on every push to `main` and
+  weekly. The image is built on `python:3.12-slim-trixie` (Debian Trixie) when a
+  release is cut, with the Debian updates available then; it is not rebuilt between
+  releases, so Debian's security patches reach it with the next release.
+- **Security Posture** reads the alerts all of the above publish to GitHub code
+  scanning and fails when a high or critical finding has no reasoned exception in
+  `SECURITY-EXCEPTIONS.toml`. It also runs weekly, because an exception expires by
+  date and not by commit.
+- GitHub secret scanning, with push protection, is enabled on the repository.
+- Reports sent to the address above.
 
-Last reviewed: 2026-09-10
+## Response times
+
+- A fix ships with the next release. Releases can be up to a month apart.
+- For a vulnerability with a CVSS score of 9.0 or more, customers who have given a
+  security contact are told within 48 hours of the report being taken in charge,
+  even if the fix is not ready yet.
+- A vulnerability that is accepted rather than fixed is recorded in
+  `SECURITY-EXCEPTIONS.toml` with the reason and a review date; Security Posture
+  fails once the review date has passed.
+
+## Customer notification
+
+Every fix is described in the release notes on GitHub, which are the CHANGELOG
+section of that version. For a vulnerability with a CVSS score of 9.0 or more,
+customers who have given a security contact also get a direct email.
+
+## Rollback
+
+Every version stays installable and pinnable:
+
+- Docker Hub: `maksimtech/cookieradar:v<version>`, and the SHA256 digest of that
+  image, which cannot change. The image carries the Python dependencies and the
+  Chromium it was built with. The maintainer can rebuild a published version by
+  hand, which pushes its tag again: the digest is the reference that does not move.
+- PyPI: `pip install cookieradar==<version>`, then `playwright install chromium`.
+  The package declares minimum versions only, so an older CookieRadar installed
+  this way comes with today's dependencies and today's Chromium.
+
+Rolling back means pinning the previous version or digest. Releases are cut with
+`release.sh`.
+
+## Evidence attached to every release
+
+Each GitHub release carries CycloneDX SBOMs of the image and of the Python
+environment, and dated Trivy reports of the image and of the repository at the
+tag. The Trivy reports are an automated scan for known vulnerabilities, not a
+penetration test; no penetration test has been carried out. What these files are,
+and the answers to the questions a customer subject to NIS2 may ask, are in
+[docs/nis2-compliance.md](docs/nis2-compliance.md).
+
+Last reviewed: 2026-10-11
