@@ -107,11 +107,11 @@ normative. Questi sono gli host fissi che CookieRadar contatta:
 
 Queste richieste non contengono l'indirizzo analizzato né i risultati dell'audit, e
 si presentano con uno User-Agent che indica la versione di CookieRadar e questo
-repository. publications.europa.eu risponde alla richiesta HTTPS con un rinvio a un
-indirizzo `http://`, e CookieRadar lo segue: il testo dell'atto arriva quindi in
-chiaro, senza TLS (misurato il 2026-10-11). Il riferimento richiesto è pubblico, ma
-l'integrità del testo scaricato, e quindi dello SHA-256 citato nel report, non è
-protetta dal trasporto.
+repository. I testi degli atti si scaricano solo in HTTPS: publications.europa.eu
+risponde alla richiesta HTTPS con un rinvio a un indirizzo `http://`, e CookieRadar
+segue quel rinvio sullo stesso indirizzo in `https://`, che serve lo stesso documento
+(misurato il 2026-10-11). Fino a quel giorno lo seguiva così com'era, e il testo
+arrivava senza TLS.
 
 **Su disco** CookieRadar scrive:
 
