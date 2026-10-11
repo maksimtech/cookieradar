@@ -236,14 +236,16 @@ def test_only_audit_consults_the_law_sources(doc):
     assert "`batch` non contatta le fonti normative" in prose(doc)
 
 
-def test_the_plain_http_answer_of_the_law_source_is_declared(doc):
+def test_the_https_only_law_fetch_is_declared(doc):
     """publications.europa.eu answers the HTTPS request with a 303 to an http://
-    address (measured on 2026-10-11), and fetch_html follows redirects: the text
-    of the act then travels without TLS. The document says so as long as the
-    code follows redirects as they come."""
+    address (recorded on 2026-10-11). Until that day fetch_html followed it and the
+    act travelled without TLS; it now follows redirects by hand and takes such a
+    hop over HTTPS (tests/test_law_fetch_https.py). The document says so."""
     source = (PACKAGE / "law_fetcher.py").read_text(encoding="utf-8")
-    assert "follow_redirects=True" in source
-    assert "in chiaro" in prose(doc)
+    assert "follow_redirects=True" not in source
+    assert "follow_redirects=False" in source
+    assert "solo in HTTPS" in prose(doc)
+    assert "arriva quindi in chiaro" not in prose(doc)
 
 
 BROWSER_STATE = (
@@ -508,13 +510,18 @@ def test_every_request_of_the_package_carries_the_user_agent_it_claims(doc):
             for call in ast.walk(node)
         )
     }
-    assert callers == {"fetch_html"}
+    # Since 2026-10-11 the requests go out of _get_over_https, which follows
+    # redirects by hand over HTTPS and sends the headers fetch_html gives it.
+    assert callers == {"_get_over_https"}
     # Read from the file, not from the function: conftest replaces fetch_html in
     # every test so that none reaches the network.
-    source = ast.get_source_segment(
-        (PACKAGE / "law_fetcher.py").read_text(encoding="utf-8"), function(PACKAGE / "law_fetcher.py", "fetch_html")
-    )
+    law = (PACKAGE / "law_fetcher.py").read_text(encoding="utf-8")
+    source = ast.get_source_segment(law, function(PACKAGE / "law_fetcher.py", "fetch_html"))
     assert 'headers = {"User-Agent": USER_AGENT, **(headers or {})}' in source
+    assert "_get_over_https(own_client, url, headers, source)" in source
+    assert "_get_over_https(client, url, headers, source)" in source
+    helper = ast.get_source_segment(law, function(PACKAGE / "law_fetcher.py", "_get_over_https"))
+    assert "client.get(target, headers=headers, follow_redirects=False)" in helper
     for path in sorted(PACKAGE.rglob("*.py")):
         if path.name != "law_fetcher.py":
             assert not re.search(r"^\s*(?:import|from)\s+httpx\b", path.read_text(encoding="utf-8"), re.M), path.name
