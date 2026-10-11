@@ -101,6 +101,23 @@ jobs:
             --pyproject pyproject.toml --mc-type application \
             --output-format JSON --spec-version 1.5 \
             --output-file "$OUT/sbom-source-${VERSION}.cdx.json"
+          # The version is dynamic in pyproject.toml (hatch reads it from
+          # cookieradar/__init__.py), so cyclonedx-py leaves the main component
+          # without one. It is taken from the package installed above, which has
+          # to be the tag's.
+          /tmp/product/bin/python - "$OUT/sbom-source-${VERSION}.cdx.json" <<'PY'
+          import json, os, sys
+          from importlib.metadata import version
+          installed = version("cookieradar")
+          if installed != os.environ["VERSION"]:
+              sys.exit(f"installed cookieradar {installed}, the tag says {os.environ['VERSION']}")
+          path = sys.argv[1]
+          with open(path, encoding="utf-8") as fh:
+              sbom = json.load(fh)
+          sbom["metadata"]["component"]["version"] = installed
+          with open(path, "w", encoding="utf-8") as fh:
+              json.dump(sbom, fh, indent=2)
+          PY
 
       # Anonymous pulls from the runners' shared addresses hit Docker Hub's rate
       # limit; Syft and Trivy read the credentials this step writes.

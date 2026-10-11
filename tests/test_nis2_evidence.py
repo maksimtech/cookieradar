@@ -429,13 +429,18 @@ def test_the_image_is_rebuilt_only_when_the_document_says(doc):
     assert "is not rebuilt between releases" in prose(security)
 
 
-def test_the_evidence_note_gives_the_digest_and_not_the_tag_twice():
+def _evidence_step(evidence: dict, name: str) -> str:
+    job = next(iter(evidence["jobs"].values()))
+    return next(step["run"] for step in job["steps"] if step.get("name") == name)
+
+
+def test_the_evidence_note_gives_the_digest_and_not_the_tag_twice(evidence):
     """Syft puts the tag in metadata.component.version, and mailradar's first
     EVIDENCE note, on v2026.44, read "digest v2026.44". The digest a customer pins
     comes from Docker Hub, which gives the index digest and one per platform."""
-    evidence = EVIDENCE.read_text(encoding="utf-8")
-    assert '["metadata"]["component"]' not in evidence
-    assert "https://hub.docker.com/v2/repositories/${IMAGE}/tags/${TAG}" in evidence
+    note = _evidence_step(evidence, "Describe the evidence")
+    assert '["metadata"]["component"]' not in note
+    assert "https://hub.docker.com/v2/repositories/${IMAGE}/tags/${TAG}" in note
 
 
 def test_the_source_sbom_names_the_package_it_describes():
@@ -444,6 +449,30 @@ def test_the_source_sbom_names_the_package_it_describes():
     evidence = EVIDENCE.read_text(encoding="utf-8")
     assert "--pyproject pyproject.toml" in evidence
     assert "--mc-type application" in evidence
+
+
+def test_the_source_sbom_gives_the_version_it_describes(evidence):
+    """The version is dynamic in pyproject.toml (hatch reads it from
+    cookieradar/__init__.py), so cyclonedx-py named the main component with no
+    version: the source SBOM attached to v2026.44 on 2026-10-11 said "cookieradar"
+    and nothing else. The step takes the version from the package it installed,
+    refuses one that is not the tag's, and writes it into the SBOM."""
+    step = _evidence_step(evidence, "SBOM of the Python environment")
+    assert 'version("cookieradar")' in step
+    assert '"VERSION"' in step and "exit(" in step
+    assert '["version"] =' in step
+
+
+def test_the_document_says_what_the_image_evidence_leaves_out(doc):
+    """Chromium reaches the image through `playwright install chromium`, as an
+    archive with no package metadata: the image SBOM of v2026.44 has no Chromium
+    component, not even its files, and the Trivy image report has no result for
+    it. The document says so, and names what does identify it."""
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    assert re.search(r"^RUN playwright install chromium$", dockerfile, re.M)
+    text = prose(doc)
+    assert "non elenca Chromium" in text
+    assert "non lo controlla" in text
 
 
 def test_the_evidence_job_pins_its_actions():

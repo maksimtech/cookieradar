@@ -24,6 +24,12 @@ che il fornitore è in grado di dare, non un attestato di conformità.
 - Ogni release su GitHub porta in allegato due SBOM in formato CycloneDX 1.5:
   quella dell'immagine Docker, pacchetti di sistema inclusi, e quella dell'ambiente
   Python del pacchetto installato da sorgente (vedi la tabella al punto 6).
+- La SBOM dell'immagine non elenca Chromium, e la scansione Trivy dell'immagine non
+  lo controlla: Playwright lo scarica come archivio, senza i metadati di pacchetto
+  che Syft e Trivy leggono (verificato il 2026-10-11 sui file allegati alla
+  2026.44). Lo identifica la versione del pacchetto `playwright` elencata nella
+  SBOM, perché ogni versione di Playwright scarica un build di Chromium fisso: la
+  1.63.0, quella dell'immagine 2026.44, il build 1243, Chromium 153.0.8010.12.
 - Provenienza: le wheel e i sorgenti su PyPI hanno un'attestazione PEP 740 firmata
   con Sigstore dal workflow di pubblicazione (`publish.yml`, verificato sulla 2026.44);
   le immagini su Docker Hub (`maksimtech/cookieradar`) hanno un'attestazione di
@@ -205,6 +211,8 @@ SBOM:
 | `trivy-fs-<versione>-<data>.json` | vulnerabilità note nei file del repository al tag, scansione Trivy |
 | `EVIDENCE-<versione>.md` | cosa sono questi file, quando e da quale commit e digest dell'immagine sono stati prodotti |
 <!-- assets:end -->
+
+Come detto al punto 1, né la SBOM né la scansione dell'immagine coprono Chromium.
 
 ## 7. E se il fornitore sparisce
 
