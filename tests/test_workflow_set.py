@@ -54,6 +54,9 @@ CAPABILITY = {
     and (ROOT / "tests" / "docker" / "smoke.py").is_file(),
     "docker": lambda: (ROOT / "Dockerfile").is_file(),
     "docker-scout": lambda: (ROOT / "Dockerfile").is_file(),
+    # SBOMs and dated scans of the published image, attached to each release:
+    # the evidence docs/nis2-compliance.md points a customer to.
+    "sbom": lambda: (ROOT / "Dockerfile").is_file(),
     "codspeed": lambda: (ROOT / "tests" / "benchmarks").is_dir()
     or (ROOT / "benchmarks").is_dir(),
 }

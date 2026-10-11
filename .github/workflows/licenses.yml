@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install dependencies
@@ -28,6 +28,11 @@ jobs:
             --format=markdown \
             --output-file=licenses.md
           cat licenses.md
+      # --partial-match, because without it --fail-on compares whole licence
+      # strings and no package declares just "GPL": they declare "GNU Lesser
+      # General Public License v2 or later (LGPLv2+)" and the like. Measured on
+      # 2026-10-11 with chardet 5.2.0 installed next to cookieradar: exit 0
+      # without the flag, exit 1 with it. The gate had never refused anything.
       - name: Fail on forbidden licenses
         run: |
-          pip-licenses --fail-on="GPL;AGPL;LGPL"
+          pip-licenses --fail-on="GPL;AGPL;LGPL" --partial-match
