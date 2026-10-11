@@ -311,7 +311,7 @@ def test_the_lockfile_is_not_presented_as_what_the_image_installs(doc):
     for what an image really holds."""
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
     assert "pip install" in dockerfile
-    assert not re.search(r"uv", dockerfile)
+    assert not re.search(r"\buv\b", dockerfile)
     assert "non lo usano" in prose(doc)
 
 
@@ -463,6 +463,64 @@ def test_the_source_sbom_gives_the_version_it_describes(evidence):
     assert '["version"] =' in step
 
 
+REMOVABLE = ("pip", "setuptools", "wheel")
+
+
+def test_the_source_sbom_leaves_out_what_the_image_removes(evidence):
+    """The source SBOM describes a venv, which comes with its own pip; if the
+    image removed pip (or setuptools, or wheel), the SBOM would list what the
+    image does not ship, as releaseradar's first sbom-source did. This Dockerfile
+    removes none of them, and the image SBOM of v2026.44 lists pip 25.0.1, as the
+    source SBOM does: so nothing is uninstalled, and each must follow the other."""
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    step = _evidence_step(evidence, "SBOM of the Python environment")
+    for package in REMOVABLE:
+        removed = bool(re.search(rf"pip uninstall\b[^\n]*\b{package}\b", dockerfile))
+        dropped = f"/tmp/product/bin/python -m pip uninstall --yes --quiet {package}" in step
+        assert removed == dropped, f"{package}: removed from the image {removed}, from the SBOM venv {dropped}"
+
+
+def test_an_empty_repository_scan_is_not_presented_as_a_clean_one(evidence, doc):
+    """The trivy-fs report attached to v2026.44 on 2026-10-11 has no Results at
+    all: that tag has no lockfile, so Trivy found nothing it could analyse. An
+    empty report reads as "no vulnerabilities" to whoever opens it; the note and
+    the document say what it is."""
+    describe = _evidence_step(evidence, "Describe the evidence")
+    assert '"Results"' in describe
+    assert "found no file it could analyse" in describe
+    assert "non indica l'assenza di vulnerabilità" in prose(doc)
+
+
+def test_every_request_of_the_package_carries_the_user_agent_it_claims(doc):
+    """The document says the requests to the law sources name CookieRadar and this
+    repository. They all go through fetch_html, the only place that calls an
+    httpx client, and it sets USER_AGENT before any header a caller adds. The
+    browser's requests carry Chromium's own User-Agent, and the document says
+    that instead."""
+    tree = ast.parse((PACKAGE / "law_fetcher.py").read_text(encoding="utf-8"))
+    callers = {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+        and any(
+            isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute) and call.func.attr == "get"
+            and isinstance(call.func.value, ast.Name) and call.func.value.id in {"client", "own_client"}
+            for call in ast.walk(node)
+        )
+    }
+    assert callers == {"fetch_html"}
+    # Read from the file, not from the function: conftest replaces fetch_html in
+    # every test so that none reaches the network.
+    source = ast.get_source_segment(
+        (PACKAGE / "law_fetcher.py").read_text(encoding="utf-8"), function(PACKAGE / "law_fetcher.py", "fetch_html")
+    )
+    assert 'headers = {"User-Agent": USER_AGENT, **(headers or {})}' in source
+    for path in sorted(PACKAGE.rglob("*.py")):
+        if path.name != "law_fetcher.py":
+            assert not re.search(r"^\s*(?:import|from)\s+httpx\b", path.read_text(encoding="utf-8"), re.M), path.name
+    assert "`HeadlessChrome`" in doc
+
+
 def test_the_document_says_what_the_image_evidence_leaves_out(doc):
     """Chromium reaches the image through `playwright install chromium`, as an
     archive with no package metadata: the image SBOM of v2026.44 has no Chromium
@@ -510,6 +568,10 @@ SCANNERS = {
     "SonarCloud": "sonarcloud",
     "Security Posture": "security-posture",
     "mutmut": "mutation",
+    # Not a security scanner: it measures the benchmarks. Listed because
+    # question 5 asks what checks the code, and leaving a workflow out of the
+    # answer would make the list look complete when it is not.
+    "CodSpeed": "codspeed",
 }
 
 

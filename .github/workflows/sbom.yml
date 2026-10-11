@@ -173,6 +173,16 @@ jobs:
           print(tag["digest"], amd64[0] if amd64 else "absent")
           PY
           )
+          # A report with no Results means Trivy found nothing it could read at
+          # the tag: v2026.44 has no lockfile, and its trivy-fs report, attached
+          # on 2026-10-11, was empty. Whoever opens it would read "no
+          # vulnerabilities", so the note says what it is.
+          FS_RESULTS=$(python -c 'import json, sys; print(len(json.load(open(sys.argv[1], encoding="utf-8")).get("Results") or []))' \
+            "$OUT/trivy-fs-${VERSION}-${DATE}.json")
+          FS_NOTE=""
+          if [ "$FS_RESULTS" = "0" ]; then
+            FS_NOTE=" This scan found no file it could analyse at this tag, such as a lockfile: the empty report is not evidence that there are no vulnerabilities."
+          fi
           cat > "$OUT/EVIDENCE-${VERSION}.md" <<EOF
           # CookieRadar ${VERSION}: release evidence
 
@@ -183,13 +193,17 @@ jobs:
           the image describe its linux/amd64 image, digest ${AMD64_DIGEST}.
 
           - sbom-image-${VERSION}.cdx.json: CycloneDX 1.5 SBOM of the image, Debian
-            packages included, made with Syft v1.52.0.
+            packages included, made with Syft v1.52.0. Chromium, which Playwright
+            downloads as an archive with no package metadata, is not in it and is
+            not in the image scan; the playwright version listed identifies its
+            build.
           - sbom-source-${VERSION}.cdx.json: CycloneDX 1.5 SBOM of the Python
-            environment the package installs, made with cyclonedx-bom 7.4.0.
+            environment the package installs, resolved on that date; made with
+            cyclonedx-bom 7.4.0.
           - trivy-image-${VERSION}-${DATE}.json: known vulnerabilities in the image
             on that date, Trivy.
           - trivy-fs-${VERSION}-${DATE}.json: known vulnerabilities in the repository
-            files at the tag on that date, Trivy.
+            files at the tag on that date, Trivy.${FS_NOTE}
 
           The Trivy reports are an automated scan for known vulnerabilities. They
           are not a penetration test: no penetration test has been carried out.

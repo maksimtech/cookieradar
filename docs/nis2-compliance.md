@@ -172,6 +172,7 @@ Analisi automatiche, ciascuna con il proprio workflow in `.github/workflows`:
 | `Docker Scout` | vulnerabilità note nell'immagine `latest` pubblicata su Docker Hub | ogni push su `main`, ogni settimana |
 | `Security Posture` | raccoglie gli avvisi pubblicati dagli altri e fallisce se un avviso alto o critico non ha un'eccezione motivata | ogni pull request, ogni push su `main`, ogni settimana |
 | `mutmut` | mutation testing: verifica che i test si accorgano delle modifiche al codice | ogni settimana |
+| `CodSpeed` | le prestazioni dei benchmark in `tests/benchmarks`; non è uno strumento di sicurezza e non blocca il merge | ogni push su `main`, ogni pull request che modifica `cookieradar/`, `tests/` o `pyproject.toml`, e a mano |
 <!-- scanners:end -->
 
 A questi si aggiungono i test automatici (pytest su Python 3.11, 3.12, 3.13 e 3.14,
@@ -213,6 +214,11 @@ SBOM:
 <!-- assets:end -->
 
 Come detto al punto 1, né la SBOM né la scansione dell'immagine coprono Chromium.
+
+Un rapporto Trivy dei file del repository senza risultati vuol dire che Trivy non ha
+trovato al tag nessun file che sapesse analizzare, come un file di dipendenze
+bloccate: quello allegato alla 2026.44 il 2026-10-11 è vuoto, e un rapporto vuoto non
+indica l'assenza di vulnerabilità. Quando succede, la nota `EVIDENCE` lo dice.
 
 ## 7. E se il fornitore sparisce
 
