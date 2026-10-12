@@ -45,6 +45,10 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **The local HTTPS server of the law-fetch tests allowed any TLS version.** CodeQL raised a
+  high `py/insecure-protocol` alert on it, which the new pull-request gate caught on #37. It now
+  requires TLS 1.2 at least, and makes its certificate with `cryptography`, added to the `test`
+  extra, instead of calling `openssl`, so the test can no longer skip itself.
 - **SonarCloud failed main on the coverage of new code** (78.6% against 80%) after the HTTPS-only
   law fetch: `fetch_html` without a client of its own and the redirect limit had no test. Both
   are now exercised against real servers on 127.0.0.1: a plain HTTP server that is never served

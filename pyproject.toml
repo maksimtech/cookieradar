@@ -45,6 +45,9 @@ test = [
     "mypy>=1.18",
     "hypothesis>=6.140",
     "mutmut>=3.8",
+    # The local HTTPS server of tests/test_law_fetch_paths.py makes its certificate
+    # with it; the same lower bound as mailradar's runtime dependency.
+    "cryptography>=42.0",
 ]
 
 [tool.pytest.ini_options]
