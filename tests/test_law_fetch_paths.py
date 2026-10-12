@@ -9,15 +9,16 @@ answers made up for the occasion.
   builds its own, takes the request over https://, and the server never serves
   anything in clear.
 - An HTTPS server whose every answer redirects to itself, with a certificate made
-  by `openssl` for this test and trusted only by the client passed in: the fetch
-  gives up after MAX_REDIRECTS hops instead of following forever.
+  here with `cryptography` (a test dependency) and trusted only by the client
+  passed in: the fetch gives up after MAX_REDIRECTS hops instead of following
+  forever.
 """
 
 from __future__ import annotations
 
-import shutil
+import datetime
+import ipaddress
 import ssl
-import subprocess
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -26,6 +27,10 @@ from pathlib import Path
 
 import httpx
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 
 from cookieradar.law_fetcher import MAX_REDIRECTS, LawFetchError, fetch_html
 
@@ -66,17 +71,28 @@ def test_without_a_client_the_fetch_never_goes_out_in_clear():
 
 @pytest.fixture
 def certificate(tmp_path: Path) -> tuple[Path, Path]:
-    openssl = shutil.which("openssl")
-    if openssl is None:
-        pytest.skip("openssl is not on PATH: the certificate for the local HTTPS server cannot be made")
-    cert, key = tmp_path / "cert.pem", tmp_path / "key.pem"
-    subprocess.run(
-        [openssl, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes",
-         "-keyout", str(key), "-out", str(cert), "-days", "1",
-         "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1"],
-        check=True, capture_output=True,
+    """A certificate for 127.0.0.1, valid for an hour and trusted by nobody but
+    the client this test builds."""
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")])
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(hours=1))
+        .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]), critical=False)
+        .sign(key, hashes.SHA256())
     )
-    return cert, key
+    cert_path, key_path = tmp_path / "cert.pem", tmp_path / "key.pem"
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(
+        key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    )
+    return cert_path, key_path
 
 
 def test_a_redirect_loop_stops_after_the_limit(certificate):
@@ -94,6 +110,9 @@ def test_a_redirect_loop_stops_after_the_limit(certificate):
             pass
 
     server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    # TLS 1.2 at least: without a floor CodeQL reports the context as allowing
+    # insecure protocol versions (py/insecure-protocol, alert #108).
+    server_context.minimum_version = ssl.TLSVersion.TLSv1_2
     server_context.load_cert_chain(cert, key)
     with _serve(Loop, server_context) as server:
         port = server.server_address[1]
