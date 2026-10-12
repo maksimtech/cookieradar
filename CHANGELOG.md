@@ -45,6 +45,11 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **SonarCloud failed main on the coverage of new code** (78.6% against 80%) after the HTTPS-only
+  law fetch: `fetch_html` without a client of its own and the redirect limit had no test. Both
+  are now exercised against real servers on 127.0.0.1: a plain HTTP server that is never served
+  in clear, and an HTTPS server, with a certificate made by `openssl` for the test, whose
+  redirects loop until the limit stops them.
 - **Security Posture judged every pull request by main's alerts.** It listed the alerts without
   a `ref`, so GitHub answered for main, and its wait compared the scanners' runs with the merge
   commit, which none of them carries: on mailradar #39 it waited two seconds. It now waits for
