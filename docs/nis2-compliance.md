@@ -182,12 +182,14 @@ Sul repository è attivo il secret scanning di GitHub con push protection; gli a
 di sicurezza di Dependabot non sono attivi (entrambi letti dalle impostazioni il
 2026-10-11).
 
-Le regole del ramo `main`, lette dalle impostazioni del repository il 2026-10-11:
-le modifiche passano da una pull request, che non richiede approvazioni; i controlli
+Le regole del ramo `main`, lette dalle impostazioni del repository il 2026-10-12: le
+modifiche passano da una pull request, che non richiede approvazioni; i controlli
 obbligatori per il merge sono Tests e Quality; la cronologia deve restare lineare; il
-ramo non può essere cancellato né riscritto con un force push. L'account del
-manutentore è configurato come eccezione a queste regole e può scavalcarle. Nessuno
-degli strumenti della tabella è tra i controlli obbligatori.
+ramo non può essere cancellato né riscritto con un force push. Non prevedono
+eccezioni, nemmeno per l'account del manutentore: anche il commit che aggiorna il
+numero di versione arriva su `main` attraverso una pull request. Fino a quel giorno
+l'account del manutentore era configurato per poterle scavalcare. Nessuno degli
+strumenti della tabella è tra i controlli obbligatori.
 
 CookieRadar ha un manutentore unico. Non c'è nessuna revisione obbligatoria da parte
 di una seconda persona: le pull request vengono unite dal manutentore dopo che la CI è
