@@ -98,7 +98,9 @@ def test_a_redirect_loop_stops_after_the_limit(certificate):
     with _serve(Loop, server_context) as server:
         port = server.server_address[1]
         client_context = ssl.create_default_context(cafile=str(cert))
-        with httpx.Client(verify=client_context, timeout=5) as client:
-            with pytest.raises(LawFetchError, match=f"redirected more than {MAX_REDIRECTS} times"):
-                fetch_html(f"https://127.0.0.1:{port}/resource/act", client=client)
+        with (
+            httpx.Client(verify=client_context, timeout=5) as client,
+            pytest.raises(LawFetchError, match=f"redirected more than {MAX_REDIRECTS} times"),
+        ):
+            fetch_html(f"https://127.0.0.1:{port}/resource/act", client=client)
     assert served == ["/resource/act"] * (MAX_REDIRECTS + 1)
