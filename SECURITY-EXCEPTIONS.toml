@@ -324,6 +324,14 @@ HTTP Negotiate only on a 401 with `WWW-Authenticate: Negotiate`, as an \
 initiator and never as the acceptor the flaw is in. cookieradar authenticates \
 to nothing and no service in the image accepts Kerberos. Measured in \
 maksimtech/cookieradar:latest (2026.43) on 2026-10-09.
+
+Since 2026-10-11T17:07:25Z Docker Scout has stopped reporting it, which is why \
+the gate lists this entry as settled. It is kept, and the reason is not how long \
+the silence has lasted: `patchradar debian CVE-2026-107778` on 2026-10-15 still \
+reports krb5 no-dsa in trixie at 1.21.3-5+deb13u1, no fix in any suite, Debian \
+bug 1150461. The package named in `where` is still unfixed in trixie and only \
+the reporting changed. Deleting a flaw that is demonstrably present because a \
+scanner fell silent is the one direction this file must not drift in.
 """
 review_by = "2026-11-30"
 
@@ -497,6 +505,14 @@ Nor is it removable. Snyk names the source package `gcc-14`, and what is actuall
 installed is `libstdc++6`, the C++ runtime that a long list of packages in the \
 base image link against. Removing it is not an option the way the full `perl` \
 would have been.
+
+Since 2026-10-07T20:13:19Z Snyk Container has stopped reporting it, which is why \
+the gate lists this entry as settled. It is kept, and the reason is not how long \
+the silence has lasted: `patchradar debian CVE-2026-102010` on 2026-10-15 still \
+reports gcc-14 no-dsa in trixie at 14.2.0-19, with the fix only in sid \
+(14.4.0-3). The package named in `where` is still unfixed in trixie and only the \
+reporting changed. Deleting a flaw that is demonstrably present because a \
+scanner fell silent is the one direction this file must not drift in.
 """
 review_by = "2026-12-31"
 
@@ -528,6 +544,14 @@ The flaw also reported as SNYK-DEBIAN13-GCC14-20335537, under the other scanner'
 id. Open in trixie for gcc-12 and gcc-14, no fixed version in any suite, no Debian \
 bug — `patchradar debian CVE-2026-102010`. Evidence goes on \
 https://security-tracker.debian.org/tracker/CVE-2026-102010.
+
+Since 2026-10-07T20:10:11Z Docker Scout has stopped reporting it, which is why \
+the gate lists this entry as settled. It is kept, and the reason is not how long \
+the silence has lasted: `patchradar debian CVE-2026-102010` on 2026-10-15 still \
+reports gcc-14 no-dsa in trixie at 14.2.0-19, with the fix only in sid \
+(14.4.0-3). The package named in `where` is still unfixed in trixie and only the \
+reporting changed. Deleting a flaw that is demonstrably present because a \
+scanner fell silent is the one direction this file must not drift in.
 """
 review_by = "2026-12-31"
 
@@ -540,6 +564,14 @@ CVE-2026-95619, an integer overflow in gcc-14, published on 2026-10-02. Read wit
 `patchradar debian CVE-2026-95619`: open in trixie for gcc-12 (12.4.0-5) and \
 gcc-14 (14.2.0-19), no fixed version in any suite, no Debian bug recorded. \
 Evidence goes on https://security-tracker.debian.org/tracker/CVE-2026-95619.
+
+Since 2026-10-08T06:27:16Z Snyk Container has stopped reporting it, which is why \
+the gate lists this entry as settled. It is kept, and the reason is not how long \
+the silence has lasted: `patchradar debian CVE-2026-95619` on 2026-10-15 still \
+reports gcc-14 no-dsa in trixie at 14.2.0-19, with the fix only in sid \
+(14.4.0-3). The package named in `where` is still unfixed in trixie and only the \
+reporting changed. Deleting a flaw that is demonstrably present because a \
+scanner fell silent is the one direction this file must not drift in.
 """
 review_by = "2026-12-31"
 
@@ -549,5 +581,13 @@ source = "Docker Scout"
 where = "gcc-14 / libstdc++6 14.2.0-19, python slim-trixie base image"
 why = """
 The same flaw as SNYK-DEBIAN13-GCC14-20386241 above, under the other scanner's id.
+
+Since 2026-10-08T06:25:36Z Docker Scout has stopped reporting it, which is why \
+the gate lists this entry as settled. It is kept, and the reason is not how long \
+the silence has lasted: `patchradar debian CVE-2026-95619` on 2026-10-15 still \
+reports gcc-14 no-dsa in trixie at 14.2.0-19, with the fix only in sid \
+(14.4.0-3). The package named in `where` is still unfixed in trixie and only the \
+reporting changed. Deleting a flaw that is demonstrably present because a \
+scanner fell silent is the one direction this file must not drift in.
 """
 review_by = "2026-12-31"
