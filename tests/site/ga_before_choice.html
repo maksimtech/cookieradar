@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+  Not a site's page: the shape measured on repubblica.it on 2026-10-17, reduced to
+  what the finding is about. Before any choice — the banner unanswered, the TCF
+  string empty — Google Analytics had written its `_ga` cookie, in its own
+  format (GA1.1.<random>.<seconds>), next to an iubenda-style banner offering
+  both choices. Here the page's script writes the same cookie on load, as gtag
+  does, and the banner's buttons record which one was clicked.
+-->
+<html lang="it">
+<head>
+<meta charset="utf-8"><title>Notizie di oggi</title>
+<script>document.cookie = "_ga=GA1.1.1234567890.1760700000; path=/; max-age=63072000";</script>
+</head>
+<body>
+<h1>Notizie di oggi</h1>
+<div id="cookie-banner" role="dialog" aria-label="Cookie">
+  <p>Usiamo cookie di profilazione con il tuo consenso.</p>
+  <button type="button" onclick="document.cookie='clicked=rifiuta'">Rifiuta</button>
+  <button type="button" onclick="document.cookie='clicked=accetta'">Accetta</button>
+</div>
+</body>
+</html>

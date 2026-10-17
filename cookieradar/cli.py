@@ -22,7 +22,14 @@ from rich.text import Text
 from typer.core import TyperGroup
 
 import cookieradar
-from cookieradar.scanner import Violations, bot_challenge, find_violations, not_served, page_not_served
+from cookieradar.scanner import (
+    Violations,
+    bot_challenge,
+    find_violations,
+    not_served,
+    page_not_served,
+    stored_before_choice,
+)
 
 
 def enable_utf8_output() -> None:
@@ -410,6 +417,11 @@ def _verdict(result) -> ExitCode:
         # page. A challenge answering 200 would otherwise reach the checks
         # below and be reported as a site with no trackers and no banner.
         return ExitCode.ERROR
+    # Before the refusal is considered: tracking stored on the device before any
+    # choice is a violation whatever the banner did afterwards (art. 122(1)
+    # Codice privacy). Same exit code, its own cause in the report.
+    if stored_before_choice(result):
+        return ExitCode.VIOLATION
     if not result.post_reject.consent_clicked:
         return ExitCode.UNVERIFIED
     return ExitCode.VIOLATION if find_violations(result).all else ExitCode.OK
@@ -462,6 +474,17 @@ def _render_report(out: Console, url: str, result, law=None):
     # Summary
     violations = find_violations(result)
     verdict = _verdict(result)
+
+    contacted = sorted({t.domain for t in result.pre_consent.trackers})
+    if contacted and not stored_before_choice(result) and not _why_not_the_site(result):
+        # Before the verdict, which is about other evidence. Reported, not cited:
+        # Tag Manager loading, or Consent Mode's pings with storage denied, can be
+        # lawful, and a request alone is not storage.
+        out.print(Text(
+            f"ℹ️  Contacted before any choice: {', '.join(contacted)} — not cited: a request "
+            f"alone does not show that anything was stored on the device or read from it.",
+            style="dim",
+        ))
 
     challenge = bot_challenge(result)
     if unserved:
@@ -530,8 +553,16 @@ def _render_report(out: Console, url: str, result, law=None):
                 "not.[/red]"
             )
     elif verdict is ExitCode.VIOLATION:
-        out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after rejection:[/bold red]")
-        _print_violations(out, violations, "  ")
+        stored = stored_before_choice(result)
+        if stored:
+            out.print("[bold red]⚠️  VIOLATION — tracking data stored on the device before any "
+                      "choice:[/bold red]")
+            for item in stored:
+                out.print(f"  [red]• {escape(item)}[/red]")
+        if violations.all:
+            out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after "
+                      f"rejection:[/bold red]")
+            _print_violations(out, violations, "  ")
     else:
         out.print("[bold green]✅ No trackers loaded after rejection[/bold green]")
 
@@ -784,7 +815,9 @@ def batch(
                 console.print(f"    [yellow]{escape(reason)}[/yellow]")
             else:
                 console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
-                if verdict is ExitCode.UNVERIFIED:
+                for item in stored_before_choice(result):
+                    console.print(f"    [red]stored before any choice: {escape(item)}[/red]")
+                if not result.post_reject.consent_clicked:
                     console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
                 else:
                     _print_violations(console, find_violations(result), "    ")

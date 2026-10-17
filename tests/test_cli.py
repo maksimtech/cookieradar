@@ -488,7 +488,9 @@ def test_audit_shows_cookies():
 
     res = _invoke(["audit", "example.com"], build)
 
-    assert res.exit_code == 0, res.output
+    # `_ga` before any choice is tracking stored on the device: a violation of
+    # its own since F-04. What this test is about — the cookies listed — holds.
+    assert res.exit_code == 1, res.output
     assert "Cookies: 2" in res.output
     assert "_ga" in res.output and ".example.com" in res.output and "2030-01-01" in res.output
     assert "sess[/b]" in res.output and "session" in res.output
