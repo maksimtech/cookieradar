@@ -240,10 +240,14 @@ def test_the_https_only_law_fetch_is_declared(doc):
     """publications.europa.eu answers the HTTPS request with a 303 to an http://
     address (recorded on 2026-10-11). Until that day fetch_html followed it and the
     act travelled without TLS; it now follows redirects by hand and takes such a
-    hop over HTTPS (tests/test_law_fetch_https.py). The document says so."""
-    source = (PACKAGE / "law_fetcher.py").read_text(encoding="utf-8")
-    assert "follow_redirects=True" not in source
-    assert "follow_redirects=False" in source
+    hop over HTTPS. The document says so.
+
+    The behaviour is held by tests/test_law_fetch_https.py, which replays the
+    recorded 303 and fails on any request in clear. This case used to search
+    law_fetcher.py for `follow_redirects=True` as text, and under mutmut the text
+    is not the program: mutants/ holds every mutated variant of the module, one
+    of which turns the call's `False` into `True`, so the Saturday run stopped in
+    its stats phase (found in WSL on 2026-10-17)."""
     assert "solo in HTTPS" in prose(doc)
     assert "arriva quindi in chiaro" not in prose(doc)
 
