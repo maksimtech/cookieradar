@@ -1,0 +1,22 @@
+<!doctype html>
+<!--
+  Not a site's banner: the shape GDPR art. 4(11) is cited against, built here
+  because it is the counterpart the other fixtures need. One choice, "Accetta",
+  and a link that leaves for the cookie policy — reading it is not a choice made
+  on the banner. Nothing else that can be clicked: the "Rifiuta" left in the
+  markup with `visibility: hidden` takes up room and cannot be seen or used.
+
+  The accept button records the click in a cookie, as in the other fixtures.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>Un sito con un solo pulsante</title></head>
+<body>
+<h1>Benvenuti</h1>
+<div id="cookie-notice" role="dialog" aria-label="Cookie">
+  <p>Questo sito usa cookie di profilazione. Proseguendo accetti l'uso dei cookie.
+    <a href="/cookie-policy">Leggi la cookie policy</a></p>
+  <button type="button" style="visibility: hidden" onclick="document.cookie='clicked=rifiuta'">Rifiuta</button>
+  <button type="button" onclick="document.cookie='clicked=accetta'">Accetta</button>
+</div>
+</body>
+</html>

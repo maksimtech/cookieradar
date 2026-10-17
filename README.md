@@ -238,6 +238,17 @@ spots a quick manual check has. Keep these in mind before relying on a result.
   "Non accetto", "Continua senza accettare", "Solo gli essenziali",
   "Essential only" and similar. A banner in another language, or with other
   wording, results in **UNVERIFIED**.
+- When no "Reject" is recognised, the consent platform's close "×" is tried
+  (iubenda, Didomi, OneTrust, Cookiebot), as the banner's own text often says
+  and the Garante's 2021 guidelines describe: closing keeps the default, no
+  consent. Only a visible one: a close button the site hides is not clicked.
+- A refusal offered only with a subscription ("Rifiuta e abbonati") is reported
+  as such and never clicked. Whether a paid alternative leaves consent free is
+  not something an audit of requests can settle, so no provision is cited.
+- "Accept was applied and no refusal control was found", with GDPR art. 4(11),
+  is reported only when Accept was the **one** thing on the banner to click. A
+  banner with other controls, none recognised as a refusal, is reported with
+  their number and no citation: one of them may well be the refusal.
 - Banners displayed inside an embedded frame (`iframe`), which some consent
   platforms use, are not clicked.
 - Banners that only offer "Settings" with individual switches to turn off

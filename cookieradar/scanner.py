@@ -160,6 +160,14 @@ class SessionResult:
     status: int | None = None
     error: str | None = None
     consent_clicked: bool = False  # accept/reject button found and clicked
+    # How many other things there were to click on the banner beside the accept
+    # button, counted just before it was clicked; None when not counted. "No
+    # refusal" is cited only on 0: a banner with other controls, none of which
+    # this tool recognises, has not been shown to lack a refusal.
+    other_controls: int | None = None
+    # The label of a refusal offered only together with a subscription ("Rifiuta
+    # e abbonati"), seen and deliberately not clicked; empty when there was none.
+    pay_to_refuse: str = ""
     # The document's own identity, kept so that `bot_challenge` can tell a
     # challenge page from the site. A challenge answering 200 is invisible to
     # everything that only reads counts: it has no trackers and no banner, which
@@ -437,6 +445,26 @@ REJECT_SELECTORS = [
     "[data-testid='uc-deny-all-button']",
 ]
 
+# The close "×" of a consent platform, tried only after every explicit refusal.
+# iubenda's banner says what its X does — "Chiudi questa informativa per
+# continuare senza accettare" (aranzulla.it, 2026-10-17) — and the Garante's 2021
+# cookie guidelines describe closing the banner as keeping the default, which is
+# no consent. Selectors and not labels: "Chiudi" alone would also close a
+# newsletter pop-up, and that is not a refusal of anything. Visible only, as
+# everywhere: repubblica.it keeps an X in the page with `display: none`.
+CLOSE_SELECTORS = [
+    ".iubenda-cs-close-btn",
+    "#didomi-notice-x-button",
+    ".onetrust-close-btn-handler",
+    "#CybotCookiebotBannerCloseButton",
+]
+
+# A refusal that costs a subscription: seen, named in the report, never clicked.
+# Measured on repubblica.it, 2026-10-17 (iubenda, `.iubenda-cs-reject-btn`).
+PAY_TO_REFUSE_LABELS = [
+    re.compile(r"^\s*rifiuta\s+e\s+abbonati\s*$", re.I),
+]
+
 # Whole accessible names, case-insensitive: "OK" must not match "Cookie settings",
 # "Accept" must not match "Don't accept".
 ACCEPT_LABELS = [
@@ -469,12 +497,19 @@ async def _first_visible(page: Page, selector: str):
     return None
 
 
-async def _click_consent_button(page: Page, selectors: list[str], labels: list[re.Pattern]) -> bool:
-    """Click the first visible match: CSS selectors first, then buttons by accessible name."""
+async def _click_consent_button(page: Page, selectors: list[str], labels: list[re.Pattern],
+                                before_click=None) -> bool:
+    """Click the first visible match: CSS selectors first, then buttons by accessible name.
+
+    `before_click`, when given, is awaited with the element about to be clicked:
+    what surrounds a button has to be read before the click takes the banner away.
+    """
     for selector in selectors:
         try:
             btn = await _first_visible(page, selector)
             if btn:
+                if before_click:
+                    await before_click(btn)
                 await btn.click()
                 return True
         except PlaywrightError:
@@ -485,11 +520,74 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
             for i in range(await buttons.count()):
                 btn = buttons.nth(i)
                 if await btn.is_visible():
+                    if before_click:
+                        await before_click(btn)
                     await btn.click()
                     return True
         except PlaywrightError:
             pass
     return False
+
+
+async def _visible_label(page: Page, labels: list[re.Pattern]) -> str:
+    """The text of the first visible button whose accessible name matches, or ""."""
+    for label in labels:
+        try:
+            buttons = page.get_by_role("button", name=label)
+            for i in range(await buttons.count()):
+                btn = buttons.nth(i)
+                if await btn.is_visible():
+                    return " ".join((await btn.inner_text()).split())
+        except PlaywrightError:
+            pass
+    return ""
+
+
+# Counted in the page, around the accept button. The banner is the outermost
+# ancestor that a consent platform marks as one — a dialog role, or an id or
+# class naming cookies, consent or the platform — and None when there is none,
+# since a count over an unknown area says nothing. Counted: visible buttons,
+# elements with role=button, input buttons, and links that stay on the page
+# (empty href, "#…", javascript:); a link that leaves, to the cookie policy, is
+# something to read and not a choice. An <a> with no href is not a control at
+# all. A control wrapping another is counted once, as the inner one.
+_OTHER_CONTROLS_JS = """
+accept => {
+  const marker = /cookie|consent|gdpr|banner|cmp|privacy|iubenda|didomi|onetrust|truste|cybot|usercentrics/i;
+  let banner = null;
+  for (let n = accept.parentElement; n && n !== document.body; n = n.parentElement) {
+    const role = n.getAttribute('role');
+    if (role === 'dialog' || role === 'alertdialog' || n.getAttribute('aria-modal') === 'true'
+        || marker.test(n.id) || marker.test(n.getAttribute('class') || '')) {
+      banner = n;
+    }
+  }
+  if (!banner) return null;
+  const selector = 'button, [role=button], input[type=button], input[type=submit], a[href]';
+  const isControl = el => {
+    if (el.tagName !== 'A' || el.getAttribute('role') === 'button') return true;
+    const href = el.getAttribute('href').trim();
+    return href === '' || href.startsWith('#') || /^javascript:/i.test(href);
+  };
+  const visible = el => el.getClientRects().length > 0
+    && el.checkVisibility({visibilityProperty: true, checkVisibilityCSS: true});
+  let count = 0;
+  for (const el of banner.querySelectorAll(selector)) {
+    if (el === accept || el.contains(accept) || accept.contains(el)) continue;
+    if (!isControl(el) || !visible(el)) continue;
+    if ([...el.querySelectorAll(selector)].some(inner => isControl(inner) && visible(inner))) continue;
+    count++;
+  }
+  return count;
+}
+"""
+
+
+async def _other_controls(button) -> int | None:
+    try:
+        return await button.evaluate(_OTHER_CONTROLS_JS)
+    except PlaywrightError:
+        return None
 
 
 def _is_main_document(request) -> bool:
@@ -628,7 +726,11 @@ async def _run_session(
 
         # Accept all
         if accept is True:
-            if await _click_consent_button(page, ACCEPT_SELECTORS, ACCEPT_LABELS):
+            async def count_the_rest(button):
+                result.other_controls = await _other_controls(button)
+
+            if await _click_consent_button(page, ACCEPT_SELECTORS, ACCEPT_LABELS,
+                                           before_click=count_the_rest):
                 result.consent_clicked = True
                 await page.wait_for_timeout(2000)
 
@@ -653,6 +755,15 @@ async def _run_session(
                             rejected = True
                 except PlaywrightError:
                     pass
+
+            # Step 3 — the platform's close X, which keeps the default
+            if not rejected:
+                rejected = await _click_consent_button(page, CLOSE_SELECTORS, [])
+                if rejected:
+                    await page.wait_for_timeout(2000)
+
+            if not rejected:
+                result.pay_to_refuse = await _visible_label(page, PAY_TO_REFUSE_LABELS)
 
             if rejected:
                 result.consent_clicked = True

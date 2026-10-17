@@ -1,0 +1,17 @@
+<!doctype html>
+<!--
+  Not a site's banner. One choice beside "Accetta", marked up twice over: a link
+  that stays on the page wraps the button that records the click, as banners
+  built from a theme's link styles do. A person sees one control, and it is
+  counted once.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>Un controllo dentro un altro</title></head>
+<body>
+<div class="cookie-consent" role="dialog" aria-label="Cookie">
+  <p>Usiamo cookie di profilazione.</p>
+  <a href="#" class="cc-link"><button type="button" onclick="document.cookie='clicked=personalizza'">Personalizza</button></a>
+  <button type="button" onclick="document.cookie='clicked=accetta'">Accetta</button>
+</div>
+</body>
+</html>
