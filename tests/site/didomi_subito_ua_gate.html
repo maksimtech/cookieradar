@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  Didomi banner as served on https://www.subito.it on 2026-10-17, captured from a
+  real headless Chromium with a Chrome User-Agent and trimmed to the notice. Text
+  shortened, links made local, styles dropped; the ids, classes, roles,
+  aria-labels and the order of the controls are the site's.
+
+  The gate in the script is derived, not copied. Measured that day, twice: with
+  Playwright's own User-Agent ("HeadlessChrome/153…") the page mounted no
+  notice at all — `#didomi-host button, #didomi-notice, .didomi-popup-container`
+  matched nothing — and with the same browser announcing "Chrome/153…" the
+  notice was there, "Continua senza accettare →" first. Didomi's own logic is
+  not visible from outside; this reproduces what it did. CookieRadar reported
+  UNVERIFIED, "no refusal could be applied", about a site that offers one and
+  keeps contacting doubleclick.net after it.
+
+  Each control records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>Subito.it: annunci gratuiti</title></head>
+<body>
+<h1>Annunci in tutta Italia</h1>
+<div id="didomi-host" class="didomi-host" data-nosnippet="true" lang="it" data-lang-dir="ltr"></div>
+<template id="didomi-notice">
+  <div id="didomi-popup" class="didomi-popup-backdrop didomi-notice-popup didomi-popup__backdrop">
+    <div class="didomi-popup-container didomi-popup__dialog didomi-popup-notice didomi-popup-notice-info-type"
+         role="dialog" aria-modal="true" aria-label="Benvenuto su Subito Gestione dei consensi" data-testid="notice">
+      <div class="didomi-popup-view" tabindex="-1" role="document">
+        <span class="didomi-continue-without-agreeing" tabindex="0" role="button"
+              onclick="document.cookie='clicked=continua-senza-accettare'">Continua senza accettare<span aria-hidden="true"> →</span></span>
+        <div class="didomi-popup-notice-text-container">
+          <div class="didomi-popup-notice-text">
+            <p>Questo sito ed i suoi Partners fanno uso di cookie tecnici, analitici e di altre tecnologie
+              per finalità di profilazione. Selezionando “Continua senza accettare” potrai continuare la
+              navigazione con i soli cookie tecnici e analitici. Consulta <a href="/cookie-policy" target="_blank">l’informativa</a>.</p>
+          </div>
+          <a tabindex="0" class="didomi-notice-view-partners-link" role="button"
+             onclick="document.cookie='clicked=partner'"><span>Vedi i nostri 144 partner</span></a>
+        </div>
+        <div id="buttons" class="multiple didomi-buttons didomi-popup-notice-buttons">
+          <button id="didomi-notice-learn-more-button" class="didomi-components-button didomi-button didomi-learn-more-button didomi-button-standard standard-button"
+                  aria-label="Personalizza: Configura i consensi"
+                  onclick="document.cookie='clicked=personalizza'"><span>Personalizza</span></button>
+          <button id="didomi-notice-agree-button" class="didomi-components-button didomi-button didomi-dismiss-button didomi-components-button--color didomi-button-highlight highlight-button"
+                  aria-label="Accetta: Accetta l'elaborazione dei dati e chiudi"
+                  onclick="document.cookie='clicked=accetta'"><span>Accetta</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+  // Derived gate: the notice is mounted only for a browser that does not say it is headless.
+  if (!/HeadlessChrome/.test(navigator.userAgent)) {
+    document.getElementById("didomi-host").appendChild(
+      document.getElementById("didomi-notice").content.cloneNode(true));
+  }
+</script>
+</body>
+</html>

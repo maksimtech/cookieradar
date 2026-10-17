@@ -303,7 +303,7 @@ def _mock_playwright(browser):
 async def test_scan_continues_when_a_session_crashes():
     contexts = []
 
-    async def new_context():
+    async def new_context(user_agent=None):
         ctx = AsyncMock()
         contexts.append(ctx)
         return ctx
@@ -319,8 +319,14 @@ async def test_scan_continues_when_a_session_crashes():
             raise RuntimeError("Target page, context or browser has been closed")
         return SessionResult(session=name)
 
+    # The User-Agent is read from a real browser (tests/test_headless_user_agent.py);
+    # this stand-in has none to read, and the crash is what this test is about.
+    async def visitor_user_agent(browser):
+        return "Mozilla/5.0 Chrome/153.0.0.0"
+
     with patch.object(scanner, "async_playwright", _mock_playwright(browser)), \
-         patch.object(scanner, "_run_session", run_session):
+         patch.object(scanner, "_run_session", run_session), \
+         patch.object(scanner, "_visitor_user_agent", visitor_user_agent):
         result = await scanner.scan("https://example.com")
 
     assert result.pre_consent.error is None

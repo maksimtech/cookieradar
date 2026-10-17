@@ -279,9 +279,14 @@ the login page or the teaser), and tracking that only happens after login is
 not seen. Audit the specific pages that matter (home, product, checkout)
 as separate addresses.
 
-**Automated browsers can be treated differently.** Some sites detect
-automated or headless browsers and show a CAPTCHA, a different banner or no
-banner at all. If the result looks wrong, retry with `--no-headless`.
+**Automated browsers can be treated differently.** Headless Chromium says so
+in its User-Agent ("HeadlessChrome"), and some consent platforms then show no
+banner — subito.it's Didomi notice, measured on 2026-10-17. CookieRadar announces
+the browser's own User-Agent as the same build says it with a window
+("Chrome/…") and writes it in the report. Sites that look further — at
+`navigator.webdriver`, timing or the network — may still show a CAPTCHA, a
+different banner or none; if the result looks wrong, retry with
+`--no-headless`.
 
 **Timing.** Each page gets up to 30 seconds to load, plus a few seconds for
 the banner and trackers to appear. Trackers that load much later (e.g. after
