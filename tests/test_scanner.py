@@ -247,7 +247,7 @@ async def test_goto_timeout_sets_error_and_continues():
         raise PlaywrightTimeoutError("Timeout 30000ms exceeded.")
 
     page.goto = AsyncMock(side_effect=goto)
-    page.query_selector_all = AsyncMock(side_effect=lambda sel: [banner] if sel == "[id*='cookie']" else [])
+    page.query_selector_all = AsyncMock(side_effect=lambda sel: [banner] if sel == "[id*='cookie' i]" else [])
 
     result = await _run_session(context, "https://example.com", "pre-consent", accept=None)
 
@@ -490,7 +490,7 @@ def _hidden_element():
 async def test_banner_found_when_first_match_is_hidden():
     context, page = make_mock_context()
     matches = [_hidden_element(), _visible_button()]
-    page.query_selector_all = AsyncMock(side_effect=lambda sel: matches if sel == "[id*='cookie']" else [])
+    page.query_selector_all = AsyncMock(side_effect=lambda sel: matches if sel == "[id*='cookie' i]" else [])
 
     result = await _run_session(context, "https://example.com", "pre-consent")
 

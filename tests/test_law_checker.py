@@ -170,7 +170,15 @@ def test_the_note_says_which_of_the_two_situations_happened():
     assert "no refusal control was found" in accepted_only
 
     no_banner = " ".join(notes_of(scan_result(clicked=False))).lower()
-    assert "no cookie banner was found" in no_banner
+    assert "no cookie banner was recognised" in no_banner
+
+
+def test_the_note_does_not_claim_there_was_no_banner():
+    """The hint reads ids and classes, and on 2026-10-17 it missed Cookiebot's
+    dialog and Didomi's notice, both on screen. "Not found" is a claim about
+    the page; "not recognised" is what the tool can actually say."""
+    note = " ".join(notes_of(scan_result(clicked=False))).lower()
+    assert "no cookie banner was found" not in note
 
 
 def test_unverified_cites_nothing_and_notes_why():
