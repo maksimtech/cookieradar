@@ -220,6 +220,7 @@ def test_the_report_weighs_a_banner_that_only_accepts():
         for s in (r.pre_consent, r.post_accept, r.post_reject):
             s.banner_found = True
         r.post_accept.consent_clicked = True
+        r.post_accept.other_controls = 0  # Accept was all the banner had
         r.post_accept.trackers = [_tracker("adobedtm.com"), _tracker("demdex.net")]
         r.post_reject.consent_clicked = False
 

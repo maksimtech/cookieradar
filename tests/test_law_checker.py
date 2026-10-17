@@ -107,7 +107,8 @@ def test_violation_lists_the_trackers():
 
 
 def _accept_only(trackers=("adobedtm.com", "demdex.net")):
-    """The banner was found, accept was applied, no refusal control was found.
+    """The banner was found, accept was applied, no refusal control was found,
+    and there was nothing else on the banner to click.
 
     Modelled on kyoceradocumentsolutions.it as measured on 2026-09-26.
     """
@@ -119,6 +120,7 @@ def _accept_only(trackers=("adobedtm.com", "demdex.net")):
     )
     for session in (result.pre_consent, result.post_accept, result.post_reject):
         session.banner_found = True
+    result.post_accept.other_controls = 0
     return result
 
 

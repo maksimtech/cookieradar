@@ -1,0 +1,63 @@
+<!doctype html>
+<!--
+  iubenda banner as served on https://www.aranzulla.it on 2026-10-17, captured
+  from a real headless Chromium and trimmed to the banner. Text shortened, links
+  made local, styles dropped; the classes, the tags, the roles, the aria-label and
+  the order of the controls are the site's.
+
+  The refusal is the close button, `.iubenda-cs-close-btn`, a "×" whose
+  accessible name is "Chiudi questa informativa", and the banner's own text says
+  what it does: "Chiudi questa informativa per continuare senza accettare".
+  CookieRadar recognised no refusal, clicked "Accetta" in the post-accept session
+  and reported "Accept was applied and no refusal control was found", citing
+  GDPR art. 4(11) against the site. Clicking the X in a real browser that day
+  closed the banner and the site took it as a refusal: it set `sa_limited_ads`
+  and its iubenda preference cookies, and after a reload Google's tags reported
+  Consent Mode `gcs=G100`, storage denied.
+
+  Each control records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>Aranzulla.it - Il sito numero uno per la tecnologia</title></head>
+<body>
+<h1>Guide e tutorial</h1>
+<div id="iubenda-cs-banner" class="iubenda-cs-black iubenda-cs-default-floating iubenda-cs-top iubenda-cs-center iubenda-cs-overlay iubenda-cs-slidein iubenda-cs-padded iubenda-cs-visible">
+  <div class="iubenda-cs-container" role="alertdialog" aria-describedby="iubenda-cs-paragraph" aria-labelledby="iubenda-cs-title">
+    <div class="iubenda-cs-content">
+      <div class="iubenda-cs-rationale">
+        <button type="button" class="iubenda-cs-close-btn" tabindex="0" role="button" aria-label="Chiudi questa informativa"
+                onclick="document.cookie='clicked=close'">
+          <span aria-hidden="true">×</span>
+        </button>
+        <div class="iubenda-banner-content iubenda-custom-content iubenda-banner-content-padded" role="document">
+          <h2 id="iubenda-cs-title">Informativa</h2>
+          <div id="iubenda-cs-paragraph">
+            <p class="iub-p">Noi e terze parti selezionate utilizziamo cookie o tecnologie simili per finalità
+              tecniche e, con il tuo consenso, anche per altre finalità come specificato nella
+              <a href="/cookie-policy" role="button" target="_blank" rel="noopener" class="iubenda-cs-cookie-policy-lnk">cookie policy</a>.</p>
+            <p class="iub-p">Per quanto riguarda la pubblicità, noi e 1229
+              <button class="iubenda-vendor-list-link" data-iub-enabled="1"
+                      onclick="document.cookie='clicked=vendor-list'">terze parti</button>
+              selezionate, potremmo utilizzare dati di geolocalizzazione precisi per le seguenti
+              <button class="iubenda-advertising-preferences-link"
+                      onclick="document.cookie='clicked=advertising-preferences'">finalità pubblicitarie</button>.</p>
+            <p class="iub-p">Usa il pulsante “Accetta” per acconsentire. Chiudi questa informativa per continuare senza accettare.</p>
+          </div>
+        </div>
+        <div class="iubenda-cs-counter" style="display: none;">Premi ancora per continuare 0/1</div>
+        <div class="iubenda-cs-opt-group">
+          <div class="iubenda-cs-opt-group-custom">
+            <button class="iubenda-cs-customize-btn" tabindex="0" role="button"
+                    onclick="document.cookie='clicked=customize'">Scopri di più e personalizza</button>
+          </div>
+          <div class="iubenda-cs-opt-group-consent">
+            <button class="iubenda-cs-accept-btn iubenda-cs-btn-primary" tabindex="0" role="button"
+                    onclick="document.cookie='clicked=accetta'">Accetta</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -45,6 +45,17 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **GDPR art. 4(11) was cited against banners that offer a refusal.** On aranzulla.it (iubenda)
+  the refusal is the banner's "×", whose text says "Chiudi questa informativa per continuare
+  senza accettare"; on repubblica.it it is "Rifiuta e abbonati". Both were reported on
+  2026-10-17 as "Accept was applied and no refusal control was found", with art. 4(11) and
+  ePrivacy art. 5(3) cited. The close "×" of iubenda, Didomi, OneTrust and Cookiebot is now
+  tried after every explicit refusal, visible only — repubblica.it keeps one in the page with
+  `display: none`. A refusal sold with a subscription is named in the report, not clicked, and
+  cites nothing. And "no refusal" now also needs Accept to have been the one control on the
+  banner, counted just before the click: with others beside it, none recognised, the note gives
+  their number and cites nothing. The tests run a real Chromium against the two banners as
+  captured that day, trimmed, ids and order kept.
 - **The local HTTPS server of the law-fetch tests allowed any TLS version.** CodeQL raised a
   high `py/insecure-protocol` alert on it, which the new pull-request gate caught on #37. It now
   requires TLS 1.2 at least, and makes its certificate with `cryptography`, added to the `test`

@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  iubenda banner as served on https://www.repubblica.it on 2026-10-17, captured
+  from a real headless Chromium and trimmed to the banner. Text shortened, links
+  made local, styles dropped except the one that decides what is visible; the
+  classes, the tags, the roles and the order of the controls are the site's.
+
+  Two buttons side by side, "Accetta" and "Rifiuta e abbonati": the refusal is
+  offered only together with a subscription, and the banner says so ("ti
+  chiederemo di acquistare uno dei nostri abbonamenti"). CookieRadar reported
+  "Accept was applied and no refusal control was found" and cited GDPR art. 4(11),
+  which is not what the banner shows.
+
+  The close button is in the page and labelled "Continua senza accettare", but
+  the site hides it with `display: none !important`, exactly as kept here: a
+  person cannot click it, so the scanner must not either.
+
+  Each control records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>la Repubblica: notizie, inchieste, approfondimenti</title></head>
+<body>
+<h1>Ultime notizie</h1>
+<div id="iubenda-cs-banner" class="iubenda-cs-black iubenda-cs-default-floating iubenda-cs-top iubenda-cs-center iubenda-cs-slidein iubenda-cs-no-heading iubenda-cs-visible">
+  <div class="iubenda-cs-container">
+    <div class="iubenda-cs-content">
+      <div class="iubenda-cs-rationale">
+        <button type="button" class="iubenda-cs-close-btn" tabindex="0" role="button" aria-pressed="false"
+                style="visibility: visible; display: none !important;"
+                onclick="document.cookie='clicked=close'">Continua senza accettare</button>
+        <div class="iubenda-banner-content iubenda-custom-content" role="document">
+          <div>
+            <div class="iubenda-cs-header">
+              <p><strong>I ricavi ottenuti dalla pubblicità personalizzata ci aiutano a supportare il lavoro
+                della nostra redazione.</strong> Per questo chiediamo il tuo consenso, come specificato nella
+                <a href="/cookie-policy" target="_blank">Cookie Policy</a>.<br>
+                Sei libero di rifiutare o revocare il consenso in qualsiasi momento, accedendo al
+                <a class="btn-underline"><button class="iubenda-cs-preferences-link" data-iub-enabled="1"
+                   onclick="document.cookie='clicked=preferences'">pannello delle preferenze pubblicitarie</button></a>;
+                in tal caso, ti chiederemo di acquistare uno dei nostri abbonamenti.</p>
+            </div>
+            <div class="iubenda-cs-opt-group">
+              <div class="iubenda-cs-opt-group-consent">
+                <button class="iubenda-cs-reject-btn iubenda-cs-btn-primary" tabindex="0" role="button" aria-pressed="false"
+                        onclick="document.cookie='clicked=rifiuta-e-abbonati'">Rifiuta e abbonati</button>
+                <button class="iubenda-cs-accept-btn iubenda-cs-btn-primary" tabindex="0" role="button" aria-pressed="false"
+                        onclick="document.cookie='clicked=accetta'">Accetta</button>
+              </div>
+            </div>
+            <div class="iubenda-cs-login">Sei già abbonato?
+              <a href="#" id="iub_cmp_subscribe_custom_btn" onclick="document.cookie='clicked=accedi'">ACCEDI</a></div>
+          </div>
+        </div>
+        <div class="iubenda-cs-counter" style="display: none;">Premi ancora per continuare 0/1</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

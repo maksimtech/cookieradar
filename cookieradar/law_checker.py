@@ -30,7 +30,8 @@ FINDING_ARTICLES = {
     # what the banner offered. Art. 4(11) defines consent as a freely given
     # indication of the data subject's wishes, and a choice with one button is
     # the case that definition exists to exclude; art. 5(3) is what makes
-    # consent necessary here in the first place.
+    # consent necessary here in the first place. Cited only when the accept
+    # button was the one thing on the banner to click (`refusal_not_offered`).
     "no_refusal": ((GDPR, "4(11)"), (EPRIVACY, "5(3)")),
 }
 
@@ -83,6 +84,27 @@ NO_REFUSAL_NOTE = (
     "banner is cited instead"
 )
 
+# Accept was applied and the banner had other things to click, none of which
+# this tool recognises as a refusal. On aranzulla.it on 2026-10-17 one of them
+# was the refusal — iubenda's X — and the report cited art. 4(11) against the
+# site for not offering one. What is known is the count, and the note says that.
+OTHER_CONTROLS_NOTE = (
+    "UNVERIFIED: the banner was found and accepted; it had {count} beside the "
+    "accept button and none was recognised as a refusal, so no provision is "
+    "cited for the post-reject session"
+)
+
+# repubblica.it, 2026-10-17: "Accetta" and "Rifiuta e abbonati". The refusal is
+# on the banner, at the price of a subscription. Whether that still leaves
+# consent free is argued between regulators and courts, and nothing a browser
+# records can settle it, so the note names the offer and cites nothing.
+PAY_TO_REFUSE_NOTE = (
+    "UNVERIFIED: the banner offers refusal only together with a subscription "
+    "(\"{label}\"), which this audit does not accept on anyone's behalf, so "
+    "nothing was tested after a refusal and no provision is cited; whether a "
+    "paid alternative leaves consent free is not something it can settle"
+)
+
 
 def _rejected(result) -> bool:
     return bool(result.post_reject.consent_clicked)
@@ -99,11 +121,19 @@ def refusal_not_offered(result) -> bool:
     What this cannot establish is that no refusal control exists: it reports
     that none was found, which is a different sentence and the only one the
     evidence supports.
+
+    And none found is only evidence when there was nothing else to find: the
+    accept button has to have been the one control on the banner. With others
+    beside it, unrecognised, the sentence is about this tool's labels, and on
+    aranzulla.it it was false — the refusal was iubenda's X. A refusal offered
+    with a subscription is a refusal offered, whatever else it is.
     """
     return bool(
         result.post_accept.banner_found
         and result.post_accept.consent_clicked
         and not result.post_reject.consent_clicked
+        and result.post_accept.other_controls == 0
+        and not result.post_reject.pay_to_refuse
     )
 
 
@@ -167,8 +197,14 @@ def notes_of(result) -> list[str]:
         return [not_the_site]
     if _rejected(result):
         return []
+    if result.post_reject.pay_to_refuse:
+        return [PAY_TO_REFUSE_NOTE.format(label=result.post_reject.pay_to_refuse)]
     if refusal_not_offered(result):
         return [NO_REFUSAL_NOTE]
+    others = result.post_accept.other_controls
+    if result.post_accept.consent_clicked and others:
+        count = "1 other control" if others == 1 else f"{others} other controls"
+        return [OTHER_CONTROLS_NOTE.format(count=count)]
     sessions = (result.pre_consent, result.post_accept, result.post_reject)
     if any(s.banner_found for s in sessions):
         return [UNRECOGNISED_BANNER_NOTE]
