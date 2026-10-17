@@ -184,6 +184,32 @@ async def test_without_a_banner_around_accept_nothing_is_counted(browser, site_u
     assert result.other_controls is None
 
 
+@pytest.mark.integration
+async def test_a_banner_that_goes_away_mid_count_is_not_counted(browser, site_url):
+    """The page is gone by the time the count runs — a site that navigates on
+    its own, a tab closed under the session. None, not an exception that would
+    lose the session, and not 0."""
+    from cookieradar.scanner import _other_controls
+
+    page = await browser.new_page()
+    await page.goto(f"{site_url}/accept_only.html")
+    button = await page.query_selector("button:not([style])")
+    await page.close()
+
+    assert await _other_controls(button) is None
+
+
+@pytest.mark.integration
+async def test_a_page_that_goes_away_has_no_subscription_label(browser, site_url):
+    from cookieradar.scanner import PAY_TO_REFUSE_LABELS, _visible_label
+
+    page = await browser.new_page()
+    await page.goto(f"{site_url}/iubenda_repubblica.html")
+    await page.close()
+
+    assert await _visible_label(page, PAY_TO_REFUSE_LABELS) == ""
+
+
 # ─── The whole audit, as `cookieradar audit` runs it ─────────────────────────
 
 @pytest.mark.integration
