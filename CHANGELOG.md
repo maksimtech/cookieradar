@@ -45,6 +45,11 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **corriere.it's refusal with a subscription was not seen, because it is a link.** On 2026-10-17
+  the wall (RCS's, in the page itself — not in an iframe, as the audit had recorded) offered
+  "accetta e continua" and "preferenze" as buttons and "Rifiuta e abbonati" as an `<a href="#">`.
+  The subscription label was looked for among buttons only, so the wall showed no refusal of any
+  kind. Links are searched too; the report names the paid refusal and cites nothing.
 - **Cookiebot was not recognised, and the report said there was no banner.** On cookiebot.com on
   2026-10-17 the dialog offered "Deny", "Customize", "Allow all" (in English, the scanner's
   locale; "Rifiuta" and "Accetta tutti" in Italian, with the same ids), and CookieRadar knew

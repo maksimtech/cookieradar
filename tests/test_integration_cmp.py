@@ -267,6 +267,43 @@ async def test_didomi_s_notice_is_seen_as_a_banner(browser, site_url):
     assert result.banner_found is True
 
 
+# ─── corriere.it: a refusal sold with a subscription, written as a link ───────
+#
+# Measured 2026-10-17: RCS's wall in the page itself, "accetta e continua" and
+# "preferenze" as buttons, "Rifiuta e abbonati" as an <a href="#">. The
+# subscription label was looked for among buttons only.
+
+@pytest.mark.integration
+async def test_a_refusal_sold_as_a_link_is_seen_and_not_clicked(browser, site_url):
+    result, clicked = await _session(browser, f"{site_url}/rcs_corriere.html", accept=False)
+
+    assert clicked is None
+    assert result.consent_clicked is False
+    assert result.pay_to_refuse == "Rifiuta e abbonati"
+
+
+@pytest.mark.integration
+async def test_corriere_s_accetta_e_continua_is_the_acceptance(browser, site_url):
+    """Beside it: "Rifiuta e abbonati", "in questa lista", "preferenze" and
+    "Accedi" — four; the two links that leave for the policy are not choices,
+    and the hidden copy of the refusal for small screens is not counted."""
+    result, clicked = await _session(browser, f"{site_url}/rcs_corriere.html", accept=True)
+
+    assert clicked == "accetta-e-continua"
+    assert result.other_controls == 4
+
+
+@pytest.mark.integration
+async def test_corriere_s_wall_is_reported_as_a_refusal_with_a_subscription(browser, site_url):
+    from cookieradar.law_checker import findings_of, notes_of
+    from cookieradar.scanner import scan
+
+    result = await scan(f"{site_url}/rcs_corriere.html")
+
+    assert "no_refusal" not in findings_of(result)
+    assert any("Rifiuta e abbonati" in note for note in notes_of(result))
+
+
 # ─── The whole audit, as `cookieradar audit` runs it ─────────────────────────
 
 @pytest.mark.integration
