@@ -432,6 +432,9 @@ ACCEPT_SELECTORS = [
     # buttons; `data-testid` is the one stable handle. Playwright's selectors
     # pierce open shadow roots. Measured on zalando.it, 2026-10-09.
     "[data-testid='uc-accept-all-button']",
+    # Cookiebot's ids do not change with the language: "Allow all" in English,
+    # "Accetta tutti" in Italian (cookiebot.com, 2026-10-17).
+    "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
 ]
 REJECT_SELECTORS = [
     "#onetrust-reject-all-handler",
@@ -446,6 +449,8 @@ REJECT_SELECTORS = [
     # 2026-10-09, when both sites were reported as offering no refusal.
     "[id^='truste-consent-required']",
     "[data-testid='uc-deny-all-button']",
+    # Cookiebot's "Deny" / "Rifiuta", same id in both (cookiebot.com, 2026-10-17).
+    "#CybotCookiebotDialogBodyButtonDecline",
 ]
 
 # The close "×" of a consent platform, tried only after every explicit refusal.
@@ -474,11 +479,18 @@ ACCEPT_LABELS = [
     re.compile(r"^\s*accett[ao](\s+tutt[oi])?(\s+i\s+cookie)?\s*$", re.I),
     re.compile(r"^\s*accept(\s+all)?(\s+cookies)?\s*$", re.I),
     re.compile(r"^\s*ok\s*$", re.I),
+    # Measured on 2026-10-17: "Allow all" (Cookiebot, cookiebot.com, en-US) and
+    # "ACCETTA E CONTINUA" (corriere.it). "Allow selection" stays out: on a
+    # fresh visit it accepts what the switches say, the necessary only.
+    re.compile(r"^\s*allow\s+all\s*$", re.I),
+    re.compile(r"^\s*accetta\s+e\s+continua\s*$", re.I),
 ]
 REJECT_LABELS = [
     re.compile(r"^\s*rifiuta(\s+tutt[oi])?(\s+i\s+cookie)?\s*$", re.I),
     re.compile(r"^\s*reject(\s+all)?(\s+cookies)?\s*$", re.I),
     re.compile(r"^\s*decline(\s+all)?\s*$", re.I),
+    # Cookiebot's refusal in English (cookiebot.com, 2026-10-17).
+    re.compile(r"^\s*deny\s*$", re.I),
     # The refusals Italian banners actually carry, measured on 2026-10-09:
     # "Non accetto" (poste.it), "Continua senza accettare" (enel.it, whose
     # banner says it leaves only technical cookies), "Solo gli essenziali"
@@ -713,11 +725,17 @@ async def _run_session(
             ))[:_TEXT_SNIFF]
 
         # Check for cookie banner
+        # Case-insensitive (` i`): Cookiebot's dialog is "CybotCookiebotDialog",
+        # and `[id*='cookie']` missed it on cookiebot.com on 2026-10-17. Didomi's
+        # notice names none of these words, so its own prefix is listed: on
+        # subito.it that day it was `#didomi-popup` inside `#didomi-host`, and
+        # the host is an empty, invisible element until the notice is mounted.
         banner_selectors = [
-            "[id*='cookie']", "[class*='cookie']",
-            "[id*='consent']", "[class*='consent']",
-            "[id*='gdpr']", "[class*='gdpr']",
-            "[id*='banner']", "[class*='banner']",
+            "[id*='cookie' i]", "[class*='cookie' i]",
+            "[id*='consent' i]", "[class*='consent' i]",
+            "[id*='gdpr' i]", "[class*='gdpr' i]",
+            "[id*='banner' i]", "[class*='banner' i]",
+            "[id^='didomi-']",
         ]
         for selector in banner_selectors:
             try:

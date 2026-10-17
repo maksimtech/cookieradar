@@ -210,6 +210,63 @@ async def test_a_page_that_goes_away_has_no_subscription_label(browser, site_url
     assert await _visible_label(page, PAY_TO_REFUSE_LABELS) == ""
 
 
+# ─── Cookiebot, and the banner the hint did not see ──────────────────────────
+#
+# Measured 2026-10-17 on cookiebot.com: "Deny", "Customize", "Allow all" in
+# English — the scanner's locale — with ids that do not change with the
+# language. Neither label nor id was known, and the case-sensitive banner
+# selectors missed "CybotCookiebotDialog".
+
+@pytest.mark.integration
+async def test_cookiebot_deny_is_the_refusal(browser, site_url):
+    result, clicked = await _session(browser, f"{site_url}/cookiebot_cookiebotcom.html", accept=False)
+
+    assert clicked == "deny"
+    assert result.consent_clicked is True
+
+
+@pytest.mark.integration
+async def test_cookiebot_allow_all_is_the_acceptance(browser, site_url):
+    result, clicked = await _session(browser, f"{site_url}/cookiebot_cookiebotcom.html", accept=True)
+
+    assert clicked == "allow-all"
+
+
+@pytest.mark.integration
+async def test_cookiebot_is_refused_by_its_id_in_a_language_without_labels(browser, site_url):
+    """cookiebot.com/da, 2026-10-17: "Afvis" — no rule here reads Danish."""
+    result, clicked = await _session(browser, f"{site_url}/cookiebot_cookiebotcom_da.html", accept=False)
+
+    assert clicked == "deny"
+    assert result.consent_clicked is True
+
+
+@pytest.mark.integration
+async def test_cookiebot_is_accepted_by_its_id_in_a_language_without_labels(browser, site_url):
+    _, clicked = await _session(browser, f"{site_url}/cookiebot_cookiebotcom_da.html", accept=True)
+
+    assert clicked == "allow-all"
+
+@pytest.mark.integration
+async def test_the_banner_hint_is_not_fooled_by_a_capital_letter(browser, site_url):
+    result, _ = await _session(browser, f"{site_url}/cookiebot_cookiebotcom.html", accept=None)
+
+    assert result.banner_found is True
+
+
+@pytest.mark.integration
+async def test_didomi_s_notice_is_seen_as_a_banner(browser, site_url):
+    """subito.it, 2026-10-17: nothing in Didomi's ids or classes names cookies,
+    consent, GDPR or a banner, and the hint said no banner was there."""
+    from cookieradar.scanner import _visitor_user_agent
+
+    ctx = await browser.new_context(user_agent=await _visitor_user_agent(browser))
+    result = await _run_session(ctx, f"{site_url}/didomi_subito_ua_gate.html", "pre-consent", accept=None)
+    await ctx.close()
+
+    assert result.banner_found is True
+
+
 # ─── The whole audit, as `cookieradar audit` runs it ─────────────────────────
 
 @pytest.mark.integration

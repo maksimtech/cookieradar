@@ -46,9 +46,13 @@ FINDING_TITLES = {
 # Articles downloaded and cached even when not cited, by act
 ALSO_FETCH: dict = {}
 
+# "Recognised", not "found": the hint reads ids and classes, and on 2026-10-17 it
+# missed Cookiebot's dialog and Didomi's notice, both on screen. Whether a page
+# has a banner is a fact about the page; what this tool can say is whether it
+# recognised one.
 UNVERIFIED_NOTE = (
-    "UNVERIFIED: no cookie banner was found, so no provision is cited for the "
-    "post-reject session"
+    "UNVERIFIED: no cookie banner was recognised, so no provision is cited for "
+    "the post-reject session"
 )
 
 # The same outcome when a session did see something that looked like a banner.

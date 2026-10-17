@@ -232,12 +232,13 @@ spots a quick manual check has. Keep these in mind before relying on a result.
 **The banner is not always detected or clicked.**
 - Buttons are recognised by the most common consent platform codes
   (OneTrust, including its two-step "Preferences → Reject all" flow; TrustArc;
-  Usercentrics, whose banner lives in a shadow root; Didomi's "agree" button)
-  and by labels in **English and Italian** only: "Accept", "Accept all",
-  "Accetta tutto", "OK", "Reject", "Reject all", "Decline", "Rifiuta tutto",
-  "Non accetto", "Continua senza accettare", "Solo gli essenziali",
-  "Essential only" and similar. A banner in another language, or with other
-  wording, results in **UNVERIFIED**.
+  Usercentrics, whose banner lives in a shadow root; Didomi's "agree" button;
+  Cookiebot, whose ids are the same in every language) and by labels in
+  **English and Italian** only: "Accept", "Accept all", "Allow all", "Accetta
+  tutto", "Accetta e continua", "OK", "Reject", "Reject all", "Decline", "Deny",
+  "Rifiuta tutto", "Non accetto", "Continua senza accettare", "Solo gli
+  essenziali", "Essential only" and similar. A banner in another language, or
+  with other wording, results in **UNVERIFIED**.
 - When no "Reject" is recognised, the consent platform's close "×" is tried
   (iubenda, Didomi, OneTrust, Cookiebot), as the banner's own text often says
   and the Garante's 2021 guidelines describe: closing keeps the default, no
@@ -253,9 +254,11 @@ spots a quick manual check has. Keep these in mind before relying on a result.
   platforms use, are not clicked.
 - Banners that only offer "Settings" with individual switches to turn off
   (other than OneTrust) are not handled.
-- "Banner found" is a hint, not proof: it means something whose name
-  contains `cookie`, `consent`, `gdpr` or `banner` was visible. The verdict
-  never depends on it; it depends on whether "Reject" was actually clicked.
+- "Banner found" is a hint, not proof: it means something whose id or class
+  contains `cookie`, `consent`, `gdpr` or `banner`, in any case, or a Didomi
+  notice, was visible. When none was, the report says no banner was
+  *recognised* — not that the page had none. The verdict never depends on it;
+  it depends on whether "Reject" was actually clicked.
 
 **Only known trackers are detected.** CookieRadar recognises a fixed list of
 34 tracking and advertising services (and all their subdomains), such

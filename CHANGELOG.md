@@ -45,6 +45,14 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **Cookiebot was not recognised, and the report said there was no banner.** On cookiebot.com on
+  2026-10-17 the dialog offered "Deny", "Customize", "Allow all" (in English, the scanner's
+  locale; "Rifiuta" and "Accetta tutti" in Italian, with the same ids), and CookieRadar knew
+  neither the labels nor the ids, while its banner selectors are case-sensitive and missed
+  "CybotCookiebotDialog". Didomi's notice names none of the words the hint looks for. Cookiebot's
+  ids and the labels measured that day ("Deny", "Allow all", corriere.it's "Accetta e continua")
+  are known now, the hint ignores case and knows Didomi's prefix, and when it recognises nothing
+  the note says no banner was *recognised* instead of claiming none was there.
 - **A banner shown only to a browser that is not headless was never seen.** Headless Chromium
   announces "HeadlessChrome/<version>", and on subito.it on 2026-10-17 the Didomi notice was not
   mounted for it and was for "Chrome/<version>" from the same browser: the audit said
