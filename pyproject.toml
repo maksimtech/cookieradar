@@ -134,6 +134,9 @@ also_copy = [
     "release.sh",
     # docs/nis2-compliance.md, which tests/test_nis2_evidence.py holds to the code.
     "docs",
+    # The licence file pyproject names, which tests/test_declared_files.py looks for:
+    # behind the line-ending case it was the next thing to stop the stats phase.
+    "LICENSE",
 ]
 # mutmut 3.8 refuses to run on Windows and points at WSL, so this is a CI-only
 # configuration: the scheduled workflow runs it on ubuntu.

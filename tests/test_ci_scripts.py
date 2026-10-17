@@ -537,7 +537,16 @@ def test_shell_scripts_are_pinned_to_lf_line_endings():
 
     Asked of git rather than searched for in the file: what counts is that the
     rule applies to every tracked script, not that the text contains certain
-    words."""
+    words.
+
+    So it needs the checkout itself. mutmut runs the suite in mutants/, a copy
+    inside the working tree: git answers there, about the files tracked under
+    mutants/, which are none, and the Saturday run stopped in its stats phase
+    on "no tracked .sh script" (2026-10-10, 2026-10-17). apkradar's twin of
+    this case skips the same way."""
+    if not (ROOT / ".git").exists():
+        pytest.skip("needs a git checkout: this is a copy of the tree, not the repository")
+
     def git(*args):
         try:
             done = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True,
