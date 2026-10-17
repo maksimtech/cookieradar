@@ -420,6 +420,34 @@ def is_tracker(url: str) -> bool:
     return tracker_domain(url) is not None
 
 
+# Cookies that are tracking storage by their name wherever they are set, measured
+# before any choice on 2026-10-17: Google Analytics' `_ga` (repubblica.it,
+# subito.it) and GA4's per-property `_ga_<id>`, Meta's `_fbp` (subito.it), Google
+# Ads' `_gcl_au`. A tracker domain's own cookie (`IDE` on doubleclick.net) counts
+# by its domain.
+TRACKING_COOKIE_NAMES = {"_ga", "_fbp", "_gcl_au"}
+TRACKING_COOKIE_PREFIXES = ("_ga_",)
+
+
+def stored_before_choice(result: ScanResult) -> list[str]:
+    """The tracking cookies present at the end of the pre-consent session.
+
+    Nothing is clicked in that session, so each one was written before any
+    choice: storage on the user's device without consent, which is what art.
+    122(1) of the Codice privacy and ePrivacy art. 5(3) are about. A request to
+    a tracker's host is not counted here — it does not by itself show that
+    anything was stored or read.
+    """
+    found = set()
+    for cookie in result.pre_consent.cookies:
+        name = cookie.get("name") or ""
+        domain = (cookie.get("domain") or "").lstrip(".")
+        if (name in TRACKING_COOKIE_NAMES or name.startswith(TRACKING_COOKIE_PREFIXES)
+                or tracker_domain(f"https://{domain}/")):
+            found.add(f"cookie {name} ({domain})")
+    return sorted(found)
+
+
 ACCEPT_SELECTORS = [
     "#onetrust-accept-btn-handler",
     "button[id*='accept-all']",

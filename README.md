@@ -194,13 +194,18 @@ At the end of the report there is one of three outcomes:
 | Verdict | Meaning | What to do |
 |---|---|---|
 | ✅ **OK** — *"No trackers loaded after rejection"* | The "Reject" button was clicked and, after reloading, **none** of the known trackers was contacted. | Nothing, for the trackers CookieRadar knows. Still review session 1 (see below). |
-| 🔴 **VIOLATION** | The "Reject" button was clicked, yet after reloading **at least one** known tracker was contacted. The list follows. | Investigate each listed service with whoever manages the site's tags and consent platform. |
-| ⚠️ **UNVERIFIED** | CookieRadar **could not click "Reject"**: no banner, or a banner it does not recognise. Session 3 then shows the page without any choice made, so **no verdict is given**. | Check the site by hand, or with `--no-headless` to see what the banner looks like. |
+| 🔴 **VIOLATION** | The "Reject" button was clicked, yet after reloading **at least one** known tracker was contacted; or, before any choice, a **tracking cookie** was already on the device. The list follows, with its cause. | Investigate each listed service with whoever manages the site's tags and consent platform. |
+| ⚠️ **UNVERIFIED** | CookieRadar **could not click "Reject"**: no banner, or a banner it does not recognise. Session 3 then shows the page without any choice made, so **no verdict is given** on it. | Check the site by hand, or with `--no-headless` to see what the banner looks like. |
 
-The verdict only looks at session 3. **Trackers in session 1 (pre-consent)
-are not part of the verdict**, but they deserve attention on their own:
-a tracker that loads before the visitor has chosen anything is loaded
-without consent. Read the session 1 table even when the verdict is OK.
+Session 1 counts in the verdict when it shows **storage**: a tracking cookie
+present before the visitor has chosen anything — Google Analytics' `_ga` or
+`_ga_<id>`, Meta's `_fbp`, Google Ads' `_gcl_au`, or any cookie of a known
+tracker's domain. Art. 122(1) of the Codice privacy allows storing information
+on the device, or reading it, only with consent, and the report cites it with
+ePrivacy art. 5(3). That is a VIOLATION whatever happened with the refusal, and
+the exit code stays the same. A **request** to a tracker before any choice is
+listed but not cited: Tag Manager loading, or Consent Mode's pings with storage
+denied, can be lawful, and a request alone does not show anything stored.
 
 If a session hit an error (for example the site took more than 30 seconds
 to load), the report shows it in yellow and adds *"Result may be incomplete:

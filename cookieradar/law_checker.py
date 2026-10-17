@@ -15,7 +15,16 @@ from datetime import UTC, datetime
 
 from cookieradar import law_fetcher
 from cookieradar.law_cache import Key, LawCache
-from cookieradar.law_fetcher import CONSUMER_CODE, DIGITAL_CONTENT, EPRIVACY, GDPR, Act, LawFetchError, Provision
+from cookieradar.law_fetcher import (
+    CONSUMER_CODE,
+    DIGITAL_CONTENT,
+    EPRIVACY,
+    GDPR,
+    PRIVACY_CODE,
+    Act,
+    LawFetchError,
+    Provision,
+)
 
 # ─── Mapping: CookieRadar findings → provisions ───────────────────────────────
 
@@ -33,6 +42,11 @@ FINDING_ARTICLES = {
     # consent necessary here in the first place. Cited only when the accept
     # button was the one thing on the banner to click (`refusal_not_offered`).
     "no_refusal": ((GDPR, "4(11)"), (EPRIVACY, "5(3)")),
+    # Different evidence again: what the device held before the banner was
+    # answered. Art. 122(1) allows storage on it, or reading from it, "unicamente"
+    # with consent; ePrivacy art. 5(3) is the rule it transposes. Cited for a
+    # tracking cookie present before any choice, never for a request alone.
+    "pre_consent": ((PRIVACY_CODE, "122(1)"), (EPRIVACY, "5(3)")),
 }
 
 FINDING_TITLES = {
@@ -41,6 +55,7 @@ FINDING_TITLES = {
     "post_reject": "Trackers loaded after rejection",
     "invalid_consent": "Consent not valid (personal data in the digital contract)",
     "no_refusal": "Accept was applied and no refusal control was found",
+    "pre_consent": "Tracking data stored on the device before any choice",
 }
 
 # Articles downloaded and cached even when not cited, by act
@@ -160,13 +175,27 @@ def findings_of(result) -> dict[str, list[str]]:
     evidence is a violation of the consent rules (GDPR, ePrivacy), an unfair
     commercial practice (Consumer Code) and invalid consent in a digital
     content contract (directive 2019/770).
+
+    Beside it, whatever happened with the refusal: tracking data stored on the
+    device before any choice (`pre_consent`), a fact about the first session.
     """
-    from cookieradar.scanner import find_violations
+    from cookieradar.scanner import stored_before_choice
 
     if _not_the_site(result):
         # A reject button on an error page, or on a challenge, is not the
         # site's: the report says NOT MEASURED and must not cite a violation.
         return {}
+    found = _refusal_findings(result)
+    stored = stored_before_choice(result)
+    if stored:
+        found["pre_consent"] = stored
+    return found
+
+
+def _refusal_findings(result) -> dict[str, list[str]]:
+    """What the refusal, or the lack of one, showed."""
+    from cookieradar.scanner import find_violations
+
     if not _rejected(result):
         if refusal_not_offered(result):
             accepted = len({t.domain for t in result.post_accept.trackers})

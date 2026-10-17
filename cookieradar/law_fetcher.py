@@ -81,6 +81,15 @@ CONSUMER_CODE = Act(
     "testo vigente",
     source="Normattiva",
 )
+# Art. 122 is the Italian rule ePrivacy art. 5(3) is transposed into, and the one
+# that applies to a site in Italy: storage on the device, or reading from it,
+# only with consent.
+PRIVACY_CODE = Act(
+    "Codice privacy D.Lgs. 196/2003",
+    "urn:nir:stato:decreto.legislativo:2003-06-30;196",
+    "testo vigente",
+    source="Normattiva",
+)
 
 
 class LawFetchError(Exception):

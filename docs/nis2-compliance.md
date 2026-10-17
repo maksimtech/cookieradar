@@ -102,7 +102,7 @@ normative. Questi sono gli host fissi che CookieRadar contatta:
 | --- | --- | --- |
 | `publications.europa.eu` | `cookieradar audit`, quando il report cita un atto dell'UE | il numero CELEX dell'atto |
 | `eur-lex.europa.eu` | come sopra, solo se publications.europa.eu non restituisce l'atto | il numero CELEX dell'atto |
-| `www.normattiva.it` | `cookieradar audit`, quando il report cita il Codice del Consumo | l'URN del Codice del Consumo e il numero dell'articolo |
+| `www.normattiva.it` | `cookieradar audit`, quando il report cita il Codice del Consumo o il Codice privacy (art. 122) | l'URN del codice citato e il numero dell'articolo |
 <!-- hosts:end -->
 
 Queste richieste non contengono l'indirizzo analizzato né i risultati dell'audit, e

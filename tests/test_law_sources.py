@@ -153,3 +153,16 @@ def test_errors_name_the_source():
         real_fetch_html("https://www.normattiva.it/uri-res/N2Ls?x", client=client)
     with pytest.raises(LawFetchError, match="EUR-Lex answered HTTP 503"):
         real_fetch_html("https://eur-lex.europa.eu/x", client=client)
+
+
+def test_normattiva_privacy_code_article_122():
+    """Recorded on 2026-10-17 from the URL `fetch_provisions` asks for
+    (urn:nir:stato:decreto.legislativo:2003-06-30;196~art122!vig=), trimmed like
+    the Consumer Code pages to the validity line and the article."""
+    texts = parse_articles(page("normattiva_privacy_art122.html"), ("122",))
+
+    assert texts["122(1)"].startswith(
+        "1. L'archiviazione delle informazioni nell'apparecchio terminale di un contraente o di un "
+        "utente o l'accesso a informazioni già archiviate sono consentiti unicamente a condizione che"
+    )
+    assert "monitorare le operazioni dell'utente" in texts["122"]

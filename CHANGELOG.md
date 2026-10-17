@@ -45,6 +45,14 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **Tracking stored before any choice never reached the verdict.** The verdict read the session
+  after the refusal only, so a site that wrote Google Analytics' `_ga` before its banner was
+  answered — repubblica.it on 2026-10-17, TCF string still empty — could end in exit 0. A tracking
+  cookie present at the end of the pre-consent session (`_ga`, `_ga_<id>`, `_fbp`, `_gcl_au`, or
+  any cookie of a known tracker's domain) is now a VIOLATION of its own, whatever the refusal did,
+  with the same exit code, and the report cites art. 122(1) of the Codice privacy, fetched from
+  Normattiva, with ePrivacy art. 5(3). A request to a tracker before any choice is listed and not
+  cited: it does not by itself show anything stored on the device. `batch` says the cause too.
 - **corriere.it's refusal with a subscription was not seen, because it is a link.** On 2026-10-17
   the wall (RCS's, in the page itself — not in an iframe, as the audit had recorded) offered
   "accetta e continua" and "preferenze" as buttons and "Rifiuta e abbonati" as an `<a href="#">`.

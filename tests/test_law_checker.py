@@ -19,6 +19,7 @@ from cookieradar.law_fetcher import (
     DIGITAL_CONTENT,
     EPRIVACY,
     GDPR,
+    PRIVACY_CODE,
     LawFetchError,
     Provision,
 )
@@ -84,6 +85,9 @@ def test_mapping():
         # Evidence about the banner, not about the trackers: art. 4(11) is the
         # definition of consent as freely given, art. 5(3) is what requires it.
         "no_refusal": ((GDPR, "4(11)"), (EPRIVACY, "5(3)")),
+        # Evidence about the device before any choice: a tracking cookie stored
+        # without consent, art. 122(1) Codice privacy and the rule it transposes.
+        "pre_consent": ((PRIVACY_CODE, "122(1)"), (EPRIVACY, "5(3)")),
     }
     assert set(FINDING_TITLES) == set(FINDING_ARTICLES)
 
