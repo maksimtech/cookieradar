@@ -424,8 +424,13 @@ def _render_report(out: Console, url: str, result, law=None):
     # tool. The hour matters too: a site changes its banner during the day.
     out.print(
         f"[dim]Audited on {result.scanned_at.astimezone(UTC):%Y-%m-%d %H:%M} UTC "
-        f"with CookieRadar {cookieradar.__version__}[/dim]\n"
+        f"with CookieRadar {cookieradar.__version__}[/dim]"
+        + ("" if result.user_agent else "\n")
     )
+    if result.user_agent:
+        # The browser the site was shown: a banner some platforms mount only for
+        # one that does not say it is headless is part of what was measured.
+        out.print(Text(f"User-Agent: {result.user_agent}\n", style="dim"))
 
     # Pre-consent
     pre = result.pre_consent

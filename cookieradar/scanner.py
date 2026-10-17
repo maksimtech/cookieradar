@@ -187,6 +187,9 @@ class ScanResult:
     # said no day at all: the only dates in it were the "Version of:" lines
     # under the legal citations, which appear only when something is cited.
     scanned_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    # The User-Agent every session announced: which browser the site believed
+    # it was talking to is part of the evidence. Empty when not recorded.
+    user_agent: str = ""
 
 
 @dataclass
@@ -791,6 +794,23 @@ async def _run_session(
     return result
 
 
+async def _visitor_user_agent(browser) -> str:
+    """The browser's own User-Agent, as the same build says it with a window.
+
+    Headless Chromium announces "HeadlessChrome/<version>", and some consent
+    platforms answer by showing no banner: on subito.it on 2026-10-17 the Didomi
+    notice was never mounted for it and was for "Chrome/<version>". Read from
+    the browser rather than written here, so the version is the one that ran.
+    """
+    context = await browser.new_context()
+    try:
+        page = await context.new_page()
+        native = await page.evaluate("navigator.userAgent")
+    finally:
+        await context.close()
+    return native.replace("HeadlessChrome/", "Chrome/")
+
+
 async def scan(url: str, headless: bool = True, timeout_ms: int = DEFAULT_TIMEOUT_MS,
                trackers: TrackerDB | None = None) -> ScanResult:
     """
@@ -810,8 +830,9 @@ async def scan(url: str, headless: bool = True, timeout_ms: int = DEFAULT_TIMEOU
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=headless)
         try:
+            result.user_agent = await _visitor_user_agent(browser)
             for attr, name, accept in sessions:
-                ctx = await browser.new_context()
+                ctx = await browser.new_context(user_agent=result.user_agent)
                 try:
                     session = await _run_session(ctx, url, name, accept=accept,
                                                  timeout_ms=timeout_ms,

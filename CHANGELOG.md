@@ -45,6 +45,12 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **A banner shown only to a browser that is not headless was never seen.** Headless Chromium
+  announces "HeadlessChrome/<version>", and on subito.it on 2026-10-17 the Didomi notice was not
+  mounted for it and was for "Chrome/<version>" from the same browser: the audit said
+  UNVERIFIED, "no refusal could be applied", about a site that offers one. The sessions now
+  announce the browser's own User-Agent as the build says it with a window, and the report
+  states it. The test runs a real Chromium against the notice captured that day.
 - **GDPR art. 4(11) was cited against banners that offer a refusal.** On aranzulla.it (iubenda)
   the refusal is the banner's "×", whose text says "Chiudi questa informativa per continuare
   senza accettare"; on repubblica.it it is "Rifiuta e abbonati". Both were reported on
