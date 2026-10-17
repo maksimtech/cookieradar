@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+  The Cookiebot dialog of cookiebot_cookiebotcom.html as https://www.cookiebot.com/da/
+  served it on 2026-10-17 to a real headless Chromium with locale da-DK: the same
+  ids, the same order, the labels in Danish — "Afvis", "Tilpas", "Tillad alle",
+  and the hidden "Tillad valgte". CookieRadar has no rule for any Danish word, so
+  only the ids can reach these buttons: this page is what tells whether they do.
+
+  Each button records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="da">
+<head><meta charset="utf-8"><title>Cookiebot - Cookie consent banner and cookie checker</title></head>
+<body>
+<h1>The leading consent management platform</h1>
+<div id="CybotCookiebotDialog" name="CybotCookiebotDialog" role="region" aria-labelledby="CybotCookiebotDialogBodyContentTitle"
+     tabindex="-1" lang="da" dir="ltr" data-template="popup" class="CybotCookiebotDialogActive">
+  <div id="CybotCookiebotDialogBodyContentTitle" class="CybotCookiebotDialogBodyContentHeading" lang="da" role="heading" aria-level="2">Denne hjemmeside bruger cookies</div>
+  <div id="CybotCookiebotDialogBodyContentText" lang="da">Vi bruger cookies til at tilpasse vores indhold og annoncer.</div>
+  <div id="CybotCookiebotDialogFooter" class="CybotCookiebotScrollContainer">
+    <div id="CybotCookiebotDialogBodyButtonsWrapper">
+      <button id="CybotCookiebotDialogBodyButtonDecline" class="CybotCookiebotDialogBodyButton" tabindex="0" lang="da"
+              onclick="document.cookie='clicked=deny'">Afvis</button>
+      <button id="CybotCookiebotDialogBodyLevelButtonLevelOptinAllowallSelection" class="CybotCookiebotDialogBodyButton CybotCookiebotDialogHide"
+              tabindex="0" lang="da" style="display: none"
+              onclick="document.cookie='clicked=allow-selection'">Tillad valgte</button>
+      <button id="CybotCookiebotDialogBodyLevelButtonTilpas" class="CybotCookiebotDialogBodyButton" tabindex="0" lang="da"
+              onclick="document.cookie='clicked=customize'">Tilpas</button>
+      <button id="CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll" class="CybotCookiebotDialogBodyButton" tabindex="0" lang="da"
+              onclick="document.cookie='clicked=allow-all'">Tillad alle</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

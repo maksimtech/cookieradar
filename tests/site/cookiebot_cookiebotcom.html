@@ -1,0 +1,43 @@
+<!doctype html>
+<!--
+  Cookiebot dialog as served on https://www.cookiebot.com on 2026-10-17, captured
+  from a real headless Chromium (locale en-US, the scanner's) and trimmed to the
+  title, the text and the buttons. Text shortened, styles dropped; the ids, the
+  role, the classes of the buttons and their order are the site's.
+
+  "Allow selection" carries Cookiebot's CybotCookiebotDialogHide class, which the
+  site's stylesheet hides; with the stylesheet trimmed away it is hidden inline.
+
+  The same dialog in Italian (locale it-IT) labels the buttons "Rifiuta",
+  "Personalizza", "Accetta tutti", with the same ids. CookieRadar knew neither
+  "Deny" nor "Allow all", nor the ids, and its banner selectors are
+  case-sensitive, so `[id*='cookie']` missed "CybotCookiebotDialog": the audit
+  reported "no cookie banner was found" about this dialog.
+
+  Each button records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="en">
+<head><meta charset="utf-8"><title>Cookiebot - Cookie consent banner and cookie checker</title></head>
+<body>
+<h1>The leading consent management platform</h1>
+<div id="CybotCookiebotDialog" name="CybotCookiebotDialog" role="region" aria-labelledby="CybotCookiebotDialogBodyContentTitle"
+     tabindex="-1" lang="en" dir="ltr" data-template="popup" class="CybotCookiebotDialogActive">
+  <div id="CybotCookiebotDialogBodyContentTitle" class="CybotCookiebotDialogBodyContentHeading" lang="en" role="heading" aria-level="2">This website uses cookies</div>
+  <div id="CybotCookiebotDialogBodyContentText" lang="en">We use cookies to personalise content and ads, to provide
+    social media features and to analyse our traffic.</div>
+  <div id="CybotCookiebotDialogFooter" class="CybotCookiebotScrollContainer">
+    <div id="CybotCookiebotDialogBodyButtonsWrapper">
+      <button id="CybotCookiebotDialogBodyButtonDecline" class="CybotCookiebotDialogBodyButton" tabindex="0" lang="en"
+              onclick="document.cookie='clicked=deny'">Deny</button>
+      <button id="CybotCookiebotDialogBodyLevelButtonLevelOptinAllowallSelection" class="CybotCookiebotDialogBodyButton CybotCookiebotDialogHide"
+              tabindex="0" lang="en" style="display: none"
+              onclick="document.cookie='clicked=allow-selection'">Allow selection</button>
+      <button id="CybotCookiebotDialogBodyLevelButtonCustomize" class="CybotCookiebotDialogBodyButton" tabindex="0" lang="en"
+              onclick="document.cookie='clicked=customize'">Customize</button>
+      <button id="CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll" class="CybotCookiebotDialogBodyButton" tabindex="0" lang="en"
+              onclick="document.cookie='clicked=allow-all'">Allow all</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

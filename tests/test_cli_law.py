@@ -114,7 +114,7 @@ def test_unverified_prints_note_and_cites_nothing(eurlex):
     out = _audit(scan_result(rejected=["doubleclick.net"], clicked=False))
 
     assert out.exit_code == 2   # UNVERIFIED, unchanged
-    assert "no cookie banner was found" in out.output
+    assert "no cookie banner was recognised" in out.output
     assert "Norma applicata" not in out.output
     assert eurlex == []
 
