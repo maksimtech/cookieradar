@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  The consent wall as served on https://www.corriere.it on 2026-10-17, captured
+  from a real headless Chromium (Chrome User-Agent) and trimmed. Text shortened,
+  styles and images dropped; the ids, the classes, the tags, the links' targets
+  and the order of the controls are the site's.
+
+  It is in the page itself, not in an iframe as the audit had recorded it. The
+  refusal is "Rifiuta e abbonati" — a link, `<a href="#">`, not a button — and
+  it comes with a subscription. CookieRadar looked for that label among buttons
+  only, so on this wall it saw no refusal of any kind. The header repeats the
+  link for small screens; the site's stylesheet hides it on a desktop, which is
+  done inline here with the stylesheet trimmed away.
+
+  Each control records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>Corriere della Sera: news e ultime notizie</title></head>
+<body class="sub-default type-home">
+<h1>Ultime notizie</h1>
+<div class="privacy-cp-wall">
+  <div class="privacy-cp-wall__wrapper_cmp">
+    <header>
+      <a id="privacy-cp-wall-reject-and-subscribe-mobile" href="#" style="display: none"
+         onclick="document.cookie='clicked=rifiuta-e-abbonati-mobile'">Rifiuta e abbonati </a>
+    </header>
+    <div id="wall-accedi">
+      <a id="privacy-cp-wall-reject-and-subscribe" href="#"
+         onclick="document.cookie='clicked=rifiuta-e-abbonati'">Rifiuta e abbonati </a>
+    </div>
+    <div class="privacy-cp-wall__body_cmp">
+      <div class="privacy-cp-wall__container_cmp">
+        <p class="privacy-cp-wall__container__answer_cmp">
+          Senza la pubblicità l'accesso ai nostri servizi avviene previo pagamento. Scegli se accedere al
+          <a class="link" href="/termini-e-condizioni">servizio di base</a> o a un piano di abbonamento equivalente.</p>
+        <p class="privacy-cp-wall__container__answer_cmp">
+          Come indicato nella <a class="link" href="/privacy.shtml">cookie policy</a>, noi e alcune tra 1226 terze parti
+          presenti <a class="link" href="#" id="privacy-cp-wall-partnersList"
+                      onclick="document.cookie='clicked=lista-partner'"> in questa lista</a> potremo archiviare
+          informazioni sul tuo dispositivo. Puoi acconsentire facendo click su "Accetta e continua" o rifiutarne
+          l'uso e abbonarti facendo click su "Rifiuta e abbonati".</p>
+      </div>
+    </div>
+    <footer>
+      <button id="privacy-cp-wall-accept" class="privacy-cp-footer__button_cmp privacy-cp-footer__button_cmp--big privacy-cp-footer__button_cmp--main"
+              data-privacy-expression="acceptAll" onclick="document.cookie='clicked=accetta-e-continua'">
+        accetta e continua
+      </button>
+      <button id="privacy-cp-wall-settings" class="privacy-cp-footer__button_cmp privacy-cp-footer__button_cmp--big privacy-cp-footer__button_cmp--main"
+              onclick="document.cookie='clicked=preferenze'">
+        preferenze
+      </button>
+      <p class="privacy-cp-login__link_cmp">
+        Sei già abbonato? <a id="privacy-cp-wall-login" href="#" onclick="document.cookie='clicked=accedi'">Accedi</a>
+      </p>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

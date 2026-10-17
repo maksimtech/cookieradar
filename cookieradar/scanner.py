@@ -545,16 +545,21 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
 
 
 async def _visible_label(page: Page, labels: list[re.Pattern]) -> str:
-    """The text of the first visible button whose accessible name matches, or ""."""
+    """The text of the first visible button or link whose accessible name matches, or "".
+
+    Links too: corriere.it's "Rifiuta e abbonati" is an `<a href="#">` (2026-10-17),
+    and among buttons alone that wall showed no refusal of any kind.
+    """
     for label in labels:
-        try:
-            buttons = page.get_by_role("button", name=label)
-            for i in range(await buttons.count()):
-                btn = buttons.nth(i)
-                if await btn.is_visible():
-                    return " ".join((await btn.inner_text()).split())
-        except PlaywrightError:
-            pass
+        for role in ("button", "link"):
+            try:
+                controls = page.get_by_role(role, name=label)
+                for i in range(await controls.count()):
+                    control = controls.nth(i)
+                    if await control.is_visible():
+                        return " ".join((await control.inner_text()).split())
+            except PlaywrightError:
+                pass
     return ""
 
 
