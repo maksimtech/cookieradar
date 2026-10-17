@@ -41,6 +41,17 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 EVIDENCE = WORKFLOWS / "sbom.yml"
 DOCKER = WORKFLOWS / "docker.yml"
 
+# mutmut runs the suite from a copy in which every source file holds, beside each
+# function, all of its mutated variants and a trampoline that picks one. A test
+# that reads the package's source, as text or as a syntax tree, reads that and
+# not this repository: a variant turns `follow_redirects=False` into `True`, and
+# `_get_over_https` comes with `x__get_over_https__mutmut_14` beside it. The
+# Saturday run stopped on both in its stats phase (found in WSL on 2026-10-17).
+# The tests below that read the source skip there, as patchradar's do; the
+# ordinary run is the one that holds the claims.
+IN_MUTMUT_COPY = "mutants" in ROOT.parts
+reads_source = pytest.mark.skipif(IN_MUTMUT_COPY, reason="mutmut's copy holds every mutant beside the source")
+
 # A module that imports one of these can reach the network; one that does not
 # cannot, whatever URLs its constants mention (cli.py shows https://tim.it as an
 # example in its help text and never contacts it). Playwright is the network
@@ -146,6 +157,7 @@ def doc() -> str:
 # --- Question 3: what leaves the machine ------------------------------------
 
 
+@reads_source
 def test_every_host_the_code_contacts_is_declared_and_no_other(doc):
     declared = table_first_column(section(doc, "hosts"))
     in_code = set(hosts_in_code())
@@ -155,6 +167,7 @@ def test_every_host_the_code_contacts_is_declared_and_no_other(doc):
     )
 
 
+@reads_source
 def test_the_host_rule_looks_at_something():
     """A rule that found no host, or never read the browser's module, would pass
     for the wrong reason."""
@@ -162,6 +175,7 @@ def test_the_host_rule_looks_at_something():
     assert {p.name for p in network_modules()} >= {"scanner.py", "law_fetcher.py"}
 
 
+@reads_source
 def test_the_host_rule_skips_what_is_only_cited():
     """Every request to the law sources names github.com/maksimtech/cookieradar in
     its User-Agent; cli.py shows https://tim.it in its help text and
@@ -214,6 +228,7 @@ def test_nothing_is_fetched_or_cached_when_nothing_is_cited(tmp_path):
     assert not cache_file.exists()
 
 
+@reads_source
 def test_the_law_sources_are_given_the_act_and_never_the_site():
     """The URLs of the law sources are built inside fetch_provisions, from the act
     and the article numbers it is handed: nothing about the audited site can
@@ -230,12 +245,14 @@ def test_the_law_sources_are_given_the_act_and_never_the_site():
     assert used == {"fetch_provisions", "utc_stamp"}
 
 
+@reads_source
 def test_only_audit_consults_the_law_sources(doc):
     assert "_law_check" in called_names(function(PACKAGE / "cli.py", "audit"))
     assert "_law_check" not in called_names(function(PACKAGE / "cli.py", "batch"))
     assert "`batch` non contatta le fonti normative" in prose(doc)
 
 
+@reads_source
 def test_the_https_only_law_fetch_is_declared(doc):
     """publications.europa.eu answers the HTTPS request with a 303 to an http://
     address (recorded on 2026-10-11). Until that day fetch_html followed it and the
@@ -259,6 +276,7 @@ BROWSER_STATE = (
 )
 
 
+@reads_source
 def test_the_browser_keeps_nothing_on_disk(doc):
     """Each session gets a new browser context and none is saved: no persistent
     profile, no stored state, no screenshot, no recorded traffic."""
@@ -277,6 +295,7 @@ def test_the_browser_keeps_nothing_on_disk(doc):
     assert "profilo temporaneo" in prose(doc)
 
 
+@reads_source
 def test_the_report_carries_no_cookie_value(doc):
     """The report prints a cookie's name, domain and expiry. Its value is never
     read by the code that writes the report."""
@@ -286,6 +305,7 @@ def test_the_report_carries_no_cookie_value(doc):
     assert "non i loro valori" in prose(doc)
 
 
+@reads_source
 def test_the_sandbox_the_document_describes(doc):
     """Playwright starts Chromium with --no-sandbox unless chromium_sandbox=True
     is passed; measured on 2026-10-11 on the command line of
@@ -301,6 +321,7 @@ def test_the_sandbox_the_document_describes(doc):
     assert "`--no-sandbox`" in doc
 
 
+@reads_source
 def test_the_trackerdb_is_read_from_disk_only(doc):
     """--trackers reads a copy of ghostery/trackerdb the operator already has."""
     assert not NETWORK_IMPORT.search((PACKAGE / "trackerdb.py").read_text(encoding="utf-8"))
@@ -493,6 +514,7 @@ def test_an_empty_repository_scan_is_not_presented_as_a_clean_one(evidence, doc)
     assert "non indica l'assenza di vulnerabilità" in prose(doc)
 
 
+@reads_source
 def test_every_request_of_the_package_carries_the_user_agent_it_claims(doc):
     """The document says the requests to the law sources name CookieRadar and this
     repository. They all go through fetch_html, the only place that calls an
