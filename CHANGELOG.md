@@ -12,6 +12,17 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Security
+
+- **certifi 2026.10.19** in `uv.lock`, from 2026.7.22. The older bundle trusts emSign root CAs whose
+  intermediate CA keys were compromised (GHSA-6q48-6c7w-9gw2, critical, published 2026-10-20);
+  2026.10.19 is the release the advisory names as fixed. The Security Posture gate stopped every pull
+  request on it.
+- **expat CVE-2026-115506 accepted in `SECURITY-EXCEPTIONS.toml`** (SNYK-DEBIAN13-EXPAT-21479164,
+  reported on 2026-10-23, review by 2026-11-30). A denial of service through entity amplification,
+  unfixed in Debian and upstream; in the image the system libexpat1 only reads fontconfig's and Mesa's
+  own files, and cookieradar parses no XML.
+
 ## [2026.45] - 2026-10-17
 
 ### Added
