@@ -56,7 +56,7 @@ def _fake_fetch(suffix=""):
         return {
             ref: Provision.from_text(ref, f"{act.name} {ref}{suffix}", stamp, act.celex)
             for ref in refs if ref.split("(")[0] in articles
-        }
+        }, "Cellar"
 
     fake.calls = calls
     return fake
@@ -70,7 +70,7 @@ def cache(tmp_path):
 @pytest.fixture
 def online(monkeypatch):
     fake = _fake_fetch()
-    monkeypatch.setattr(law_fetcher, "fetch_provisions", fake)
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", fake)
     return fake.calls
 
 
@@ -281,7 +281,7 @@ def test_one_act_offline_other_online(cache, monkeypatch):
             raise LawFetchError("EUR-Lex answered HTTP 503")
         return online(act, articles, now=now)
 
-    monkeypatch.setattr(law_fetcher, "fetch_provisions", eprivacy_down)
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", eprivacy_down)
     law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
 
     assert [(s.act, s.source) for s in law.acts] == [
@@ -293,9 +293,9 @@ def test_one_act_offline_other_online(cache, monkeypatch):
 
 
 def test_changed_eprivacy_text_is_reported_by_act(cache, monkeypatch):
-    monkeypatch.setattr(law_fetcher, "fetch_provisions", _fake_fetch())
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _fake_fetch())
     first = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
-    monkeypatch.setattr(law_fetcher, "fetch_provisions", _fake_fetch(" (modificato)"))
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _fake_fetch(" (modificato)"))
     law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY2)
 
     assert law.changed["ePrivacy dir. 2002/58/CE art. 5(3)"] == first.citations[1].sha256
