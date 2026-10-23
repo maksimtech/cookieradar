@@ -171,6 +171,25 @@ where = "expat, Chromium dependency"
 why = "The same expat flaw as SNYK-DEBIAN13-EXPAT-20514789, reported by the other scanner."
 review_by = "2026-11-30"
 
+[[exception]]
+id = "SNYK-DEBIAN13-EXPAT-21479164"
+source = "Snyk Container"
+where = "expat, Chromium dependency"
+why = """
+CVE-2026-115506, reported on 2026-10-23: the billion-laughs protection \
+(accountingDiffTolerated() in xmlparse.c) detects entity amplification too \
+late, so a moderately sized XML document with a large DTD costs tens of seconds \
+of CPU per parse. A denial of service, nothing read or written. Unfixed \
+everywhere on 2026-10-23: the Debian tracker lists bookworm, trixie (2.8.3 and \
+trixie-security 2.9.0-1~deb13u1), forky and sid as vulnerable, and upstream \
+the fix is libexpat PR 1433, not released. Not reachable here, for the reasons \
+given for SNYK-DEBIAN13-EXPAT-20514789: the system libexpat1 is loaded by \
+fontconfig and Mesa for their own local configuration files, CPython's pyexpat \
+carries its own copy, and cookieradar parses no XML; no document from an \
+audited site reaches it.
+"""
+review_by = "2026-11-30"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # gnutls28 and krb5, reported by Docker Scout on 2026-10-09 against 2026.43, five
 # ids and no Snyk twin. Neither library is in python:3.12-slim-trixie: both come
