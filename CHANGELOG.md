@@ -12,6 +12,8 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+## [2026.46] - 2026-10-23
+
 ### Security
 
 - **certifi 2026.10.19** in `uv.lock`, from 2026.7.22. The older bundle trusts emSign root CAs whose
@@ -944,7 +946,8 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.45...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.46...HEAD
+[2026.46]: https://github.com/maksimtech/cookieradar/compare/v2026.45...v2026.46
 [2026.45]: https://github.com/maksimtech/cookieradar/compare/v2026.44...v2026.45
 [2026.44]: https://github.com/maksimtech/cookieradar/compare/v2026.43...v2026.44
 [2026.43]: https://github.com/maksimtech/cookieradar/compare/v2026.42...v2026.43
