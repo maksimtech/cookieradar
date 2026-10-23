@@ -12,6 +12,15 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Fixed
+
+- **A verified text names the source it came from.** EU acts are downloaded from Cellar
+  (publications.europa.eu), with EUR-Lex only as the fallback, but the report said "verified against
+  EUR-Lex" whichever answered (open item of the 2026-10-17 audit). It now says Cellar, EUR-Lex or
+  Normattiva, as the case was; `law_checker.check` takes an optional HTTP client, so the path is tested
+  on recorded answers. `law_fetcher` stays the only module that imports httpx at run time
+  (`test_nis2_evidence` now tells a type-checking import from a real one).
+
 ## [2026.45] - 2026-10-17
 
 ### Added

@@ -97,6 +97,8 @@ def test_violation_is_an_unfair_practice_and_invalid_consent(eurlex):
     assert "Provision applied: Codice del Consumo D.Lgs. 206/2005 art. 21\n" in out.output
     assert f"SHA256: {_sha(FIXTURES / 'normattiva_cdc_art21.html', ('21',), '21')}" in out.output
     assert "verified against Normattiva" in out.output
+    assert "GDPR: verified against Cellar (CELEX 32016R0679)" in out.output
+    assert "EUR-Lex" not in out.output
     assert "Consent not valid" in out.output
     assert "Provision applied: Contenuti digitali dir. 2019/770 art. 3(8)" in out.output
     assert f"SHA256: {_sha(DIGITAL_CONTENT_PAGE, ('3',), '3(8)')}" in out.output

@@ -230,11 +230,11 @@ def test_nothing_is_fetched_or_cached_when_nothing_is_cited(tmp_path):
 
 @reads_source
 def test_the_law_sources_are_given_the_act_and_never_the_site():
-    """The URLs of the law sources are built inside fetch_provisions, from the act
-    and the article numbers it is handed: nothing about the audited site can
+    """The URLs of the law sources are built inside fetch_provisions_from, from the
+    act and the article numbers it is handed: nothing about the audited site can
     reach them. law_checker calls nothing else of law_fetcher that downloads."""
-    parameters = set(inspect.signature(law_fetcher.fetch_provisions).parameters)
-    assert parameters == {"act", "articles", "lang", "now", "client"}
+    for fetch in (law_fetcher.fetch_provisions, law_fetcher.fetch_provisions_from):
+        assert set(inspect.signature(fetch).parameters) == {"act", "articles", "lang", "now", "client"}
 
     tree = ast.parse((PACKAGE / "law_checker.py").read_text(encoding="utf-8"))
     used = {
@@ -242,7 +242,7 @@ def test_the_law_sources_are_given_the_act_and_never_the_site():
         for node in ast.walk(tree)
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "law_fetcher"
     }
-    assert used == {"fetch_provisions", "utc_stamp"}
+    assert used == {"fetch_provisions_from", "utc_stamp"}
 
 
 @reads_source
@@ -546,8 +546,41 @@ def test_every_request_of_the_package_carries_the_user_agent_it_claims(doc):
     assert "client.get(target, headers=headers, follow_redirects=False)" in helper
     for path in sorted(PACKAGE.rglob("*.py")):
         if path.name != "law_fetcher.py":
-            assert not re.search(r"^\s*(?:import|from)\s+httpx\b", path.read_text(encoding="utf-8"), re.M), path.name
+            assert not runtime_imports_of("httpx", path), path.name
     assert "`HeadlessChrome`" in doc
+
+
+def runtime_imports_of(module: str, path: Path) -> list[int]:
+    """Lines importing `module` that run. An import under `if TYPE_CHECKING:` is only
+    for the type checker (law_checker names httpx.Client in an annotation): it never
+    executes, so it sends nothing."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    type_only = {
+        id(node)
+        for block in ast.walk(tree)
+        if isinstance(block, ast.If) and isinstance(block.test, ast.Name) and block.test.id == "TYPE_CHECKING"
+        for stmt in block.body
+        for node in ast.walk(stmt)
+    }
+    return [
+        node.lineno
+        for node in ast.walk(tree)
+        if id(node) not in type_only
+        and (
+            (isinstance(node, ast.Import) and any(alias.name.split(".")[0] == module for alias in node.names))
+            or (isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] == module)
+        )
+    ]
+
+
+def test_an_import_for_the_type_checker_only_is_not_a_runtime_import(tmp_path):
+    """The helper above is what lets law_checker name httpx.Client; it must still see a real import."""
+    typed = tmp_path / "typed.py"
+    typed.write_text("from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    import httpx\n", encoding="utf-8")
+    real = tmp_path / "real.py"
+    real.write_text("import json\nimport httpx\nfrom httpx import Client\n", encoding="utf-8")
+    assert runtime_imports_of("httpx", typed) == []
+    assert runtime_imports_of("httpx", real) == [2, 3]
 
 
 def test_the_document_says_what_the_image_evidence_leaves_out(doc):
