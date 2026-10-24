@@ -12,6 +12,11 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Security
+
+- **The harfbuzz exception also covers Docker Scout's report of the same flaw** (CVE-2026-113679),
+  which appeared once the 2026.46 image was published; same reasons as SNYK-DEBIAN13-HARFBUZZ-21663516.
+
 ## [2026.46] - 2026-10-23
 
 ### Security
