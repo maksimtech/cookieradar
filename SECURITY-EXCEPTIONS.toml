@@ -190,6 +190,24 @@ audited site reaches it.
 """
 review_by = "2026-11-30"
 
+[[exception]]
+id = "SNYK-DEBIAN13-HARFBUZZ-21663516"
+source = "Snyk Container"
+where = "harfbuzz, Chromium dependency"
+why = """
+CVE-2026-113679, reported on 2026-10-24: an out-of-bounds write in HarfBuzz's \
+experimental WebAssembly shaper (font_glyph_to_string has a wrong WAMR \
+signature), reached through a crafted font carrying a wasm module. Fixed \
+upstream in 15.0.0, unfixed in Debian. The code is not in this image: the \
+shaper exists only when HarfBuzz is built with the `wasm` option, which is \
+`disabled` by default in 10.2.0 (meson.options), and Debian builds trixie's \
+10.2.0-1+deb13u1 with -Dauto_features=enabled, which turns on `auto` options \
+only; libharfbuzz0b depends on libc6, freetype, glib and graphite2 and not on \
+the WAMR runtime the shaper needs. Snyk matches the version, not the build. \
+Checked on sources.debian.org and packages.debian.org on 2026-10-24.
+"""
+review_by = "2026-11-30"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # gnutls28 and krb5, reported by Docker Scout on 2026-10-09 against 2026.43, five
 # ids and no Snyk twin. Neither library is in python:3.12-slim-trixie: both come
