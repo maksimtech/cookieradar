@@ -24,6 +24,10 @@ no version in this file has ever matched — 40 is not a month, and
   reported on 2026-10-23, review by 2026-11-30). A denial of service through entity amplification,
   unfixed in Debian and upstream; in the image the system libexpat1 only reads fontconfig's and Mesa's
   own files, and cookieradar parses no XML.
+- **harfbuzz CVE-2026-113679 accepted in `SECURITY-EXCEPTIONS.toml`** (SNYK-DEBIAN13-HARFBUZZ-21663516,
+  reported on 2026-10-24, review by 2026-11-30). The flaw is in HarfBuzz's experimental WebAssembly
+  shaper, which Debian does not build: the `wasm` option is disabled in 10.2.0 and libharfbuzz0b has no
+  WAMR runtime among its dependencies.
 
 ### Fixed
 
