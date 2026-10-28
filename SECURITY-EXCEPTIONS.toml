@@ -145,6 +145,30 @@ why = "The same expat flaw as SNYK-DEBIAN13-EXPAT-19964593, reported by the othe
 review_by = "2026-11-30"
 
 [[exception]]
+id = "CVE-2026-118370"
+source = "Docker Scout"
+where = "expat 2.9.0-1~deb13u1, Chromium dependency"
+why = """
+Signed integer overflow in storeAtts() with oversized attribute counts, which \
+takes a multi-gigabyte start tag. Unfixed in every Debian suite on 2026-10-28 — \
+bookworm, trixie (2.9.0-1~deb13u1 from trixie-security included), forky and sid — \
+Debian bug 1152337. Nothing to install yet; review when the bug closes.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-117610"
+source = "Docker Scout"
+where = "expat 2.9.0-1~deb13u1, Chromium dependency"
+why = """
+NULL pointer dereference in externalEntityInitProcessor2() on an empty first \
+chunk, which needs control over how the input is split into parse calls. Unfixed \
+in every Debian suite on 2026-10-28 — bookworm, trixie (2.9.0-1~deb13u1 included), \
+forky and sid — Debian bug 1152343. Nothing to install yet; review when the bug closes.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
 id = "SNYK-DEBIAN13-EXPAT-20514789"
 source = "Snyk Container"
 where = "expat 2.8.3-1~deb13u1, Chromium dependency"
