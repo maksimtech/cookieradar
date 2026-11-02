@@ -22,6 +22,15 @@ no version in this file has ever matched — 40 is not a month, and
   quota. The Snyk-sourced entries left `SECURITY-EXCEPTIONS.toml`, their reasons moving into the entries
   of the scanners that still report the same CVEs; `tests/test_trivy_workflow.py` holds the image scan,
   and `tests/test_workflow_set.py` keeps `snyk.yml` retired.
+  Its first run reported the nine base-image CVEs the other Radar record (util-linux ×4, ncurses,
+  systemd, perl, sqlite3, acl), to wait for Debian, and seventeen in Chromium's and the virtual
+  display's dependencies: libxml2 ×8 (CVE-2026-6653 critical), cups ×2, the X.Org server behind Xvfb ×5,
+  libX11 and libXrender. Each entry says, measured in the published image, why it is not reached: Chromium
+  does not link libxml2, the image has the cups client library and no print server, Xvfb is never
+  started and headless Chromium talks to no X server. The fix-elsewhere ones keep a short review date
+  and the Debian bug to ask on. The Snyk entries' reasons moved to the Docker Scout and Trivy entries of
+  the same CVEs; expat CVE-2026-115506, which only Snyk reported, is noted in the header. With them, the
+  three sqlite3 CVEs Docker Scout raised on `main` on 2026-11-02, which had turned Security Posture red.
 
 ### Fixed
 
