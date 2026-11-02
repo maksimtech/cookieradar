@@ -15,9 +15,8 @@ a fix ships as the next release, never as a patch to an older one.
 ## How vulnerabilities are found
 
 - **CodeQL, Bandit and Trivy** (repository files) run on every pull request, on
-  every push to `main` and weekly.
-- **Snyk** checks the code, the Python dependencies and an image built from the
-  source on every pull request and push to `main`.
+  every push to `main` and weekly. Trivy also scans the image built from the
+  Dockerfile of the pull request, before it is merged.
 - **Docker Scout** checks the published `latest` image on every push to `main` and
   weekly. The image is built on `python:3.12-slim-trixie` (Debian Trixie) when a
   release is cut, with the Debian updates available then; it is not rebuilt between
