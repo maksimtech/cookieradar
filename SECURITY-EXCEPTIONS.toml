@@ -40,108 +40,62 @@
 #
 # The dates are short on purpose. A fix that exists should not sit behind a
 # year-long acceptance.
+#
+# Until 2026-11-02 Snyk Container reported most of these too, under its own ids;
+# Snyk was retired that day (tests/test_workflow_set.py, RETIRED) and Trivy's
+# image scan reports them by CVE. The reasons that lived in the Snyk entries are
+# in the Docker Scout and Trivy entries now. One flaw has no entry left and is
+# still in the image: expat CVE-2026-115506 (billion-laughs protection that
+# detects entity amplification too late, a denial of service; unfixed in every
+# suite, upstream libexpat PR 1433), which only Snyk reported. If a scanner
+# reports it again, its reason is CVE-2026-77214's below: the system libexpat1 is
+# loaded by fontconfig and Mesa for their own configuration files, CPython's
+# pyexpat carries its own copy, and cookieradar parses no XML.
 # ─────────────────────────────────────────────────────────────────────────────
-
-[[exception]]
-id = "SNYK-DEBIAN13-LIBXML2-19669394"
-source = "Snyk Container"
-where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
-why = """
-CVE-2026-74860. Fixed in sid and forky (2.15.3+dfsg-1), open in trixie, no \
-no-dsa — so a stable update is the thing to ask for. This is the one libxml2 CVE \
-of the seven with no Debian bug of its own; the others sit on bug 1146744.
-"""
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-LIBXML2-19540237"
-source = "Snyk Container"
-where = "libxml2, Chromium dependency"
-why = "CVE-2026-86138 — fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744."
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-LIBXML2-19540216"
-source = "Snyk Container"
-where = "libxml2, Chromium dependency"
-why = "CVE-2026-86139 — fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744."
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-LIBXML2-19540223"
-source = "Snyk Container"
-where = "libxml2, Chromium dependency"
-why = "CVE-2026-86140 — fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744."
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-LIBXML2-19540224"
-source = "Snyk Container"
-where = "libxml2, Chromium dependency"
-why = "CVE-2026-86142 — fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744."
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-LIBXML2-19540211"
-source = "Snyk Container"
-where = "libxml2, Chromium dependency"
-why = """
-CVE-2026-86143 — an integer overflow check missing before a write callback in \
-xmlIO, fixed upstream in 2.15.4. Fixed in sid/forky 2.15.4+dfsg-1, open in \
-trixie, Debian bug 1146744.
-"""
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-LIBXML2-19540226"
-source = "Snyk Container"
-where = "libxml2, Chromium dependency"
-why = "CVE-2026-86144 — fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744."
-review_by = "2026-11-30"
 
 [[exception]]
 id = "CVE-2026-74860"
 source = "Docker Scout"
-where = "libxml2, Chromium dependency"
-why = "The same libxml2 flaw as SNYK-DEBIAN13-LIBXML2-19669394, reported by the other scanner."
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+Fixed in sid and forky (2.15.3+dfsg-1), open in trixie, no no-dsa — so a \
+stable update is the thing to ask for. The one libxml2 CVE of the seven with \
+no Debian bug of its own; the others sit on bug 1146744.
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`). Recorded under Snyk's id SNYK-DEBIAN13-LIBXML2-19669394 too, \
+until Snyk was retired on 2026-11-02.
+"""
 review_by = "2026-11-30"
 
 [[exception]]
 id = "CVE-2026-86140"
 source = "Docker Scout"
-where = "libxml2, Chromium dependency"
-why = "The same libxml2 flaw as SNYK-DEBIAN13-LIBXML2-19540223, reported by the other scanner."
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-CUPS-15930975"
-source = "Snyk Container"
-where = "cups 2.4.10-3+deb13u2, Chromium dependency"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
 why = """
-CVE-2026-34980, improper input validation. Fixed in sid and forky (2.4.17-1), \
-open in trixie, no no-dsa — Debian bug 1132716, and a stable update is what to \
-ask for.
+Fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744.
 
-Chromium wants cups for printing. cookieradar drives it headless and never \
-prints, so the code is present and not reached.
-"""
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-EXPAT-19964593"
-source = "Snyk Container"
-where = "expat 2.8.3-1~deb13u1, Chromium dependency"
-why = """
-CVE-2026-93990, improper handling of Unicode encoding. Fixed in sid and forky \
-(2.8.4-2), open in trixie, no no-dsa — Debian bug 1148665.
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`). Recorded under Snyk's id SNYK-DEBIAN13-LIBXML2-19540223 too, \
+until Snyk was retired on 2026-11-02.
 """
 review_by = "2026-11-30"
 
 [[exception]]
 id = "CVE-2026-93990"
 source = "Docker Scout"
-where = "expat, Chromium dependency"
-why = "The same expat flaw as SNYK-DEBIAN13-EXPAT-19964593, reported by the other scanner."
+where = "expat 2.8.3-1~deb13u1, Chromium dependency"
+why = """
+Improper handling of Unicode encoding. Fixed in sid and forky (2.8.4-2), open \
+in trixie, no no-dsa — Debian bug 1148665. Recorded under Snyk's id \
+SNYK-DEBIAN13-EXPAT-19964593 too, until Snyk was retired on 2026-11-02.
+"""
 review_by = "2026-11-30"
 
 [[exception]]
@@ -169,74 +123,46 @@ forky and sid — Debian bug 1152343. Nothing to install yet; review when the bu
 review_by = "2026-11-30"
 
 [[exception]]
-id = "SNYK-DEBIAN13-EXPAT-20514789"
-source = "Snyk Container"
+id = "CVE-2026-77214"
+source = "Docker Scout"
 where = "expat 2.8.3-1~deb13u1, Chromium dependency"
 why = """
 Heap over-read in XML_ParseBuffer when the caller passes a length past the \
-buffer it got from XML_GetBuffer (CVE-2026-77214). Fixed in sid only \
-(2.9.0-1, upstream R_2_9_0, libexpat PR 1393); open in trixie, bookworm and \
-forky, no no-dsa. `patchradar debian` on 2026-10-08 found no Debian bug and \
-said to ask for the stable update: filed the same day as Debian bug 1150320 \
-(severity important, tags security fixed-upstream, forwarded to the maintainer \
-and team@security.debian.org), naming sid 2.9.0-1. In this image the system \
-libexpat1 is loaded by \
-fontconfig and Mesa (libgbm, libGLX_mesa, gallium), for their own \
-configuration files; CPython's pyexpat carries its own copy and cookieradar \
-parses no XML. Checked in python:3.12-slim-trixie after `playwright \
-install-deps chromium`.
-"""
-review_by = "2026-11-30"
+buffer it got from XML_GetBuffer. Fixed in sid only (2.9.0-1, upstream \
+R_2_9_0, libexpat PR 1393); open in trixie, bookworm and forky, no no-dsa. \
+`patchradar debian` on 2026-10-08 found no Debian bug and said to ask for the \
+stable update: filed the same day as Debian bug 1150320 (severity important, \
+tags security fixed-upstream, forwarded to the maintainer and \
+team@security.debian.org), naming sid 2.9.0-1.
 
-[[exception]]
-id = "CVE-2026-77214"
-source = "Docker Scout"
-where = "expat, Chromium dependency"
-why = "The same expat flaw as SNYK-DEBIAN13-EXPAT-20514789, reported by the other scanner."
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-EXPAT-21479164"
-source = "Snyk Container"
-where = "expat, Chromium dependency"
-why = """
-CVE-2026-115506, reported on 2026-10-23: the billion-laughs protection \
-(accountingDiffTolerated() in xmlparse.c) detects entity amplification too \
-late, so a moderately sized XML document with a large DTD costs tens of seconds \
-of CPU per parse. A denial of service, nothing read or written. Unfixed \
-everywhere on 2026-10-23: the Debian tracker lists bookworm, trixie (2.8.3 and \
-trixie-security 2.9.0-1~deb13u1), forky and sid as vulnerable, and upstream \
-the fix is libexpat PR 1433, not released. Not reachable here, for the reasons \
-given for SNYK-DEBIAN13-EXPAT-20514789: the system libexpat1 is loaded by \
-fontconfig and Mesa for their own local configuration files, CPython's pyexpat \
-carries its own copy, and cookieradar parses no XML; no document from an \
-audited site reaches it.
-"""
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-HARFBUZZ-21663516"
-source = "Snyk Container"
-where = "harfbuzz, Chromium dependency"
-why = """
-CVE-2026-113679, reported on 2026-10-24: an out-of-bounds write in HarfBuzz's \
-experimental WebAssembly shaper (font_glyph_to_string has a wrong WAMR \
-signature), reached through a crafted font carrying a wasm module. Fixed \
-upstream in 15.0.0, unfixed in Debian. The code is not in this image: the \
-shaper exists only when HarfBuzz is built with the `wasm` option, which is \
-`disabled` by default in 10.2.0 (meson.options), and Debian builds trixie's \
-10.2.0-1+deb13u1 with -Dauto_features=enabled, which turns on `auto` options \
-only; libharfbuzz0b depends on libc6, freetype, glib and graphite2 and not on \
-the WAMR runtime the shaper needs. Snyk matches the version, not the build. \
-Checked on sources.debian.org and packages.debian.org on 2026-10-24.
+In this image the system libexpat1 is loaded by fontconfig and Mesa (libgbm, \
+libGLX_mesa, gallium), for their own configuration files; CPython's pyexpat \
+carries its own copy and cookieradar parses no XML. Checked in \
+python:3.12-slim-trixie after `playwright install-deps chromium`. Recorded \
+under Snyk's id SNYK-DEBIAN13-EXPAT-20514789 too, until Snyk was retired on \
+2026-11-02.
 """
 review_by = "2026-11-30"
 
 [[exception]]
 id = "CVE-2026-113679"
 source = "Docker Scout"
-where = "harfbuzz, Chromium dependency"
-why = "The same harfbuzz flaw as SNYK-DEBIAN13-HARFBUZZ-21663516, reported by the other scanner once the 2026.46 image was published."
+where = "harfbuzz 10.2.0-1+deb13u1, Chromium dependency"
+why = """
+An out-of-bounds write in HarfBuzz's experimental WebAssembly shaper \
+(font_glyph_to_string has a wrong WAMR signature), reached through a crafted \
+font carrying a wasm module. Fixed upstream in 15.0.0, unfixed in Debian.
+
+The code is not in this image: the shaper exists only when HarfBuzz is built \
+with the `wasm` option, which is `disabled` by default in 10.2.0 \
+(meson.options), and Debian builds trixie's 10.2.0-1+deb13u1 with \
+-Dauto_features=enabled, which turns on `auto` options only; libharfbuzz0b \
+depends on libc6, freetype, glib and graphite2 and not on the WAMR runtime the \
+shaper needs. The scanners match the version, not the build. Checked on \
+sources.debian.org and packages.debian.org on 2026-10-24. Reported by Docker \
+Scout once the 2026.46 image was published, and by Snyk as \
+SNYK-DEBIAN13-HARFBUZZ-21663516 until it was retired on 2026-11-02.
+"""
 review_by = "2026-11-30"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -413,6 +339,13 @@ review_by = "2026-11-30"
 #   attr, acl    already fixed in unstable, filed no-dsa for trixie *because the
 #                fix comes in a point release*. That waiting ends at a dated
 #                event: rebuild after it.
+#
+# attr has no entry since 2026-11-02, and not because it was fixed: Snyk was the
+# only scanner reporting CVE-2026-54371 (Debian bug 1141107, fixed in unstable
+# and forky at 1:2.6.0-1, a symlink traversal in recursive getfattr/setfattr,
+# which cookieradar never runs), and Snyk was retired that day. It is still in
+# the image until the trixie point release. acl is reported by Trivy now; its
+# entry is in the Trivy block at the end of this file.
 # ─────────────────────────────────────────────────────────────────────────────
 
 [[exception]]
@@ -431,13 +364,6 @@ responses from the sites it audits — which is the one place in the five Radar 
 where the input is genuinely third-party. That is a reason for the short review \
 habit, not for holding a release Debian cannot end.
 """
-review_by = "2026-12-31"
-
-[[exception]]
-id = "SNYK-DEBIAN13-ZLIB-19520500"
-source = "Snyk Container"
-where = "zlib, python slim-trixie base image"
-why = "The same zlib flaw as CVE-2026-85091 above, reported by the other scanner."
 review_by = "2026-12-31"
 
 [[exception]]
@@ -464,36 +390,6 @@ demonstrably present because a scanner fell silent is the one direction this fil
 must not drift in.
 """
 review_by = "2026-12-31"
-
-[[exception]]
-id = "SNYK-DEBIAN13-ATTR-17678182"
-source = "Snyk Container"
-where = "attr 1:2.5.2-3, python slim-trixie base image"
-why = """
-CVE-2026-54371, and not "no fix available" as the one-line report implies: \
-Debian has fixed it in unstable and forky (attr 1:2.6.0-1) and filed it no-dsa \
-for trixie with the note "Will be fixed first in unstable, then point release \
-update; not to be backported by individual patches" — Debian bug 1141107.
-
-The fix is scheduled, not absent, so the only thing to do is rebuild after the \
-next trixie point release. A symlink traversal in recursive getfattr/setfattr, \
-which cookieradar never runs.
-"""
-review_by = "2026-11-30"
-
-[[exception]]
-id = "SNYK-DEBIAN13-ACL-17677866"
-source = "Snyk Container"
-where = "acl 2.3.2-2, python slim-trixie base image"
-why = """
-CVE-2026-54369, Debian bug 1141110, in the same position as attr above: fixed in \
-unstable and forky (acl 2.4.0-1), no-dsa for trixie with the fix scheduled for a \
-point release. Debian's note says why it cannot be backported piecemeal — the \
-fix adds the `acl_*_at()` ABI of 2.4.0.
-
-A local TOCTOU in recursive setfacl/chacl; cookieradar calls neither.
-"""
-review_by = "2026-11-30"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CodeQL `py/incomplete-url-substring-sanitization`, eight alerts across two test
@@ -555,40 +451,10 @@ review_by = "2026-12-31"
 # rebuild happened: GitHub closed it at 2026-09-30T18:32:11Z, this repository's
 # republish, and the entry was removed on 2026-10-02. Its return would mean the
 # `apt-get upgrade` stopped taking, which is worth a build failing over. The gcc
-# one is below and is still open.
-# ─────────────────────────────────────────────────────────────────────────────
-
-[[exception]]
-id = "SNYK-DEBIAN13-GCC14-20335537"
-source = "Snyk Container"
-where = "gcc-14 / libstdc++6 14.2.0-19, python slim-trixie base image"
-why = """
-CVE-2026-102010. Open in trixie for both gcc-12 (12.4.0-5) and gcc-14 \
-(14.2.0-19), with no fixed version in any suite and no Debian bug recorded — \
-checked with `patchradar debian CVE-2026-102010`. So there is nothing to wait for \
-and nothing to ask for: what moves a flaw in this state is evidence on the \
-tracker page, https://security-tracker.debian.org/tracker/CVE-2026-102010.
-
-Nor is it removable. Snyk names the source package `gcc-14`, and what is actually \
-installed is `libstdc++6`, the C++ runtime that a long list of packages in the \
-base image link against. Removing it is not an option the way the full `perl` \
-would have been.
-
-Since 2026-10-07T20:13:19Z Snyk Container has stopped reporting it, which is why \
-the gate lists this entry as settled. It is kept, and the reason is not how long \
-the silence has lasted: `patchradar debian CVE-2026-102010` on 2026-10-15 still \
-reports gcc-14 no-dsa in trixie at 14.2.0-19, with the fix only in sid \
-(14.4.0-3). The package named in `where` is still unfixed in trixie and only the \
-reporting changed. Deleting a flaw that is demonstrably present because a \
-scanner fell silent is the one direction this file must not drift in.
-"""
-review_by = "2026-12-31"
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# gcc, reported on 2026-10-02 by both scanners under different ids. The gate
-# matches by id, so one flaw needs an entry per scanner — zlib has been in that
-# position since September.
+# one, CVE-2026-102010, is below with CVE-2026-95619, which followed on
+# 2026-10-02. Until 2026-11-02 each had a second entry under Snyk's id
+# (SNYK-DEBIAN13-GCC14-20335537, -20386241); Snyk was retired that day, and what
+# those entries said lives on in the Docker Scout entries below.
 #
 # Positions read with `patchradar debian` rather than from the scanners' one line:
 # CVE-2026-102010 and CVE-2026-95619 are both open in trixie for gcc-12 (12.4.0-5)
@@ -596,7 +462,7 @@ review_by = "2026-12-31"
 # recorded. Nothing to wait for and nothing to ask for; evidence goes on the
 # tracker page.
 #
-# What Snyk names is the *source* package gcc-14, and Debian's gcc source produces
+# What the scanners name is the *source* package gcc-14, and Debian's gcc source produces
 # both the compiler and libstdc++6. A flaw in cc1 needs something to compile and
 # nothing in this image compiles anything; which binary package is installed is a
 # measurement and not an assumption, which is why tests/docker/inspect.sh prints
@@ -608,10 +474,15 @@ id = "CVE-2026-102010"
 source = "Docker Scout"
 where = "gcc-14 / libstdc++6 14.2.0-19, python slim-trixie base image"
 why = """
-The flaw also reported as SNYK-DEBIAN13-GCC14-20335537, under the other scanner's \
-id. Open in trixie for gcc-12 and gcc-14, no fixed version in any suite, no Debian \
-bug — `patchradar debian CVE-2026-102010`. Evidence goes on \
+Open in trixie for gcc-12 (12.4.0-5) and gcc-14 (14.2.0-19), no fixed version in \
+any suite, no Debian bug — `patchradar debian CVE-2026-102010`. Evidence goes on \
 https://security-tracker.debian.org/tracker/CVE-2026-102010.
+
+Nor is it removable. The scanners name the source package `gcc-14`, and what is \
+actually installed is `libstdc++6`, the C++ runtime that a long list of packages \
+in the base image link against. Removing it is not an option the way the full \
+`perl` would have been. Recorded under Snyk's id SNYK-DEBIAN13-GCC14-20335537 \
+too, until Snyk was retired on 2026-11-02.
 
 Since 2026-10-07T20:10:11Z Docker Scout has stopped reporting it, which is why \
 the gate lists this entry as settled. It is kept, and the reason is not how long \
@@ -624,16 +495,18 @@ scanner fell silent is the one direction this file must not drift in.
 review_by = "2026-12-31"
 
 [[exception]]
-id = "SNYK-DEBIAN13-GCC14-20386241"
-source = "Snyk Container"
+id = "CVE-2026-95619"
+source = "Docker Scout"
 where = "gcc-14 / libstdc++6 14.2.0-19, python slim-trixie base image"
 why = """
-CVE-2026-95619, an integer overflow in gcc-14, published on 2026-10-02. Read with \
+An integer overflow in gcc-14, published on 2026-10-02. Read with \
 `patchradar debian CVE-2026-95619`: open in trixie for gcc-12 (12.4.0-5) and \
 gcc-14 (14.2.0-19), no fixed version in any suite, no Debian bug recorded. \
-Evidence goes on https://security-tracker.debian.org/tracker/CVE-2026-95619.
+Evidence goes on https://security-tracker.debian.org/tracker/CVE-2026-95619. \
+Recorded under Snyk's id SNYK-DEBIAN13-GCC14-20386241 too, until Snyk was \
+retired on 2026-11-02.
 
-Since 2026-10-08T06:27:16Z Snyk Container has stopped reporting it, which is why \
+Since 2026-10-08T06:25:36Z Docker Scout has stopped reporting it, which is why \
 the gate lists this entry as settled. It is kept, and the reason is not how long \
 the silence has lasted: `patchradar debian CVE-2026-95619` on 2026-10-15 still \
 reports gcc-14 no-dsa in trixie at 14.2.0-19, with the fix only in sid \
@@ -643,19 +516,519 @@ scanner fell silent is the one direction this file must not drift in.
 """
 review_by = "2026-12-31"
 
-[[exception]]
-id = "CVE-2026-95619"
-source = "Docker Scout"
-where = "gcc-14 / libstdc++6 14.2.0-19, python slim-trixie base image"
-why = """
-The same flaw as SNYK-DEBIAN13-GCC14-20386241 above, under the other scanner's id.
+# ─────────────────────────────────────────────────────────────────────────────
+# Chromium's and the virtual display's dependencies as Trivy's image scan reports
+# them, from its first run on 2026-11-02, the day Snyk was retired. The libxml2
+# and cups reasons are the ones recorded above since 2026-09-29; the rest are
+# new, read with `patchradar debian` and measured in the published image. The
+# maintainer decided on 2026-11-02 that they are recorded rather than the image
+# reduced. fix-elsewhere ones keep the short date, no-dsa ones the year's end.
+# ─────────────────────────────────────────────────────────────────────────────
 
-Since 2026-10-08T06:25:36Z Docker Scout has stopped reporting it, which is why \
-the gate lists this entry as settled. It is kept, and the reason is not how long \
-the silence has lasted: `patchradar debian CVE-2026-95619` on 2026-10-15 still \
-reports gcc-14 no-dsa in trixie at 14.2.0-19, with the fix only in sid \
-(14.4.0-3). The package named in `where` is still unfixed in trixie and only the \
-reporting changed. Deleting a flaw that is demonstrably present because a \
-scanner fell silent is the one direction this file must not drift in.
+[[exception]]
+id = "CVE-2026-74860"
+source = "Trivy"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+Fixed in sid and forky (2.15.3+dfsg-1), open in trixie, no no-dsa — so a \
+stable update is the thing to ask for. The one libxml2 CVE of the seven with \
+no Debian bug of its own; the others sit on bug 1146744.
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-86138"
+source = "Trivy"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+Fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744.
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-86139"
+source = "Trivy"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+Fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744.
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-86140"
+source = "Trivy"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+Fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744.
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-86142"
+source = "Trivy"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+Fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744.
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-86143"
+source = "Trivy"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+An integer overflow check missing before a write callback in xmlIO, fixed \
+upstream in 2.15.4. Fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian \
+bug 1146744.
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-86144"
+source = "Trivy"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+Fixed in sid/forky 2.15.4+dfsg-1, open in trixie, Debian bug 1146744.
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-6653"
+source = "Trivy"
+where = "libxml2 2.12.7+dfsg+really2.9.14-2.1+deb13u3, Chromium dependency"
+why = """
+Critical for Trivy: a use after free in xmlParseInternalSubset, through \
+improper entity resolution (OSV). Debian: no-dsa for trixie, "Minor issue", \
+fixed in sid and forky (2.14.5+dfsg-0.1) and not to be carried into trixie, no \
+Debian bug — so the stable update has already been answered; evidence goes on \
+https://security-tracker.debian.org/tracker/CVE-2026-6653 (`patchradar \
+debian`, 2026-11-02).
+
+Chromium does not link libxml2, and the only installed package that depends on \
+it is libllvm19, Mesa's software renderer; cookieradar's Python code parses no \
+XML — measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on \
+Playwright's chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends \
+--installed`). It needs this library to parse a document with an internal \
+subset, and nothing cookieradar runs hands it one.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-34980"
+source = "Trivy"
+where = "cups 2.4.10-3+deb13u2 (libcups2t64), Chromium dependency"
+why = """
+Improper input validation. Fixed in sid and forky (2.4.17-1), open in trixie, \
+no no-dsa — Debian bug 1132716, and a stable update is what to ask for.
+
+Chromium links libcups for printing. cookieradar drives it headless and never \
+prints, so the code is present and not reached. Recorded since 2026-09-29, \
+under Snyk's id SNYK-DEBIAN13-CUPS-15930975 until Snyk was retired on \
+2026-11-02.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-55453"
+source = "Trivy"
+where = "cups 2.4.10-3+deb13u2 (libcups2t64), Chromium dependency"
+why = """
+A status-line injection in CUPS's ipp backend that can update a queue's PPD \
+and lead to code execution as lp through foomatic-rip (OSV). Fixed in sid \
+(2.4.20-1), open in trixie, fix-elsewhere — ask for a stable update on Debian \
+bug 1150560 (`patchradar debian`, 2026-11-02).
+
+The flaw is in the print server, and the image carries only the client library \
+libcups2t64: no cupsd, nothing in /usr/lib/cups/backend, no foomatic — \
+measured in maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on Playwright's \
+chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-88812"
+source = "Trivy"
+where = "xorg-server 2:21.1.16-1.3+deb13u4 (xserver-common, xvfb), Chromium dependency"
+why = """
+In the X.Org server, a double free in XKB SetGeometry text doodads (OSV). \
+Fixed in sid and forky (2:21.1.25-1), open in trixie, fix-elsewhere — a stable \
+update is what to ask for, on Debian bug 1150214 (`patchradar debian`, \
+2026-11-02).
+
+Xvfb is in the image because `playwright install-deps chromium` installs it \
+for headed runs, and it is never started: the entrypoint is cookieradar, \
+DISPLAY is unset, and Chromium runs headless unless --no-headless is given, \
+which needs a display the container does not provide — measured in \
+maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on Playwright's \
+chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`). The \
+flaw needs a client connected to a running X server.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-93516"
+source = "Trivy"
+where = "xorg-server 2:21.1.16-1.3+deb13u4 (xserver-common, xvfb), Chromium dependency"
+why = """
+In the X.Org server, a use after free in XInput passive grabs (OSV). Fixed in \
+sid and forky (2:21.1.25-1), open in trixie, fix-elsewhere — a stable update \
+is what to ask for, on Debian bug 1150214 (`patchradar debian`, 2026-11-02).
+
+Xvfb is in the image because `playwright install-deps chromium` installs it \
+for headed runs, and it is never started: the entrypoint is cookieradar, \
+DISPLAY is unset, and Chromium runs headless unless --no-headless is given, \
+which needs a display the container does not provide — measured in \
+maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on Playwright's \
+chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`). The \
+flaw needs a client connected to a running X server.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-93521"
+source = "Trivy"
+where = "xorg-server 2:21.1.16-1.3+deb13u4 (xserver-common, xvfb), Chromium dependency"
+why = """
+In the X.Org server, a heap buffer overflow in RandR ChangeProviderProperty \
+(OSV). Fixed in sid and forky (2:21.1.25-1), open in trixie, fix-elsewhere — a \
+stable update is what to ask for, on Debian bug 1150214 (`patchradar debian`, \
+2026-11-02).
+
+Xvfb is in the image because `playwright install-deps chromium` installs it \
+for headed runs, and it is never started: the entrypoint is cookieradar, \
+DISPLAY is unset, and Chromium runs headless unless --no-headless is given, \
+which needs a display the container does not provide — measured in \
+maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on Playwright's \
+chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`). The \
+flaw needs a client connected to a running X server.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-93523"
+source = "Trivy"
+where = "xorg-server 2:21.1.16-1.3+deb13u4 (xserver-common, xvfb), Chromium dependency"
+why = """
+In the X.Org server, an out-of-bounds write in XInput2 PassiveUngrabDevice \
+(OSV). Fixed in sid and forky (2:21.1.25-1), open in trixie, fix-elsewhere — a \
+stable update is what to ask for, on Debian bug 1150214 (`patchradar debian`, \
+2026-11-02).
+
+Xvfb is in the image because `playwright install-deps chromium` installs it \
+for headed runs, and it is never started: the entrypoint is cookieradar, \
+DISPLAY is unset, and Chromium runs headless unless --no-headless is given, \
+which needs a display the container does not provide — measured in \
+maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on Playwright's \
+chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`). The \
+flaw needs a client connected to a running X server.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2023-5574"
+source = "Trivy"
+where = "xorg-server 2:21.1.16-1.3+deb13u4 (xserver-common, xvfb), Chromium dependency"
+why = """
+A use after free in Xvfb, only in a legacy multi-screen configuration with \
+multiple protocol screens (Zaphod mode) (OSV). Debian: no-dsa for trixie, \
+postponed, "Minor issue, revisit when fixed upstream", no fix in any suite; \
+evidence goes on Debian bug 1055426 (`patchradar debian`, 2026-11-02).
+
+Xvfb is in the image because `playwright install-deps chromium` installs it \
+for headed runs, and it is never started: the entrypoint is cookieradar, \
+DISPLAY is unset, and Chromium runs headless unless --no-headless is given, \
+which needs a display the container does not provide — measured in \
+maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on Playwright's \
+chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`). The \
+flaw needs a client connected to a running X server.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-88806"
+source = "Trivy"
+where = "libx11 2:1.8.12-1 (libx11-6, libx11-data, libx11-xcb1), Chromium dependency"
+why = """
+A heap buffer overflow in libX11's handling of an XkbGetMap reply (OSV). \
+Debian: no-dsa for trixie, "Minor issue", fixed in sid and forky (2:1.8.14-1) \
+and not to be carried into trixie; evidence goes on Debian bug 1148733 \
+(`patchradar debian`, 2026-11-02).
+
+Chromium links libX11, but the flaw is in reading a reply from an X server, \
+and headless Chromium connects to none — measured in \
+maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on Playwright's \
+chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`).
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-88807"
+source = "Trivy"
+where = "libxrender 1:0.9.12-1 (libxrender1), Chromium dependency"
+why = """
+A heap buffer overflow in libXrender's handling of a RenderQueryPictFormats \
+reply (OSV). Debian: no-dsa for trixie, "Minor issue", fixed in sid and forky \
+(1:0.9.13-1) and not to be carried into trixie; evidence goes on Debian bug \
+1148735 (`patchradar debian`, 2026-11-02).
+
+Chromium links libXrender, but the flaw is in reading a reply from an X \
+server, and headless Chromium connects to none — measured in \
+maksimtech/cookieradar:latest on 2026-11-02 (`ldd` on Playwright's \
+chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`).
+"""
+review_by = "2026-12-31"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# What Trivy's image scan reported on its first run here, 2026-11-02, the day
+# Snyk was retired (maksimtech/apkradar#54). The same Debian packages of the
+# python slim-trixie base image apkradar's first scan reported, none with a fix
+# in trixie and none in code cookieradar runs. The maintainer decided on 2026-11-02
+# that they wait for Debian's fixes, which the next release's rebuild picks up;
+# the Debian positions were read for apkradar that day and are the same
+# packages at the same versions here. The container runs as the unprivileged
+# user `cookieradar` (Dockerfile, USER) and its entrypoint is cookieradar itself.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-54369"
+source = "Trivy"
+where = "acl 2.3.2-2+b1 (libacl1), python slim-trixie base image"
+why = """
+Debian bug 1141110: fixed in unstable and forky (acl 2.4.0-1), no-dsa for trixie \
+with the fix scheduled for a point release. Debian's note says why it cannot be \
+backported piecemeal — the fix adds the `acl_*_at()` ABI of 2.4.0. Reported by \
+Snyk until it was retired on 2026-11-02; Trivy's image scan names it by CVE, and \
+the reason has not changed.
+
+The fix is scheduled, not absent, so the only thing to do is rebuild after the \
+next trixie point release. The date below is set for that. A local TOCTOU in \
+recursive setfacl/chacl; cookieradar calls neither.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-76642"
+source = "Trivy"
+where = "util-linux 2.41.5-0+deb13u1 (bsdutils, libblkid1, liblastlog2-2, libmount1, libsmartcols1, libuuid1, login, mount, util-linux), python slim-trixie base image"
+why = """
+libmount does not check the mount helper's exit status before running \
+post-mount hooks (X-mount.idmap, X-mount.owner), so an unprivileged user may run \
+privileged operations on existing filesystems. Debian tracker: no-dsa for trixie, \
+"Minor issue"; fixed in forky and sid (2.42.3-1); bookworm not affected (as read \
+for apkradar on 2026-11-02).
+
+Needs a local user running `mount` inside the container. cookieradar never mounts \
+anything. Like every finding in this block, it waits for Debian: `apt-get upgrade` runs at \
+build time, so the release after Debian ships a fix carries it, and the review \
+date is when to look at whether it has.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-78408"
+source = "Trivy"
+where = "util-linux 2.41.5-0+deb13u1 (bsdutils, libblkid1, liblastlog2-2, libmount1, libsmartcols1, libuuid1, login, mount, util-linux), python slim-trixie base image"
+why = """
+`nsenter --join-cgroup` opens cgroup.procs as root and keeps the descriptor \
+open across namespace, credential and execve() changes (Ubuntu's summary). Local.
+
+cookieradar never runs nsenter. Like every finding in this block, it waits for Debian: `apt-get upgrade` runs at \
+build time, so the release after Debian ships a fix carries it, and the review \
+date is when to look at whether it has.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-78409"
+source = "Trivy"
+where = "util-linux 2.41.5-0+deb13u1 (bsdutils, libblkid1, liblastlog2-2, libmount1, libsmartcols1, libuuid1, login, mount, util-linux), python slim-trixie base image"
+why = """
+The X-mount.subdir fast path on Linux 6.15+ passes the subdirectory to \
+open_tree() with AT_SYMLINK_NOFOLLOW, which does not stop intermediate symlink \
+traversal (Ubuntu's summary). Local, high attack complexity.
+
+cookieradar never mounts anything. Like every finding in this block, it waits for Debian: `apt-get upgrade` runs at \
+build time, so the release after Debian ships a fix carries it, and the review \
+date is when to look at whether it has.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-78410"
+source = "Trivy"
+where = "util-linux 2.41.5-0+deb13u1 (bsdutils, libblkid1, liblastlog2-2, libmount1, libsmartcols1, libuuid1, login, mount, util-linux), python slim-trixie base image"
+why = """
+Restricted bind mounts read the source path from fstab without pinning it before \
+the privileged mount, so a local user who can replace the source or a writable \
+ancestor may exploit it (Ubuntu's summary). Local.
+
+cookieradar never mounts anything and the image has no fstab entries of its own. \
+Like every finding in this block, it waits for Debian: `apt-get upgrade` runs at \
+build time, so the release after Debian ships a fix carries it, and the review \
+date is when to look at whether it has.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2025-69720"
+source = "Trivy"
+where = "ncurses 6.5+20250216-2 (libncursesw6, libtinfo6, ncurses-base, ncurses-bin), python slim-trixie base image"
+why = """
+A stack buffer overflow in `analyze_string` of the `infocmp` program (NVD), \
+fixed upstream in 6.5-20251213; trixie carries 6.5+20250216. Local, and it needs \
+someone to run infocmp on a crafted terminal description.
+
+cookieradar never runs infocmp; the libraries are in the image because Debian's own \
+tools link them. Like every finding in this block, it waits for Debian: `apt-get upgrade` runs at \
+build time, so the release after Debian ships a fix carries it, and the review \
+date is when to look at whether it has.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-16742"
+source = "Trivy"
+where = "systemd 257.13-1~deb13u1 (libsystemd0, libudev1), python slim-trixie base image"
+why = """
+A local privilege escalation in systemd-homed: a logged-in, homed-managed user \
+can be added to arbitrary system groups. Debian tracker: no-dsa for trixie, \
+"Minor issue"; fixed in forky (262-1) and sid.
+
+The image holds two systemd libraries and not systemd-homed, and no init system \
+runs in the container: the flaw's component is not there. Like every finding in this block, it waits for Debian: `apt-get upgrade` runs at \
+build time, so the release after Debian ships a fix carries it, and the review \
+date is when to look at whether it has.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-9538"
+source = "Trivy"
+where = "perl 5.40.1-6+deb13u1 (perl-base), python slim-trixie base image"
+why = """
+A crafted file can crash perl — a denial of service (Ubuntu USN-8684-1, which \
+fixes it; BellSoft fixes it in 5.40.4). Trixie has no fix per Trivy.
+
+perl-base is Essential in Debian — dpkg depends on it — and cannot be removed; \
+cookieradar is Python and never runs perl. Like every finding in this block, it waits for Debian: `apt-get upgrade` runs at \
+build time, so the release after Debian ships a fix carries it, and the review \
+date is when to look at whether it has.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-119373"
+source = "Trivy"
+where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
+why = """
+SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5MergeRowidLists() (OSV, 2026-11-02). One of the eleven sqlite3 \
+issues the Debian package tracker lists as open in both trixie and sid, so there is \
+no fixed version in any suite yet; the +deb13u2 in the image did not close it. \
+Docker Scout reports it too (below).
+
+libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
+Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
+checked on 2026-11-02). It waits for Debian, and the release after Debian \
+ships a fix carries it.
+"""
+review_by = "2026-12-31"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# sqlite3 as Docker Scout reports it on main, from 2026-11-02: three of the
+# eleven issues the Debian package tracker lists as open in trixie and sid.
+# The maintainer decided on 2026-11-02 that the sqlite3 findings wait for
+# Debian, on every Radar (apkradar#55 first).
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-119373"
+source = "Docker Scout"
+where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
+why = """
+SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5MergeRowidLists() (OSV, 2026-11-02). One of the eleven sqlite3 \
+issues the Debian package tracker lists as open in both trixie and sid, so there is \
+no fixed version in any suite yet; the +deb13u2 in the image did not close it. \
+The flaw recorded above under Trivy, reported by the other scanner.
+
+libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
+Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
+checked on 2026-11-02). It waits for Debian, and the release after Debian \
+ships a fix carries it.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-119374"
+source = "Docker Scout"
+where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
+why = """
+SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5DoSecureDelete() (OSV, 2026-11-02). One of the eleven sqlite3 \
+issues the Debian package tracker lists as open in both trixie and sid, so there is \
+no fixed version in any suite yet; the +deb13u2 in the image did not close it. \
+Reported by Docker Scout on the published image.
+
+libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
+Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
+checked on 2026-11-02). It waits for Debian, and the release after Debian \
+ships a fix carries it.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-119379"
+source = "Docker Scout"
+where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
+why = """
+SQLite before 3.54.0: a heap buffer overflow in the Session Extension, sessionUpdateFind() (OSV, 2026-11-02). One of the eleven sqlite3 \
+issues the Debian package tracker lists as open in both trixie and sid, so there is \
+no fixed version in any suite yet; the +deb13u2 in the image did not close it. \
+Reported by Docker Scout on the published image.
+
+libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
+Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
+checked on 2026-11-02). It waits for Debian, and the release after Debian \
+ships a fix carries it.
 """
 review_by = "2026-12-31"
