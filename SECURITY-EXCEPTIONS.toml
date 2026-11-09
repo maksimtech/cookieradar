@@ -44,13 +44,10 @@
 # Until 2026-11-02 Snyk Container reported most of these too, under its own ids;
 # Snyk was retired that day (tests/test_workflow_set.py, RETIRED) and Trivy's
 # image scan reports them by CVE. The reasons that lived in the Snyk entries are
-# in the Docker Scout and Trivy entries now. One flaw has no entry left and is
-# still in the image: expat CVE-2026-115506 (billion-laughs protection that
-# detects entity amplification too late, a denial of service; unfixed in every
-# suite, upstream libexpat PR 1433), which only Snyk reported. If a scanner
-# reports it again, its reason is CVE-2026-77214's below: the system libexpat1 is
-# loaded by fontconfig and Mesa for their own configuration files, CPython's
-# pyexpat carries its own copy, and cookieradar parses no XML.
+# in the Docker Scout and Trivy entries now. expat CVE-2026-115506, which only
+# Snyk reported then, Trivy reports since 2026-11-09: its entry is with the other
+# expat ones in the Chromium block, where the 2026-11-09 measurement found that
+# Chromium itself links the system libexpat.
 # ─────────────────────────────────────────────────────────────────────────────
 
 [[exception]]
@@ -103,10 +100,12 @@ id = "CVE-2026-118370"
 source = "Docker Scout"
 where = "expat 2.9.0-1~deb13u1, Chromium dependency"
 why = """
-Signed integer overflow in storeAtts() with oversized attribute counts, which \
-takes a multi-gigabyte start tag. Unfixed in every Debian suite on 2026-10-28 — \
-bookworm, trixie (2.9.0-1~deb13u1 from trixie-security included), forky and sid — \
-Debian bug 1152337. Nothing to install yet; review when the bug closes.
+libexpat through 2.9.0: a signed integer overflow in storeAtts() with \
+oversized attribute counts, which takes a multi-gigabyte start tag (OSV). \
+Debian: fixed in sid and forky (2.10.0-1), open in trixie with no no-dsa, so \
+a stable update is the thing to ask for, on Debian bug 1152337 (`patchradar \
+debian`, 2026-11-09). The flaw recorded under Trivy in \
+the Chromium block, reported by the other scanner; the measurement is there.
 """
 review_by = "2026-11-30"
 
@@ -115,10 +114,12 @@ id = "CVE-2026-117610"
 source = "Docker Scout"
 where = "expat 2.9.0-1~deb13u1, Chromium dependency"
 why = """
-NULL pointer dereference in externalEntityInitProcessor2() on an empty first \
-chunk, which needs control over how the input is split into parse calls. Unfixed \
-in every Debian suite on 2026-10-28 — bookworm, trixie (2.9.0-1~deb13u1 included), \
-forky and sid — Debian bug 1152343. Nothing to install yet; review when the bug closes.
+libexpat through 2.9.0: a NULL pointer dereference in \
+externalEntityInitProcessor2() on an empty first chunk, which needs control \
+over how the input is split into parse calls (OSV). Debian: fixed in sid and \
+forky (2.10.0-1), open in trixie with no no-dsa, so a stable update is the \
+thing to ask for, on Debian bug 1152343 (`patchradar debian`, 2026-11-09). The flaw recorded under Trivy in \
+the Chromium block, reported by the other scanner; the measurement is there.
 """
 review_by = "2026-11-30"
 
@@ -135,9 +136,11 @@ stable update: filed the same day as Debian bug 1150320 (severity important, \
 tags security fixed-upstream, forwarded to the maintainer and \
 team@security.debian.org), naming sid 2.9.0-1.
 
-In this image the system libexpat1 is loaded by fontconfig and Mesa (libgbm, \
-libGLX_mesa, gallium), for their own configuration files; CPython's pyexpat \
-carries its own copy and cookieradar parses no XML. Checked in \
+In this image Chromium declares libexpat.so.1 as a direct dependency, besides \
+fontconfig and Mesa (libgbm, libGLX_mesa, gallium); CPython's pyexpat carries \
+its own copy and cookieradar parses no XML. Measured in \
+maksimtech/cookieradar:latest on 2026-11-09 (see the Trivy entries of expat in \
+the Chromium block); until then this said fontconfig and Mesa alone, from \
 python:3.12-slim-trixie after `playwright install-deps chromium`. Recorded \
 under Snyk's id SNYK-DEBIAN13-EXPAT-20514789 too, until Snyk was retired on \
 2026-11-02.
@@ -820,6 +823,143 @@ chromium-1248 `chrome`, `dpkg-query`, `apt-cache rdepends --installed`).
 """
 review_by = "2026-12-31"
 
+[[exception]]
+id = "CVE-2026-115506"
+source = "Trivy"
+where = "expat 2.9.0-1~deb13u1 (libexpat1), Chromium dependency"
+why = """
+libexpat through 2.9.0: its billion-laughs protection detects entity \
+amplification too late, a denial of service (OSV). Debian: no-dsa for trixie, \
+"Minor issue", fixed in sid and forky (2.10.0-1) and not to be carried into \
+trixie; evidence goes on Debian bug 1151841 (`patchradar debian`, 2026-11-09).
+
+Chromium itself declares libexpat.so.1 as a direct dependency, in both \
+Playwright's chromium-1248 `chrome` and the `chrome-headless-shell` that a \
+headless scan runs; fontconfig and Mesa (libgbm, libGLX_mesa, gallium) load it \
+too. CPython's pyexpat carries its own expat, 2.9.0 as well, and cookieradar \
+parses no XML (no xml, lxml or plistlib import in its source tree) — measured in maksimtech/cookieradar:latest rebuilt on 2026-11-09 \
+(sha256:7cf4a019f95f), reading the ELF files' DT_NEEDED entries, `ldd`, \
+`dpkg-query` and `apt-cache rdepends --installed`. \
+Which inputs Chromium hands to libexpat was not traced: the XML of web pages \
+goes to Chromium's own libxml2, but a page reaching libexpat is not ruled out, \
+so this entry rests on the flaw rather than on the reach. At worst it stalls the browser of one scan, which then times out; nothing is \
+written or run.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-113351"
+source = "Trivy"
+where = "expat 2.9.0-1~deb13u1 (libexpat1), Chromium dependency"
+why = """
+libexpat 2.7.2 through 2.9.0: a denial of service through XML_ParserReset \
+(OSV). Debian: no-dsa for trixie, "Minor issue", fixed in sid and forky \
+(2.10.0-1) and not to be carried into trixie; evidence goes on Debian bug \
+1151840 (`patchradar debian`, 2026-11-09).
+
+Chromium itself declares libexpat.so.1 as a direct dependency, in both \
+Playwright's chromium-1248 `chrome` and the `chrome-headless-shell` that a \
+headless scan runs; fontconfig and Mesa (libgbm, libGLX_mesa, gallium) load it \
+too. CPython's pyexpat carries its own expat, 2.9.0 as well, and cookieradar \
+parses no XML (no xml, lxml or plistlib import in its source tree) — measured in maksimtech/cookieradar:latest rebuilt on 2026-11-09 \
+(sha256:7cf4a019f95f), reading the ELF files' DT_NEEDED entries, `ldd`, \
+`dpkg-query` and `apt-cache rdepends --installed`. \
+Which inputs Chromium hands to libexpat was not traced: the XML of web pages \
+goes to Chromium's own libxml2, but a page reaching libexpat is not ruled out, \
+so this entry rests on the flaw rather than on the reach. At worst it stops the browser of one scan; nothing is written or run.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-118370"
+source = "Trivy"
+where = "expat 2.9.0-1~deb13u1 (libexpat1), Chromium dependency"
+why = """
+libexpat through 2.9.0: a signed integer overflow in storeAtts() with \
+oversized attribute counts, which takes a multi-gigabyte start tag (OSV). \
+Debian: fixed in sid and forky (2.10.0-1), open in trixie with no no-dsa, so \
+a stable update is the thing to ask for, on Debian bug 1152337 (`patchradar \
+debian`, 2026-11-09).
+
+Chromium itself declares libexpat.so.1 as a direct dependency, in both \
+Playwright's chromium-1248 `chrome` and the `chrome-headless-shell` that a \
+headless scan runs; fontconfig and Mesa (libgbm, libGLX_mesa, gallium) load it \
+too. CPython's pyexpat carries its own expat, 2.9.0 as well, and cookieradar \
+parses no XML (no xml, lxml or plistlib import in its source tree) — measured in maksimtech/cookieradar:latest rebuilt on 2026-11-09 \
+(sha256:7cf4a019f95f), reading the ELF files' DT_NEEDED entries, `ldd`, \
+`dpkg-query` and `apt-cache rdepends --installed`. \
+Which inputs Chromium hands to libexpat was not traced: the XML of web pages \
+goes to Chromium's own libxml2, but a page reaching libexpat is not ruled out, \
+so this entry rests on the flaw rather than on the reach. A start tag of gigabytes is far past what a page load hands any parser, and \
+the short date is for the stable update.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-117610"
+source = "Trivy"
+where = "expat 2.9.0-1~deb13u1 (libexpat1), Chromium dependency"
+why = """
+libexpat through 2.9.0: a NULL pointer dereference in \
+externalEntityInitProcessor2() on an empty first chunk, which needs control \
+over how the input is split into parse calls (OSV). Debian: fixed in sid and \
+forky (2.10.0-1), open in trixie with no no-dsa, so a stable update is the \
+thing to ask for, on Debian bug 1152343 (`patchradar debian`, 2026-11-09).
+
+Chromium itself declares libexpat.so.1 as a direct dependency, in both \
+Playwright's chromium-1248 `chrome` and the `chrome-headless-shell` that a \
+headless scan runs; fontconfig and Mesa (libgbm, libGLX_mesa, gallium) load it \
+too. CPython's pyexpat carries its own expat, 2.9.0 as well, and cookieradar \
+parses no XML (no xml, lxml or plistlib import in its source tree) — measured in maksimtech/cookieradar:latest rebuilt on 2026-11-09 \
+(sha256:7cf4a019f95f), reading the ELF files' DT_NEEDED entries, `ldd`, \
+`dpkg-query` and `apt-cache rdepends --installed`. \
+Which inputs Chromium hands to libexpat was not traced: the XML of web pages \
+goes to Chromium's own libxml2, but a page reaching libexpat is not ruled out, \
+so this entry rests on the flaw rather than on the reach. At worst it stops the browser of one scan, and the short date is for the \
+stable update.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-109089"
+source = "Trivy"
+where = "libxi 2:1.8.2-1 (libxi6), Chromium dependency via libatspi"
+why = """
+libXi: a control type mismatch in XGetDeviceControl that overflows a heap buffer (OSV). Debian: no-dsa for trixie, "Minor issue", fixed \
+in sid and forky (2:1.8.4-1) and not to be carried into trixie; no Debian bug \
+is recorded, so evidence goes on the security tracker page (`patchradar \
+debian`, 2026-11-09).
+
+The flaw is in reading an X server's reply. Chromium does not declare libXi \
+(its DT_NEEDED entries name no libXi); it comes in through libatspi, the \
+accessibility bridge and the only installed package depending on libxi6. \
+Headless Chromium connects to no X server: DISPLAY is unset in the image and \
+cookieradar never starts the Xvfb it carries — measured in maksimtech/cookieradar:latest rebuilt on 2026-11-09 \
+(sha256:7cf4a019f95f), reading the ELF files' DT_NEEDED entries, `ldd`, \
+`dpkg-query` and `apt-cache rdepends --installed`.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-109090"
+source = "Trivy"
+where = "libxi 2:1.8.2-1 (libxi6), Chromium dependency via libatspi"
+why = """
+libXi: a heap buffer overflow in XGetDeviceControl on a DEVICE_ENABLE control (OSV). Debian: no-dsa for trixie, "Minor issue", fixed \
+in sid and forky (2:1.8.4-1) and not to be carried into trixie; no Debian bug \
+is recorded, so evidence goes on the security tracker page (`patchradar \
+debian`, 2026-11-09).
+
+The flaw is in reading an X server's reply. Chromium does not declare libXi \
+(its DT_NEEDED entries name no libXi); it comes in through libatspi, the \
+accessibility bridge and the only installed package depending on libxi6. \
+Headless Chromium connects to no X server: DISPLAY is unset in the image and \
+cookieradar never starts the Xvfb it carries — measured in maksimtech/cookieradar:latest rebuilt on 2026-11-09 \
+(sha256:7cf4a019f95f), reading the ELF files' DT_NEEDED entries, `ldd`, \
+`dpkg-query` and `apt-cache rdepends --installed`.
+"""
+review_by = "2026-12-31"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # What Trivy's image scan reported on its first run here, 2026-11-02, the day
 # Snyk was retired (maksimtech/apkradar#54). The same Debian packages of the
@@ -963,15 +1103,15 @@ id = "CVE-2026-119373"
 source = "Trivy"
 where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
 why = """
-SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5MergeRowidLists() (OSV, 2026-11-02). One of the eleven sqlite3 \
-issues the Debian package tracker lists as open in both trixie and sid, so there is \
-no fixed version in any suite yet; the +deb13u2 in the image did not close it. \
+SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5MergeRowidLists() (OSV, 2026-11-02). Debian fixed it in sid (3.54.1-1) and marked it no-dsa for \
+trixie, "Minor issue" (security tracker, 2026-11-09): no trixie update will come, \
+so the +deb13u2 in the image keeps it. \
 Docker Scout reports it too (below).
 
 libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
 Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
-checked on 2026-11-02). It waits for Debian, and the release after Debian \
-ships a fix carries it.
+checked on 2026-11-02). Accepted on that ground, not on waiting for \
+Debian: the review date is when to look for a base image with a fixed sqlite3.
 """
 review_by = "2026-12-31"
 
@@ -983,19 +1123,53 @@ review_by = "2026-12-31"
 # ─────────────────────────────────────────────────────────────────────────────
 
 [[exception]]
+id = "CVE-2026-119374"
+source = "Trivy"
+where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
+why = """
+SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5DoSecureDelete() (OSV, 2026-11-02). Debian fixed it in sid (3.54.1-1) and marked it no-dsa for \
+trixie, "Minor issue" (security tracker, 2026-11-09): no trixie update will come, \
+so the +deb13u2 in the image keeps it. \
+Docker Scout reports it too (below).
+
+libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
+Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
+checked on 2026-11-02). Accepted on that ground, not on waiting for \
+Debian: the review date is when to look for a base image with a fixed sqlite3.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
+id = "CVE-2026-119379"
+source = "Trivy"
+where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
+why = """
+SQLite before 3.54.0: a heap buffer overflow in the Session Extension, sessionUpdateFind() (OSV, 2026-11-02). Debian fixed it in sid (3.54.1-1) and marked it no-dsa for \
+trixie, "Minor issue" (security tracker, 2026-11-09): no trixie update will come, \
+so the +deb13u2 in the image keeps it. \
+Docker Scout reports it too (below).
+
+libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
+Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
+checked on 2026-11-02). Accepted on that ground, not on waiting for \
+Debian: the review date is when to look for a base image with a fixed sqlite3.
+"""
+review_by = "2026-12-31"
+
+[[exception]]
 id = "CVE-2026-119373"
 source = "Docker Scout"
 where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
 why = """
-SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5MergeRowidLists() (OSV, 2026-11-02). One of the eleven sqlite3 \
-issues the Debian package tracker lists as open in both trixie and sid, so there is \
-no fixed version in any suite yet; the +deb13u2 in the image did not close it. \
+SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5MergeRowidLists() (OSV, 2026-11-02). Debian fixed it in sid (3.54.1-1) and marked it no-dsa for \
+trixie, "Minor issue" (security tracker, 2026-11-09): no trixie update will come, \
+so the +deb13u2 in the image keeps it. \
 The flaw recorded above under Trivy, reported by the other scanner.
 
 libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
 Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
-checked on 2026-11-02). It waits for Debian, and the release after Debian \
-ships a fix carries it.
+checked on 2026-11-02). Accepted on that ground, not on waiting for \
+Debian: the review date is when to look for a base image with a fixed sqlite3.
 """
 review_by = "2026-12-31"
 
@@ -1004,15 +1178,15 @@ id = "CVE-2026-119374"
 source = "Docker Scout"
 where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
 why = """
-SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5DoSecureDelete() (OSV, 2026-11-02). One of the eleven sqlite3 \
-issues the Debian package tracker lists as open in both trixie and sid, so there is \
-no fixed version in any suite yet; the +deb13u2 in the image did not close it. \
-Reported by Docker Scout on the published image.
+SQLite before 3.54.0: an FTS5 heap buffer overflow in fts5DoSecureDelete() (OSV, 2026-11-02). Debian fixed it in sid (3.54.1-1) and marked it no-dsa for \
+trixie, "Minor issue" (security tracker, 2026-11-09): no trixie update will come, \
+so the +deb13u2 in the image keeps it. \
+The flaw recorded above under Trivy, reported by the other scanner.
 
 libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
 Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
-checked on 2026-11-02). It waits for Debian, and the release after Debian \
-ships a fix carries it.
+checked on 2026-11-02). Accepted on that ground, not on waiting for \
+Debian: the review date is when to look for a base image with a fixed sqlite3.
 """
 review_by = "2026-12-31"
 
@@ -1021,14 +1195,14 @@ id = "CVE-2026-119379"
 source = "Docker Scout"
 where = "sqlite3 3.46.1-7+deb13u2 (libsqlite3-0), python slim-trixie base image"
 why = """
-SQLite before 3.54.0: a heap buffer overflow in the Session Extension, sessionUpdateFind() (OSV, 2026-11-02). One of the eleven sqlite3 \
-issues the Debian package tracker lists as open in both trixie and sid, so there is \
-no fixed version in any suite yet; the +deb13u2 in the image did not close it. \
-Reported by Docker Scout on the published image.
+SQLite before 3.54.0: a heap buffer overflow in the Session Extension, sessionUpdateFind() (OSV, 2026-11-02). Debian fixed it in sid (3.54.1-1) and marked it no-dsa for \
+trixie, "Minor issue" (security tracker, 2026-11-09): no trixie update will come, \
+so the +deb13u2 in the image keeps it. \
+The flaw recorded above under Trivy, reported by the other scanner.
 
 libsqlite3-0 is in the image as a dependency of util-linux (liblastlog2-2) and of \
 Python's own sqlite3 module; no module of cookieradar imports sqlite3 (its source tree, \
-checked on 2026-11-02). It waits for Debian, and the release after Debian \
-ships a fix carries it.
+checked on 2026-11-02). Accepted on that ground, not on waiting for \
+Debian: the review date is when to look for a base image with a fixed sqlite3.
 """
 review_by = "2026-12-31"
