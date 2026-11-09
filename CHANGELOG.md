@@ -14,6 +14,15 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Changed
 
+- **Trivy's expat and libXi findings are recorded, measured in the rebuilt image.** On 2026-11-09
+  Trivy began reporting four expat CVEs (CVE-2026-115506, -113351, -118370, -117610) and two libXi
+  ones (CVE-2026-109089, -109090) in the Chromium dependencies, and Security Posture failed. Measured
+  that day in the image rebuilt from v2026.46: Chromium declares the system libexpat directly, which
+  the entries had not said (they named fontconfig and Mesa alone), so the expat entries rest on what
+  each flaw takes rather than on its reach, and the two Debian has fixed elsewhere keep the short
+  date, for the stable update to ask for. libXi comes in through the accessibility bridge only and
+  its flaws need an X server, which headless Chromium never connects to.
+
 - **The sqlite3 findings say what Debian decided, and Trivy's two new ones are recorded.** On
   2026-11-09 Trivy began reporting CVE-2026-119374 and CVE-2026-119379, which only Docker Scout had
   reported, and Security Posture failed on main. Both now have a Trivy entry beside the Scout one.
