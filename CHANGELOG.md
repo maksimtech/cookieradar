@@ -103,7 +103,14 @@ no version in this file has ever matched — 40 is not a month, and
   2026-11-09 (fixed in krb5 1.22.3) has no fix in Debian, sid included (bug 1153598). Measured
   2026-11-13: krb5 comes in through libcups, which chrome-headless-shell does not declare; it names
   libgssapi_krb5 only to answer an HTTP Negotiate challenge, with no krb5.conf and no credential cache in
-  the image. Two of the CVEs are in libgssrpc, which is not installed. Reviewed by 2026-11-30.
+  the image. Three of the CVEs are in libgssrpc, which is not installed (this line said two until the
+  Docker Scout entries below were written). Reviewed by 2026-11-30.
+
+- **Docker Scout's reports of the krb5 CVEs are recorded too.** Once #67 reached main, Security Posture
+  failed there on six krb5 CVEs that Docker Scout reports on the published image, at the same version:
+  five with a Trivy entry, and CVE-2026-112314, which Scout alone reports, from the same MIT
+  denial-of-service group. Same reasons and the same review date. Checked against all 142 open alerts on
+  main, read page by page, which the gate itself reads only the first hundred of.
 
 - **The harfbuzz exception also covers Docker Scout's report of the same flaw** (CVE-2026-113679),
   which appeared once the 2026.46 image was published; same reasons as SNYK-DEBIAN13-HARFBUZZ-21663516.
