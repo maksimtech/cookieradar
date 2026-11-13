@@ -14,6 +14,14 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Changed
 
+- **The image runs Python 3.14.** It was built on python:3.12-slim-trixie: 3.12 has had security fixes
+  only since April 2025, and 3.13 joined it in October 2026. 3.14 gets bug fixes until October 2027 and
+  security fixes until October 2030; 3.15, a month old, was too new for the wheels the image needs.
+  exeradar and patchradar were already built on 3.14. `sbom.yml` resolves the Python environment of a
+  release with the image's interpreter, so it moves to 3.14 too, and `tests/test_docker_python.py` keeps
+  the two together. Measured on 2026-11-13 on the rebuilt image: the same audit of a local page, on 3.12
+  and on 3.14, gives the same verdict, provisions and report.
+
 - **Trivy's expat and libXi findings are recorded, measured in the rebuilt image.** On 2026-11-09
   Trivy began reporting four expat CVEs (CVE-2026-115506, -113351, -118370, -117610) and two libXi
   ones (CVE-2026-109089, -109090) in the Chromium dependencies, and Security Posture failed. Measured

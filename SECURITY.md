@@ -18,7 +18,7 @@ a fix ships as the next release, never as a patch to an older one.
   every push to `main` and weekly. Trivy also scans the image built from the
   Dockerfile of the pull request, before it is merged.
 - **Docker Scout** checks the published `latest` image on every push to `main` and
-  weekly. The image is built on `python:3.12-slim-trixie` (Debian Trixie) when a
+  weekly. The image is built on `python:3.14-slim-trixie` (Debian Trixie) when a
   release is cut, with the Debian updates available then; it is not rebuilt between
   releases, so Debian's security patches reach it with the next release.
 - **Security Posture** reads the alerts all of the above publish to GitHub code
