@@ -19,8 +19,11 @@ che il fornitore è in grado di dare, non un attestato di conformità.
   risoluzione completa è in `uv.lock`, e la CI (workflow Quality) fallisce se non
   corrisponde più a `pyproject.toml`. `pip install cookieradar` e la build
   dell'immagine Docker però non lo usano: risolvono le dipendenze al momento
-  dell'installazione o della build. Quello che un'immagine contiene davvero è nella
-  sua SBOM (punto 6).
+  dell'installazione o della build, tranne Playwright, che il Dockerfile installa
+  alla stessa versione risolta in `uv.lock` (lo verifica
+  `tests/test_docker_playwright.py`). Dal 2026-11-13: il giorno prima la build
+  aveva preso Playwright 1.65.1, uscita da un giorno, e non si era conclusa.
+  Quello che un'immagine contiene davvero è nella sua SBOM (punto 6).
 - Ogni release su GitHub porta in allegato due SBOM in formato CycloneDX 1.5:
   quella dell'immagine Docker, pacchetti di sistema inclusi, e quella dell'ambiente
   Python del pacchetto installato da sorgente (vedi la tabella al punto 6).

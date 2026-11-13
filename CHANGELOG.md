@@ -64,6 +64,16 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **The image builds again: it installs the Playwright that uv.lock resolves.** The Dockerfile installed
+  `playwright>=1.40.0`, so each build took the newest release on PyPI. On 2026-11-12 that was 1.65.1,
+  published the day before, whose Node driver needs `libatomic.so.1`: python:3.12-slim-trixie does not
+  ship it, `playwright install-deps chromium` stopped with exit code 127, and Trivy and Security Posture
+  failed on main with no image to scan. The build of 2026-11-09, on the same base image digest, had
+  taken 1.64.1. The image now installs `playwright==1.63.0`, the version uv.lock resolves, and
+  `tests/test_docker_playwright.py` fails when a lock update leaves the Dockerfile behind.
+  `docs/nis2-compliance.md` said the image resolves every dependency at build time; it now names
+  Playwright as the exception.
+
 - **Docker Scout no longer fails on its own base-image advice.** From 2026-10-24 every run of
   `docker-scout.yml` failed and GitHub mailed it on each push to main: the CVE scan worked, then the scout
   CLI crashed in the `recommendations` part (nil pointer in `recommendations/markdown.go`) on images built
