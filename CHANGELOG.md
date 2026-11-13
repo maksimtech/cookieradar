@@ -64,6 +64,15 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **Security Posture reads every page of alerts.** The code scanning API returns at most a hundred alerts
+  per call, and the gate read one page of each list. On 2026-11-13 #68 had 123 open alerts on its ref and
+  main had 142: three exceptions whose findings sat past the hundredth read as matching nothing, and the
+  gate failed on a product whose every alert was explained. Read the other way, an unexplained alert past
+  the hundredth would not have been seen at all. Each of the four reads now goes through
+  `gh api --paginate --slurp` and joins the pages; a failed read still fails, so an unreadable list is not
+  taken for an empty one. `tests/test_security_posture_workflow.py` runs the step's own function against a
+  stand-in `gh` that answers in two pages. Run against the real API on #68: 123 alerts read, verdict ok.
+
 - **The image builds again: it installs the Playwright that uv.lock resolves.** The Dockerfile installed
   `playwright>=1.40.0`, so each build took the newest release on PyPI. On 2026-11-12 that was 1.65.1,
   published the day before, whose Node driver needs `libatomic.so.1`: python:3.12-slim-trixie does not
