@@ -35,6 +35,8 @@ USER root
 # Where cookieradar comes from:
 #   local (default, CI) → the code in this repository
 #   pypi (release)      → cookieradar==COOKIERADAR_VERSION from PyPI
+# pip goes once cookieradar is in, in the same layer: nothing in the image runs
+# it again, and Trivy reports the packages it vendors (tests/test_docker_pip.py).
 ARG COOKIERADAR_SOURCE=local
 ARG COOKIERADAR_VERSION=
 COPY pyproject.toml README.md LICENSE /app/src/
@@ -45,6 +47,7 @@ RUN case "${COOKIERADAR_SOURCE}" in \
               pip install --no-cache-dir --root-user-action=ignore "cookieradar==${COOKIERADAR_VERSION}" ;; \
         *) echo "COOKIERADAR_SOURCE must be 'local' or 'pypi'" >&2; exit 1 ;; \
     esac && \
+    pip uninstall -y --root-user-action=ignore pip && \
     rm -rf /app/src
 USER cookieradar
 WORKDIR /home/cookieradar

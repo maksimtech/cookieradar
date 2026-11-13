@@ -95,6 +95,9 @@ jobs:
         run: |
           python -m venv /tmp/product
           /tmp/product/bin/pip install --quiet .
+          # The image uninstalls pip once cookieradar is in (Dockerfile), so the
+          # venv it is described by does the same.
+          /tmp/product/bin/python -m pip uninstall --yes --quiet pip
           python -m venv /tmp/cyclonedx
           /tmp/cyclonedx/bin/pip install --quiet "cyclonedx-bom==7.4.0"
           # --pyproject names the product as the SBOM's main component; without

@@ -492,9 +492,10 @@ REMOVABLE = ("pip", "setuptools", "wheel")
 def test_the_source_sbom_leaves_out_what_the_image_removes(evidence):
     """The source SBOM describes a venv, which comes with its own pip; if the
     image removed pip (or setuptools, or wheel), the SBOM would list what the
-    image does not ship, as releaseradar's first sbom-source did. This Dockerfile
-    removes none of them, and the image SBOM of v2026.44 lists pip 25.0.1, as the
-    source SBOM does: so nothing is uninstalled, and each must follow the other."""
+    image does not ship, as releaseradar's first sbom-source did. Up to the 3.12
+    image this Dockerfile removed none of them, and the image SBOM of v2026.44
+    lists pip 25.0.1, as the source SBOM does. Since 2026-11-13 the image removes
+    pip (tests/test_docker_pip.py), so the venv does too: each follows the other."""
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
     step = _evidence_step(evidence, "SBOM of the Python environment")
     for package in REMOVABLE:
