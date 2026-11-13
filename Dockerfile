@@ -20,8 +20,12 @@ WORKDIR /app
 # lockfile resolves (tests/test_docker_playwright.py): an open range took
 # whatever PyPI had published the day before.
 RUN pip install --no-cache-dir --root-user-action=ignore "playwright==1.63.0"
-# Chromium's system dependencies, which need root
-RUN playwright install-deps chromium
+# Chromium's system dependencies, which need root. install-deps also brings an
+# X server (xvfb, xserver-common) for headed browsers without a display, which
+# nothing here starts: it goes in the same layer, and only those two packages
+# (tests/test_docker_xserver.py).
+RUN playwright install-deps chromium && \
+    apt-get purge -y xvfb xserver-common
 # A non-root user to run as
 RUN useradd -m -u 1000 cookieradar
 # Chromium installed as cookieradar, into ~/.cache/ms-playwright
