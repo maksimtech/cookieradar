@@ -14,6 +14,22 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Changed
 
+- **The image runs Python 3.14.** It was built on python:3.12-slim-trixie: 3.12 has had security fixes
+  only since April 2025, and 3.13 joined it in October 2026. 3.14 gets bug fixes until October 2027 and
+  security fixes until October 2030; 3.15, a month old, was too new for the wheels the image needs.
+  exeradar and patchradar were already built on 3.14. `sbom.yml` resolves the Python environment of a
+  release with the image's interpreter, so it moves to 3.14 too, and `tests/test_docker_python.py` keeps
+  the two together. Measured on 2026-11-13 on the rebuilt image: the same audit of a local page, on 3.12
+  and on 3.14, gives the same verdict, provisions and report.
+
+- **pip leaves the image once cookieradar is installed.** The 3.14 base ships pip 26.2.2, and Trivy
+  reported five high findings against the packages pip vendors: msgpack 1.1.2 (CVE-2026-114613,
+  GHSA-6v7p-g79w-8964), urllib3 2.7.0 (CVE-2026-97687, -97689) and setuptools 70.3.0 (CVE-2025-47273).
+  pip 26.3 still vendors that setuptools. Nothing in the image runs pip after the build, so the layer
+  that installs cookieradar uninstalls it, and `sbom.yml` drops it from the venv the source SBOM
+  describes, as `tests/test_nis2_evidence.py` already required of any package the image removes
+  (`tests/test_docker_pip.py`).
+
 - **Trivy's expat and libXi findings are recorded, measured in the rebuilt image.** On 2026-11-09
   Trivy began reporting four expat CVEs (CVE-2026-115506, -113351, -118370, -117610) and two libXi
   ones (CVE-2026-109089, -109090) in the Chromium dependencies, and Security Posture failed. Measured

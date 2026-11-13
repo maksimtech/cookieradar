@@ -82,10 +82,12 @@ jobs:
         with:
           ref: ${{ env.TAG }}
 
+      # The interpreter of the image (python:3.14-slim-trixie), so that the two
+      # SBOMs describe the same dependency resolution (tests/test_docker_python.py).
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       # Two environments: the one described holds the package and what it pulls
       # in, and nothing of the tool that describes it.
@@ -93,6 +95,9 @@ jobs:
         run: |
           python -m venv /tmp/product
           /tmp/product/bin/pip install --quiet .
+          # The image uninstalls pip once cookieradar is in (Dockerfile), so the
+          # venv it is described by does the same.
+          /tmp/product/bin/python -m pip uninstall --yes --quiet pip
           python -m venv /tmp/cyclonedx
           /tmp/cyclonedx/bin/pip install --quiet "cyclonedx-bom==7.4.0"
           # --pyproject names the product as the SBOM's main component; without
