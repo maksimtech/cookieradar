@@ -1440,3 +1440,76 @@ krb5 libraries the image does carry because they share its source package \
 (`dpkg -l`, 2026-11-13). No fix in Debian, sid included (bug 1153598).
 """
 review_by = "2026-11-30"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The krb5 CVEs as Docker Scout reports them on the published image, from
+# 2026-11-13, the day after the Trivy entries above: the same package at the
+# same version. CVE-2026-112314 is reported by Scout alone.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-112314"
+source = "Docker Scout"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). Docker \
+Scout reports it and Trivy does not. The client here is chrome-headless-shell, \
+which loads libgssapi_krb5 only to answer an HTTP Negotiate challenge, with no \
+krb5.conf and no credential cache in the image (measured on 2026-11-13, see \
+the krb5 block): the worst MIT describes is an audit of a hostile site that \
+crashes or runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112320"
+source = "Docker Scout"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+The flaw recorded under Trivy in the krb5 block, reported by Docker Scout on \
+the published image; the measurement is there.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112321"
+source = "Docker Scout"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+The flaw recorded under Trivy in the krb5 block, reported by Docker Scout on \
+the published image; the measurement is there.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112322"
+source = "Docker Scout"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+The flaw recorded under Trivy in the krb5 block, reported by Docker Scout on \
+the published image; the measurement is there.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112323"
+source = "Docker Scout"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+The flaw recorded under Trivy in the krb5 block, reported by Docker Scout on \
+the published image; the measurement is there.
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-119079"
+source = "Docker Scout"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+The flaw recorded under Trivy in the krb5 block, reported by Docker Scout on \
+the published image; the measurement is there.
+"""
+review_by = "2026-11-30"
