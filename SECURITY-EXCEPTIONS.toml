@@ -1206,3 +1206,237 @@ checked on 2026-11-02). Accepted on that ground, not on waiting for \
 Debian: the review date is when to look for a base image with a fixed sqlite3.
 """
 review_by = "2026-12-31"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MIT krb5, from 2026-11-13: fourteen of the CVEs of MIT's 2026-11-09 announcement
+# (kerberos-announce 2026q4/000212), fixed upstream in krb5 1.22.3. Debian has
+# no fix in any release, sid included (Debian bug 1153598). Trivy reports each
+# CVE on all four binary packages of the source: libgssapi-krb5-2, libkrb5-3,
+# libk5crypto3, libkrb5support0.
+#
+# Measured on 2026-11-13 in the image built from this Dockerfile, reading the
+# ELF files' DT_NEEDED entries, `dpkg -l` and `apt-cache rdepends --installed`:
+# the only package depending on libgssapi-krb5-2 is libcups2t64. chrome-headless-
+# shell, which every audit runs, declares neither libcups nor any krb5 library;
+# its file names libgssapi_krb5.so, the library Chromium loads to answer an HTTP
+# Negotiate challenge. The full chrome binary declares libcups.so.2, which
+# declares libgssapi_krb5.so.2; it is what --no-headless starts, and the image
+# has no display for it since xvfb was removed (tests/test_docker_xserver.py).
+# The image has no /etc/krb5.conf and no credential cache.
+#
+# The maintainer decided on 2026-11-13 that these wait for Debian, the X.Org
+# findings of the same day being fixed by removing the X server instead. The
+# dates are short because a fix exists upstream.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-71199"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: CAMMAC verifiers were validated without checking for \
+unkeyed checksums (MIT announcement, 2026-11-09). Validating a CAMMAC is the \
+work of whoever accepts a ticket, a KDC or an application server; nothing in \
+the image accepts Kerberos tickets, and Chromium only ever initiates. No fix \
+in Debian, sid included (bug 1153598, read on 2026-11-13).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-118380"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: libgssrpc's RPCSEC_GSS handling used the unverified \
+service type sent during authentication (MIT announcement, 2026-11-09). The \
+flaw is in libgssrpc, and libgssrpc4 is not installed: Trivy reports it on \
+the four krb5 libraries the image does carry because they share its source \
+package (`dpkg -l`, 2026-11-13). No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-71200"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-107364"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112315"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112316"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112317"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112318"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112319"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112320"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112321"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-119079"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: one of a group of null pointer dereferences, read \
+overruns, unbounded allocations and leaks that MIT lists as denial of \
+service against the KDC, kadmind, application servers or client programs, \
+without mapping each CVE to one of them (announcement, 2026-11-09). The client \
+here is chrome-headless-shell, which loads libgssapi_krb5 only to answer an \
+HTTP Negotiate challenge, with no krb5.conf and no credential cache in the \
+image: the worst MIT describes is an audit of a hostile site that crashes or \
+runs out of memory. No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112322"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: the AUTH_GSSAPI flavor of libgssrpc's GSSAPI \
+acceptor, the server side, which 1.22.3 disables by default (announcement, \
+2026-11-09). libgssrpc4 is not installed: Trivy reports it on the four \
+krb5 libraries the image does carry because they share its source package \
+(`dpkg -l`, 2026-11-13). No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"
+
+[[exception]]
+id = "CVE-2026-112323"
+source = "Trivy"
+where = "krb5 1.21.3-5+deb13u1 (libgssapi-krb5-2, libkrb5-3, libk5crypto3, libkrb5support0), via libcups and Chromium's HTTP Negotiate"
+why = """
+MIT krb5 before 1.22.3: the AUTH_GSSAPI flavor of libgssrpc's GSSAPI \
+acceptor, the server side, which 1.22.3 disables by default (announcement, \
+2026-11-09); MIT also lists it in its denial-of-service group. libgssrpc4 is not installed: Trivy reports it on the four \
+krb5 libraries the image does carry because they share its source package \
+(`dpkg -l`, 2026-11-13). No fix in Debian, sid included (bug 1153598).
+"""
+review_by = "2026-11-30"

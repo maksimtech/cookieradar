@@ -64,6 +64,16 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **The image builds again: it installs the Playwright that uv.lock resolves.** The Dockerfile installed
+  `playwright>=1.40.0`, so each build took the newest release on PyPI. On 2026-11-12 that was 1.65.1,
+  published the day before, whose Node driver needs `libatomic.so.1`: python:3.12-slim-trixie does not
+  ship it, `playwright install-deps chromium` stopped with exit code 127, and Trivy and Security Posture
+  failed on main with no image to scan. The build of 2026-11-09, on the same base image digest, had
+  taken 1.64.1. The image now installs `playwright==1.63.0`, the version uv.lock resolves, and
+  `tests/test_docker_playwright.py` fails when a lock update leaves the Dockerfile behind.
+  `docs/nis2-compliance.md` said the image resolves every dependency at build time; it now names
+  Playwright as the exception.
+
 - **Docker Scout no longer fails on its own base-image advice.** From 2026-10-24 every run of
   `docker-scout.yml` failed and GitHub mailed it on each push to main: the CVE scan worked, then the scout
   CLI crashed in the `recommendations` part (nil pointer in `recommendations/markdown.go`) on images built
@@ -79,6 +89,21 @@ no version in this file has ever matched — 40 is not a month, and
   holds them together.
 
 ### Security
+
+- **The image no longer carries an X server.** `playwright install-deps chromium` installs xvfb and
+  xserver-common for headed browsers without a display; nothing in the image starts one, and nothing
+  else installed depends on either (measured 2026-11-13). The first image scanned since the build broke
+  brought six X.Org Server CVEs against them (CVE-2026-109091, -109092, -109093, -109095, -109096,
+  -109903), fixed in sid and open in trixie. Both packages are now purged in the same layer, and only
+  they: `--auto-remove` would also take Mesa and libvulkan, which Chromium may load. The five older
+  X.Org findings accepted in SECURITY-EXCEPTIONS.toml close with them. `--no-headless` has no display
+  in the container. `tests/test_docker_xserver.py` keeps both packages out.
+
+- **Fourteen MIT krb5 CVEs are recorded in SECURITY-EXCEPTIONS.toml.** MIT's announcement of
+  2026-11-09 (fixed in krb5 1.22.3) has no fix in Debian, sid included (bug 1153598). Measured
+  2026-11-13: krb5 comes in through libcups, which chrome-headless-shell does not declare; it names
+  libgssapi_krb5 only to answer an HTTP Negotiate challenge, with no krb5.conf and no credential cache in
+  the image. Two of the CVEs are in libgssrpc, which is not installed. Reviewed by 2026-11-30.
 
 - **The harfbuzz exception also covers Docker Scout's report of the same flaw** (CVE-2026-113679),
   which appeared once the 2026.46 image was published; same reasons as SNYK-DEBIAN13-HARFBUZZ-21663516.
