@@ -27,8 +27,8 @@ from cookieradar.scanner import (
     bot_challenge,
     find_violations,
     not_served,
-    page_not_served,
     stored_before_choice,
+    verdict,
 )
 
 
@@ -410,21 +410,8 @@ def _print_violations(out: Console, violations: Violations, indent: str):
 
 
 def _verdict(result) -> ExitCode:
-    if page_not_served(result) or bot_challenge(result).seen:
-        # Not UNVERIFIED: that means the site was seen and the refusal could
-        # not be exercised. Here the site was never seen — either the edge
-        # refused it outright, or what came back was a challenge and not the
-        # page. A challenge answering 200 would otherwise reach the checks
-        # below and be reported as a site with no trackers and no banner.
-        return ExitCode.ERROR
-    # Before the refusal is considered: tracking stored on the device before any
-    # choice is a violation whatever the banner did afterwards (art. 122(1)
-    # Codice privacy). Same exit code, its own cause in the report.
-    if stored_before_choice(result):
-        return ExitCode.VIOLATION
-    if not result.post_reject.consent_clicked:
-        return ExitCode.UNVERIFIED
-    return ExitCode.VIOLATION if find_violations(result).all else ExitCode.OK
+    """The scanner's verdict as an exit code. Decided in `scanner.verdict`, not here."""
+    return ExitCode(verdict(result).value)
 
 
 def _render_report(out: Console, url: str, result, law=None):
@@ -473,7 +460,7 @@ def _render_report(out: Console, url: str, result, law=None):
 
     # Summary
     violations = find_violations(result)
-    verdict = _verdict(result)
+    outcome = _verdict(result)
 
     contacted = sorted({t.domain for t in result.pre_consent.trackers})
     if contacted and not stored_before_choice(result) and not _why_not_the_site(result):
@@ -522,7 +509,7 @@ def _render_report(out: Console, url: str, result, law=None):
             "like. Unlike a refused address, this one is sometimes served to a "
             "visible browser — try again with --no-headless.[/dim]"
         )
-    elif verdict is ExitCode.UNVERIFIED:
+    elif outcome is ExitCode.UNVERIFIED:
         out.print(
             "[bold yellow]⚠️  UNVERIFIED — no refusal could be applied, so nothing "
             "was tested after one[/bold yellow]"
@@ -552,7 +539,7 @@ def _render_report(out: Console, url: str, result, law=None):
                 "cannot say — only that acceptance was reachable and refusal was "
                 "not.[/red]"
             )
-    elif verdict is ExitCode.VIOLATION:
+    elif outcome is ExitCode.VIOLATION:
         stored = stored_before_choice(result)
         if stored:
             out.print("[bold red]⚠️  VIOLATION — tracking data stored on the device before any "
@@ -800,14 +787,14 @@ def batch(
             result = asyncio.run(scan(url))
             pre = _unique_domains(result.pre_consent)
             rej = _unique_domains(result.post_reject)
-            verdict = _verdict(result)
-            codes.add(verdict)
+            outcome = _verdict(result)
+            codes.add(outcome)
             status = {
                 ExitCode.OK: "✅ OK",
                 ExitCode.VIOLATION: "🔴 VIOLATION",
                 ExitCode.UNVERIFIED: "⚠️  UNVERIFIED",
                 ExitCode.ERROR: "⛔ NOT MEASURED",
-            }[verdict]
+            }[outcome]
             # A site never seen gets no counts, as in `audit`: zero trackers on
             # an error page or a challenge are facts about that page.
             reason = _why_not_the_site(result)
