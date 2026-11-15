@@ -12,6 +12,8 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+## [2026.47] - 2026-11-15
+
 ### Added
 
 - **`scanner.verdict` and `scanner.Verdict`: the verdict as a public function.** It lived in
@@ -1085,7 +1087,8 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.46...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.47...HEAD
+[2026.47]: https://github.com/maksimtech/cookieradar/compare/v2026.46...v2026.47
 [2026.46]: https://github.com/maksimtech/cookieradar/compare/v2026.45...v2026.46
 [2026.45]: https://github.com/maksimtech/cookieradar/compare/v2026.44...v2026.45
 [2026.44]: https://github.com/maksimtech/cookieradar/compare/v2026.43...v2026.44
