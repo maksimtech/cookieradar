@@ -7,6 +7,7 @@ import time
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import IntEnum
 from urllib.parse import urlparse
 
 from playwright.async_api import BrowserContext, Cookie, Page, async_playwright
@@ -362,6 +363,38 @@ def find_violations(result: ScanResult) -> Violations:
     pre = {t.domain for t in result.pre_consent.trackers}
     rej = {t.domain for t in result.post_reject.trackers}
     return Violations(persistent=rej & pre, new=rej - pre)
+
+
+class Verdict(IntEnum):
+    """The outcome of an audit. The values are the command line's exit codes."""
+    OK = 0
+    VIOLATION = 1
+    UNVERIFIED = 2
+    ERROR = 3
+
+
+def verdict(result: ScanResult) -> Verdict:
+    """The one place the verdict is decided, for the command line and for callers.
+
+    Public because a caller that re-derived it got it narrower: APKRadar's
+    `--full` counted only trackers seen both before consent and after rejection,
+    and printed "none persist" for the other three ways a site is not OK.
+    """
+    if page_not_served(result) or bot_challenge(result).seen:
+        # Not UNVERIFIED: that means the site was seen and the refusal could
+        # not be exercised. Here the site was never seen — either the edge
+        # refused it outright, or what came back was a challenge and not the
+        # page. A challenge answering 200 would otherwise reach the checks
+        # below and be reported as a site with no trackers and no banner.
+        return Verdict.ERROR
+    # Before the refusal is considered: tracking stored on the device before any
+    # choice is a violation whatever the banner did afterwards (art. 122(1)
+    # Codice privacy). Same exit code, its own cause in the report.
+    if stored_before_choice(result):
+        return Verdict.VIOLATION
+    if not result.post_reject.consent_clicked:
+        return Verdict.UNVERIFIED
+    return Verdict.VIOLATION if find_violations(result).all else Verdict.OK
 
 
 TRACKER_DOMAINS = [

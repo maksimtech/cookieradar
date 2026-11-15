@@ -12,6 +12,13 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Added
+
+- **`scanner.verdict` and `scanner.Verdict`: the verdict as a public function.** It lived in
+  `cli._verdict`, which a caller could not import, and APKRadar's `--full` decided it by itself,
+  more narrowly: three of the four ways a site is not OK came out as compliant. The command line
+  now uses the same function, and `Verdict`'s values are its exit codes.
+
 ### Changed
 
 - **The image runs Python 3.14.** It was built on python:3.12-slim-trixie: 3.12 has had security fixes
