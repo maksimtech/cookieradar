@@ -12,6 +12,8 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+## [2026.47.1] - 2026-11-15
+
 ### Security
 
 - **Playwright 1.65.1, for the Node it carries.** Playwright's driver is a Node binary of its own, and
@@ -1101,7 +1103,8 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.47...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.47.1...HEAD
+[2026.47.1]: https://github.com/maksimtech/cookieradar/compare/v2026.47...v2026.47.1
 [2026.47]: https://github.com/maksimtech/cookieradar/compare/v2026.46...v2026.47
 [2026.46]: https://github.com/maksimtech/cookieradar/compare/v2026.45...v2026.46
 [2026.45]: https://github.com/maksimtech/cookieradar/compare/v2026.44...v2026.45
