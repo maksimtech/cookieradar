@@ -123,14 +123,53 @@ def test_a_version_ahead_of_the_last_tag_means_this_package_changed():
     if normalised(VERSION) == normalised(tag):
         return
 
-    changed = git("diff", "--name-only", f"{tag}..HEAD", "--", PACKAGE_DIR)
-    if changed is None:
+    package = git("diff", "--name-only", f"{tag}..HEAD", "--", PACKAGE_DIR)
+    image = git("diff", "--name-only", f"{tag}..HEAD", "--", *IMAGE_INPUTS)
+    if package is None or image is None:
         pytest.skip(f"git cannot diff {tag}..HEAD in this checkout")
 
-    assert changed.strip() or VERSION == BASELINE, (
+    assert version_is_earned(VERSION, package_changed=bool(package.strip()),
+                             image_changed=bool(image.strip())), (
         f"{VERSION} is ahead of {tag} and nothing under {PACKAGE_DIR} changed "
         "between them: a Radar that has not changed does not get a version"
+        + (" (the image changed, which earns a fix version, x.y.z, and no more)"
+           if image.strip() else "")
     )
+
+
+# What the published image is built from, beside the package. The image reads
+# uv.lock only through the Playwright pin, which is in the Dockerfile too
+# (tests/test_docker_playwright.py), so the Dockerfile is the one input.
+IMAGE_INPUTS = ("Dockerfile",)
+
+
+def version_is_earned(version: str, *, package_changed: bool, image_changed: bool) -> bool:
+    """Whether a version ahead of the last tag has something to be the version of."""
+    if package_changed or version == BASELINE:
+        return True
+    return image_changed and len(version.split(".")) == 3
+
+
+@pytest.mark.parametrize(("version", "package", "image", "earned"), [
+    ("2026.48", True, False, True),     # the package moved: any version
+    ("2026.47.1", True, False, True),
+    ("2026.47.1", False, True, True),   # only the image moved: a fix on what shipped
+    ("2026.48", False, True, False),    # ...and never an ordinary count
+    ("2026.47.1", False, False, False),  # nothing moved
+    ("2026.48", False, False, False),
+    (BASELINE, False, False, True),     # the baseline, once, on purpose
+])
+def test_what_earns_a_version(version, package, image, earned):
+    """The image is shipped too. On 2026-11-15 the image published as 2026.47
+    carried the Node 24.21.0 inside Playwright 1.63.0, with ten high CVEs, and
+    the fix was in the Dockerfile alone: the Playwright it pins and the
+    libatomic1 its Node needs. Nothing under cookieradar/ had to change, so the
+    rule above refused the release that would put a fixed image on Docker Hub.
+
+    A change to what the image is built from earns the third segment — the one
+    kept for something urgent on what has already shipped — and nothing more.
+    Its changelog entry says what moved, so nobody goes hunting in the code."""
+    assert version_is_earned(version, package_changed=package, image_changed=image) is earned
 
 
 def test_a_fix_on_top_of_a_baseline_never_starts_at_zero():
