@@ -56,3 +56,34 @@ def test_the_nis2_document_names_the_one_dependency_the_image_pins():
     doc = " ".join((ROOT / "docs" / "nis2-compliance.md").read_text(encoding="utf-8").split())
     assert "tranne Playwright" in doc
     assert "tests/test_docker_playwright.py" in doc
+
+
+# ── The Node inside Playwright ───────────────────────────────────────────────
+# Playwright's driver is a Node binary of its own, which scanners read in the
+# image. On 2026-11-15 Docker Scout reported ten high CVEs against the Node 24.21.0
+# that 1.63.0 bundles: three fixed in 24.22.1 (CVE-2026-105482, -105483, -106069),
+# seven in 24.22.3 and 26.13.1, the security release of 2026-11-11
+# (CVE-2026-123863, -123864, -123865, -123866, -123872, -123874, -126051). Read
+# from the Linux wheels that day: 1.64.1 bundles 24.22.1, 1.65.0 bundles 26.13.0,
+# released before the fixes, and 1.65.1 is the first with 26.13.1.
+
+FIRST_WITH_A_FIXED_NODE = (1, 65, 1)
+
+
+def test_the_locked_playwright_bundles_a_node_with_the_fixes():
+    version = tuple(int(part) for part in locked_version("playwright").split("."))
+    assert version >= FIRST_WITH_A_FIXED_NODE, (
+        f"uv.lock resolves playwright {locked_version('playwright')}, whose Node predates "
+        f"the 2026-11-11 security release")
+
+
+def test_libatomic_is_installed_before_playwright_installs_its_dependencies():
+    """Node 26, from Playwright 1.65 on, links libatomic.so.1, which the slim
+    base image does not carry: on 2026-11-12 `playwright install-deps chromium`
+    stopped with exit code 127 on 1.65.1 for that reason. It is installed in the
+    same instruction, before the driver first runs."""
+    text = re.sub(r"\\\n\s*", " ", DOCKERFILE.read_text(encoding="utf-8"))
+    run = next(line for line in text.splitlines() if "playwright install-deps chromium" in line)
+    assert "libatomic1" in run, run
+    assert run.index("libatomic1") < run.index("playwright install-deps chromium"), run
+

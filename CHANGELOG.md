@@ -12,6 +12,20 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Security
+
+- **Playwright 1.65.1, for the Node it carries.** Playwright's driver is a Node binary of its own, and
+  on 2026-11-15 Docker Scout reported ten high CVEs against the Node 24.21.0 inside 1.63.0, in the image
+  just published as 2026.47: three fixed in Node 24.22.1 (CVE-2026-105482, -105483, -106069) and seven
+  in the security release of 2026-11-11, 24.22.3 and 26.13.1 (CVE-2026-123863, -123864, -123865,
+  -123866, -123872, -123874, -126051). Read from the Linux wheels that day, 1.64.1 bundles Node 24.22.1
+  and 1.65.0 bundles 26.13.0, released before the fixes; 1.65.1 is the first with 26.13.1. It is four
+  days old, under the fourteen days a dependency waits here, and goes in because the version it replaces
+  has the known vulnerabilities. Its Node 26 links libatomic.so.1, which the slim base lacks and which
+  stopped the build on 2026-11-12, so the Dockerfile installs libatomic1 before `playwright
+  install-deps`. pyee leaves the lock: Playwright no longer depends on it.
+  `tests/test_docker_playwright.py` holds the floor and the order.
+
 ## [2026.47] - 2026-11-15
 
 ### Added

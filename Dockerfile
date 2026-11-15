@@ -19,12 +19,16 @@ WORKDIR /app
 # when only cookieradar's own code has changed. The version is the one the
 # lockfile resolves (tests/test_docker_playwright.py): an open range took
 # whatever PyPI had published the day before.
-RUN pip install --no-cache-dir --root-user-action=ignore "playwright==1.63.0"
-# Chromium's system dependencies, which need root. install-deps also brings an
-# X server (xvfb, xserver-common) for headed browsers without a display, which
-# nothing here starts: it goes in the same layer, and only those two packages
+RUN pip install --no-cache-dir --root-user-action=ignore "playwright==1.65.1"
+# Chromium's system dependencies, which need root. The playwright command is a
+# Node 26 binary that links libatomic.so.1, absent from the slim base, so
+# libatomic1 comes first. install-deps also brings an X server (xvfb,
+# xserver-common) for headed browsers without a display, which nothing here
+# starts: it goes in the same layer, and only those two packages
 # (tests/test_docker_xserver.py).
-RUN playwright install-deps chromium && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libatomic1 && \
+    playwright install-deps chromium && \
     apt-get purge -y xvfb xserver-common
 # A non-root user to run as
 RUN useradd -m -u 1000 cookieradar
