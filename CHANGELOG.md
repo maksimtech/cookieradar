@@ -14,6 +14,16 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [2026.47.1] - 2026-11-15
 
+### Changed
+
+- **A change to the image earns a fix version, and only that.** A version ahead of the last tag needed a
+  change under `cookieradar/`, so that no Radar gets a number for nothing. The Playwright fix above is
+  in the Dockerfile alone, and the rule refused the release that puts a fixed image on Docker Hub, where
+  `latest` is what Docker Scout reads and what people pull. A change to the Dockerfile, what the image
+  is built from, now earns the third segment, the one kept for something urgent on what has already
+  shipped, and never an ordinary count. The package on PyPI is the same code as 2026.47.
+  `tests/test_version_contract.py`.
+
 ### Security
 
 - **Playwright 1.65.1, for the Node it carries.** Playwright's driver is a Node binary of its own, and
