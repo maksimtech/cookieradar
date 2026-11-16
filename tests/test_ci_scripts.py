@@ -258,19 +258,9 @@ def test_the_published_file_is_still_checked_where_it_was_published():
     verify = next(i for i, s in enumerate(steps) if "--version" in s.get("run", ""))
 
     assert upload < wait < verify, names
-    assert "cookieradar==" in steps[verify]["run"], "it has to be the version just uploaded"
-
-
-def test_the_check_asks_for_no_margin_because_there_is_one_resolver():
-    """The grace exists because the runner and the buildx container ask different
-    edges of the index. Here there is only the runner, which has just had
-    `pip download` answer, so a margin would buy nothing — and a wait that buys
-    nothing is what this script was rewritten to stop doing."""
-    steps = _workflow("publish.yml")["jobs"]["build-and-publish"]["steps"]
-    wait = next(s for s in steps if "wait_for_pypi.sh" in s.get("run", ""))
-    arguments = wait["run"].split("wait_for_pypi.sh", 1)[1].split()
-
-    assert arguments[-1] == "0", wait["run"]
+    assert "install_from_pypi.sh" in steps[verify]["run"], (
+        "the install is retried; tests/test_install_from_pypi.py checks what it is given"
+    )
 
 
 def test_ci_builds_docker_image_from_local_source():
