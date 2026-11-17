@@ -133,6 +133,27 @@ async def test_a_refusal_that_comes_with_a_subscription_is_seen_and_not_clicked(
     assert result.pay_to_refuse == "Rifiuta e abbonati"
 
 
+@pytest.mark.integration
+async def test_pay_to_refuse_close_x_is_not_clicked(browser, site_url):
+    """ansa.it, 2026-11-17: iubenda's close X carries aria-label "Rifiuta e
+    abbonati". The close step ran before the pay-to-refuse check and read no
+    label: it clicked the X, Piano's checkout opened, and the session was
+    measured as a refusal."""
+    result, clicked = await _session(browser, f"{site_url}/iubenda_ansa.html", accept=False)
+
+    assert clicked is None
+    assert result.consent_clicked is False
+    assert result.pay_to_refuse.lower() == "rifiuta e abbonati"
+
+
+@pytest.mark.integration
+async def test_pay_to_refuse_close_x_does_not_stop_accept(browser, site_url):
+    result, clicked = await _session(browser, f"{site_url}/iubenda_ansa.html", accept=True)
+
+    assert clicked == "accetta"
+    assert result.consent_clicked is True
+
+
 # ─── What else the banner offered, counted where Accept was clicked ──────────
 
 @pytest.mark.integration

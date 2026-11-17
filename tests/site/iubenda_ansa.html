@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  iubenda banner as served on https://www.ansa.it on 2026-11-17, reduced to the
+  two controls that matter. The classes, the roles and the aria-label are the
+  site's; the text is shortened.
+
+  The close X of iubenda, `.iubenda-cs-close-btn`, is not a close button here:
+  its accessible name is "Rifiuta e abbonati", refuse and subscribe. CookieRadar
+  tries the platform's close X before it looks for a refusal sold with a
+  subscription, never read the label, clicked it, and the page opened Piano's
+  checkout; the report then measured a "rejection" that was the start of a
+  purchase.
+
+  Each control records which one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>ANSA.it</title></head>
+<body>
+<h1>Ultima ora</h1>
+<div id="iubenda-cs-banner" class="iubenda-cs-default">
+  <p>Usiamo i cookie. Puoi accettare oppure rifiutare e abbonarti.</p>
+  <button type="button" class="iubenda-cs-close-btn" tabindex="0" role="button" aria-pressed="false"
+          aria-label="Rifiuta e abbonati"
+          onclick="document.cookie='clicked=rifiuta-e-abbonati; path=/'">Rifiuta e abbonati</button>
+  <button class="iubenda-cs-accept-btn iubenda-cs-btn-primary" tabindex="0" role="button"
+          onclick="document.cookie='clicked=accetta; path=/'">ACCETTA E CONTINUA</button>
+</div>
+</body>
+</html>

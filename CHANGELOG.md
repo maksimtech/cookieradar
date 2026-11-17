@@ -88,6 +88,14 @@ no version in this file has ever matched — 40 is not a month, and
   and the law check; session 1 or 3 unreachable is never OK, and UNVERIFIED says which session never
   loaded. The README's exit codes say so.
 
+- **A close "×" that subscribes is no longer clicked as a refusal.** The close step ran before the
+  check for a refusal sold with a subscription, and chose by selector alone. On www.ansa.it on
+  2026-11-17 iubenda's `.iubenda-cs-close-btn` was labelled "Rifiuta e abbonati": it was clicked,
+  Piano's checkout opened, and the session was measured as a refusal and cited. Every step that
+  clicks now skips a control whose aria-label, text, value or title is a refusal sold with a
+  subscription, and the English "Reject all and subscribe" (also "Reject", "Decline" or "Refuse" …
+  "and subscribe") is recognised beside "Rifiuta e abbonati".
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.

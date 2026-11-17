@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from cookieradar.scanner import ACCEPT_LABELS, REJECT_LABELS
+from cookieradar.scanner import ACCEPT_LABELS, PAY_TO_REFUSE_LABELS, REJECT_LABELS
 
 
 def _matches(labels, name: str) -> bool:
@@ -45,3 +45,18 @@ def test_accetta_e_continua_is_an_acceptance(name):
 def test_continua_senza_accettare_is_still_the_refusal_and_not_accetta_e_continua():
     assert _matches(REJECT_LABELS, "Continua senza accettare")
     assert not _matches(ACCEPT_LABELS, "Continua senza accettare")
+
+
+@pytest.mark.parametrize("name", [
+    "Rifiuta e abbonati", "RIFIUTA E ABBONATI",
+    "Reject all and subscribe", "REJECT AND SUBSCRIBE", "Decline and subscribe", "Refuse and subscribe",
+])
+def test_a_refusal_sold_with_a_subscription_is_named_as_such(name):
+    """The English form of repubblica.it's "Rifiuta e abbonati", the label the
+    same walls carry in an English locale."""
+    assert _matches(PAY_TO_REFUSE_LABELS, name)
+
+
+@pytest.mark.parametrize("name", ["Reject all", "Subscribe", "Accept and subscribe", "Rifiuta", "Abbonati"])
+def test_a_plain_refusal_or_a_plain_subscription_is_not_pay_to_refuse(name):
+    assert not _matches(PAY_TO_REFUSE_LABELS, name)

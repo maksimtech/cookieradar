@@ -570,8 +570,14 @@ CLOSE_SELECTORS = [
 
 # A refusal that costs a subscription: seen, named in the report, never clicked.
 # Measured on repubblica.it, 2026-10-17 (iubenda, `.iubenda-cs-reject-btn`).
+#
+# Every step that clicks checks a candidate against these first: on ansa.it on
+# 2026-11-17 iubenda's close X, `.iubenda-cs-close-btn`, was labelled "Rifiuta e
+# abbonati", the close step clicked it, and Piano's checkout opened.
 PAY_TO_REFUSE_LABELS = [
     re.compile(r"^\s*rifiuta\s+e\s+abbonati\s*$", re.I),
+    # The same wall in English: "Reject all and subscribe", "Decline and subscribe"
+    re.compile(r"^\s*(reject|decline|refuse)(\s+all)?\s+and\s+subscribe\s*$", re.I),
 ]
 
 # Whole accessible names, case-insensitive: "OK" must not match "Cookie settings",
@@ -613,6 +619,33 @@ async def _first_visible(page: Page, selector: str):
     return None
 
 
+async def _sold_with_a_subscription(control) -> bool:
+    """Whether a control is named as a refusal that costs a subscription.
+
+    Its aria-label, its text, its value and its title: what makes up the name a
+    person or a screen reader is given. A close X can carry the name, as on
+    ansa.it, and a selector cannot tell.
+    """
+    names = []
+    for read in (lambda: control.get_attribute("aria-label"), control.inner_text,
+                 lambda: control.get_attribute("value"), lambda: control.get_attribute("title")):
+        with suppress(PlaywrightError):
+            names.append(await read())
+    return any(
+        label.search(" ".join(name.split()))
+        for name in names if isinstance(name, str)
+        for label in PAY_TO_REFUSE_LABELS
+    )
+
+
+async def _first_clickable(page: Page, selector: str):
+    """First visible match that is not a refusal sold with a subscription."""
+    for element in await page.query_selector_all(selector):
+        if await element.is_visible() and not await _sold_with_a_subscription(element):
+            return element
+    return None
+
+
 async def _click_consent_button(page: Page, selectors: list[str], labels: list[re.Pattern],
                                 before_click=None) -> bool:
     """Click the first visible match: CSS selectors first, then buttons by accessible name.
@@ -622,7 +655,7 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
     """
     for selector in selectors:
         try:
-            btn = await _first_visible(page, selector)
+            btn = await _first_clickable(page, selector)
             if btn:
                 if before_click:
                     await before_click(btn)
@@ -635,7 +668,7 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
             buttons = page.get_by_role("button", name=label)
             for i in range(await buttons.count()):
                 btn = buttons.nth(i)
-                if await btn.is_visible():
+                if await btn.is_visible() and not await _sold_with_a_subscription(btn):
                     if before_click:
                         await before_click(btn)
                     await btn.click()
@@ -871,11 +904,11 @@ async def _run_session(
             # Step 2 — OneTrust a due step: apri preferenze poi rifiuta
             if not rejected:
                 try:
-                    pc_btn = await _first_visible(page, "#onetrust-pc-btn-handler")
+                    pc_btn = await _first_clickable(page, "#onetrust-pc-btn-handler")
                     if pc_btn:
                         await pc_btn.click()
                         await page.wait_for_timeout(2000)
-                        refuse_btn = await _first_visible(page, ".ot-pc-refuse-all-handler")
+                        refuse_btn = await _first_clickable(page, ".ot-pc-refuse-all-handler")
                         if refuse_btn:
                             await refuse_btn.click()
                             await page.wait_for_timeout(2000)
