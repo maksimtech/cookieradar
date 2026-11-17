@@ -78,6 +78,16 @@ no version in this file has ever matched — 40 is not a month, and
   wall, five of them. The list is now printed only when the refusal was clicked, as `batch` and the
   law check already did.
 
+- **A site that never loaded is no longer reported as measured.** `verdict` ignored a session's error
+  when there was no status: a navigation that failed outright (name not resolved, connection refused
+  or reset, nothing before the timeout) left a session with no trackers and no cookie, which read as a
+  clean one. On 2026-11-17 www.gnu.org's pre-consent session got `net::ERR_CONNECTION_RESET` while the
+  other two loaded, and the verdict was OK; an unresolvable host exited with 2 and "reject button not
+  found". A session with an error, no status and nothing from a document is now unreachable
+  (`scanner.unreachable`). Every session unreachable is `⛔ NOT MEASURED`, exit 3, in `audit`, `batch`
+  and the law check; session 1 or 3 unreachable is never OK, and UNVERIFIED says which session never
+  loaded. The README's exit codes say so.
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.

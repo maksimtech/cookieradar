@@ -184,6 +184,10 @@ def test_batch_shows_session_errors(tmp_path):
     f.write_text("example.com\n", encoding="utf-8")
 
     def build(r):
+        # A timeout after the page had answered: the session is incomplete, not
+        # empty. With no status at all it would be a page that never loaded,
+        # which is never OK (tests/test_verdict_unreachable.py).
+        r.pre_consent.status = 200
         r.pre_consent.error = "Timeout 30000ms exceeded."
 
     res = _invoke(["batch", str(f)], build)

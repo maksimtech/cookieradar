@@ -139,9 +139,9 @@ cookieradar batch urls.txt -o reports/
 
 An invalid address or a site that fails to load is reported and skipped;
 the other sites are still audited. A site that answers with an error status
-(e.g. 403) or with a bot-management challenge instead of its own page is
-reported as `⛔ NOT MEASURED`, without tracker counts, and counts as not
-audited for the exit code.
+(e.g. 403) or with a bot-management challenge instead of its own page, or that
+could not be reached in any session, is reported as `⛔ NOT MEASURED`, without
+tracker counts, and counts as not audited for the exit code.
 
 ## Reading the report
 
@@ -367,17 +367,21 @@ it without reading the output:
 |---|---|---|
 | **0** | OK: no tracker loaded after rejection | Every site is OK |
 | **1** | VIOLATION | At least one site has a VIOLATION |
-| **2** | UNVERIFIED: "Reject" could not be clicked | At least one site is UNVERIFIED, none has a VIOLATION, none failed |
-| **3** | Error: invalid address, browser not starting, report not writable, invalid command-line option | The URL file cannot be read, an invalid command-line option, or at least one site could not be audited (invalid address, scan failed, report not writable) and none has a VIOLATION |
+| **2** | UNVERIFIED: "Reject" could not be clicked, or session 1 or 3 never loaded | At least one site is UNVERIFIED, none has a VIOLATION, none failed |
+| **3** | Error, or NOT MEASURED: invalid address, a site that answered with an error page or a challenge or could not be reached in any session, browser not starting, report not writable, invalid command-line option | The URL file cannot be read, an invalid command-line option, or at least one site could not be audited (invalid address, scan failed, report not writable) and none has a VIOLATION |
 
 A VIOLATION always wins: if one site violates and another fails, `batch`
 exits with 1, and so does `audit` when the verdict is VIOLATION but the
 report file cannot be written. The error is still shown in the output.
 
-A site that times out or cannot be reached is not an error for the exit
-code: the audit runs, the problem is shown in yellow, and the verdict
-follows from what was observed (usually UNVERIFIED, since "Reject" could not
-be clicked).
+A site that cannot be reached at all — no session got a page: the name does
+not resolve, the connection is refused or reset, nothing answered before the
+timeout — is `⛔ NOT MEASURED` and exits with 3, like an error page. A session
+that hit an error after the page had answered (a timeout while it kept
+loading, say) is shown in yellow, and the verdict follows from what was
+observed. A site whose session 1 or session 3 never loaded while the others
+did is never OK: with nothing cited, it is UNVERIFIED, since what the missing
+session would have shown was not measured.
 
 Example: fail a CI job only on violations, and warn when a site could not be
 verified:

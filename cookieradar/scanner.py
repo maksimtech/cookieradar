@@ -235,6 +235,39 @@ def not_served(result: ScanResult) -> tuple[str, int] | None:
     return None
 
 
+def unreachable(session: SessionResult) -> bool:
+    """The session's page never loaded: the navigation failed before any
+    document answered.
+
+    An error, no status, and nothing a document would have left: no title, no
+    text, no banner, no click, no request, no cookie. That is a name that does
+    not resolve, a connection refused or reset, or a timeout before the first
+    byte. Measured on 2026-11-17: www.gnu.org's pre-consent session got
+    net::ERR_CONNECTION_RESET while the other two loaded, and the verdict was
+    OK, built on a session that had measured nothing.
+
+    A timeout after the page had answered is not this: the status is recorded
+    (`served`), and the session is incomplete, not empty.
+    """
+    return bool(session.error) and session.status is None and not (
+        session.title or session.text or session.banner_found or session.consent_clicked
+        or session.trackers or session.external or session.cookies
+    )
+
+
+def not_reached(result: ScanResult) -> str | None:
+    """The error of a site no session could load, or None.
+
+    Every session unreachable is a site never seen, the same as an error page:
+    NOT MEASURED, not UNVERIFIED. An unresolvable host used to exit with 2 and
+    "reject button not found", a statement about a banner nobody saw.
+    """
+    sessions = (result.pre_consent, result.post_accept, result.post_reject)
+    if all(unreachable(session) for session in sessions):
+        return result.pre_consent.error
+    return None
+
+
 # A bot-management edge refuses in two ways, and only one of them looks like a
 # refusal. `page_not_served` catches the status; these catch the other, where the
 # challenge answers 200 and the browser loads it like any other page.
@@ -380,12 +413,13 @@ def verdict(result: ScanResult) -> Verdict:
     `--full` counted only trackers seen both before consent and after rejection,
     and printed "none persist" for the other three ways a site is not OK.
     """
-    if page_not_served(result) or bot_challenge(result).seen:
+    if page_not_served(result) or bot_challenge(result).seen or not_reached(result):
         # Not UNVERIFIED: that means the site was seen and the refusal could
         # not be exercised. Here the site was never seen — either the edge
         # refused it outright, or what came back was a challenge and not the
-        # page. A challenge answering 200 would otherwise reach the checks
-        # below and be reported as a site with no trackers and no banner.
+        # page, or no session got a page at all. A challenge answering 200
+        # would otherwise reach the checks below and be reported as a site
+        # with no trackers and no banner.
         return Verdict.ERROR
     # Before the refusal is considered: tracking stored on the device before any
     # choice is a violation whatever the banner did afterwards (art. 122(1)
@@ -394,7 +428,13 @@ def verdict(result: ScanResult) -> Verdict:
         return Verdict.VIOLATION
     if not result.post_reject.consent_clicked:
         return Verdict.UNVERIFIED
-    return Verdict.VIOLATION if find_violations(result).all else Verdict.OK
+    if find_violations(result).all:
+        return Verdict.VIOLATION
+    # A clean session 3 says nothing about session 1 if session 1 never loaded:
+    # the storage before any choice was not measured, and OK would vouch for it.
+    if unreachable(result.pre_consent) or unreachable(result.post_reject):
+        return Verdict.UNVERIFIED
+    return Verdict.OK
 
 
 TRACKER_DOMAINS = [

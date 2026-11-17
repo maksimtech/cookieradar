@@ -103,6 +103,13 @@ CHALLENGED_NOTE = (
     "no provision is cited — there is nothing here to apply one to"
 )
 
+# And the third: no session got a page at all. "No cookie banner was
+# recognised" was said of a host that does not resolve.
+UNREACHABLE_NOTE = (
+    "NOT MEASURED: the site could not be reached in any session, so no "
+    "provision is cited — there is nothing here to apply one to"
+)
+
 NO_REFUSAL_NOTE = (
     "UNVERIFIED: the banner was found and accepted, and no refusal control was "
     "found on it, so no provision is cited for the post-reject session — the "
@@ -164,12 +171,14 @@ def refusal_not_offered(result) -> bool:
 
 def _not_the_site(result) -> str | None:
     """The note that stands for the whole audit when the site was never seen."""
-    from cookieradar.scanner import bot_challenge, page_not_served
+    from cookieradar.scanner import bot_challenge, not_reached, page_not_served
 
     if page_not_served(result):
         return NOT_SERVED_NOTE
     if bot_challenge(result).seen:
         return CHALLENGED_NOTE
+    if not_reached(result):
+        return UNREACHABLE_NOTE
     return None
 
 

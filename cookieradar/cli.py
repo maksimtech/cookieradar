@@ -26,8 +26,10 @@ from cookieradar.scanner import (
     Violations,
     bot_challenge,
     find_violations,
+    not_reached,
     not_served,
     stored_before_choice,
+    unreachable,
     verdict,
 )
 
@@ -358,7 +360,10 @@ def _why_not_the_site(result) -> str | None:
     if unserved:
         return _not_served_in(result.pre_consent, *unserved)
     challenge = bot_challenge(result)
-    return _challenged(challenge) if challenge.seen else None
+    if challenge.seen:
+        return _challenged(challenge)
+    error = not_reached(result)
+    return f"the site could not be reached: {error}" if error else None
 
 
 def _not_served_in(session, where: str, status: int) -> str:
@@ -386,7 +391,11 @@ def _what_was_measured(result) -> str:
     and a number next to a session that did not take place is the thing this
     whole report is careful not to print.
     """
-    parts = [f"{len(_unique_domains(result.pre_consent))} before consent"]
+    if unreachable(result.pre_consent):
+        # A session that never loaded measured nothing, not zero
+        parts = ["none before consent (the page never loaded)"]
+    else:
+        parts = [f"{len(_unique_domains(result.pre_consent))} before consent"]
     if result.post_accept.consent_clicked:
         parts.append(f"{len(_unique_domains(result.post_accept))} after accepting")
     if result.post_reject.consent_clicked:
@@ -509,6 +518,22 @@ def _render_report(out: Console, url: str, result, law=None):
             "like. Unlike a refused address, this one is sometimes served to a "
             "visible browser — try again with --no-headless.[/dim]"
         )
+    elif not_reached(result):
+        out.print(
+            "[bold red]⛔ NOT MEASURED — the site could not be reached in any "
+            "session, so nothing above describes it[/bold red]"
+        )
+        out.print(f"[red]   {escape(not_reached(result) or '')}[/red]")
+    elif outcome is ExitCode.UNVERIFIED and result.post_reject.consent_clicked:
+        # The refusal was applied and nothing was cited after it, but a session
+        # the verdict rests on never loaded: OK would vouch for what it missed.
+        missed = next(s for s in (result.pre_consent, result.post_reject) if unreachable(s))
+        out.print(
+            f"[bold yellow]⚠️  UNVERIFIED — the {missed.session} session never loaded, "
+            "so this audit is incomplete[/bold yellow]"
+        )
+        out.print(f"[yellow]   {escape(missed.error or '')}[/yellow]")
+        out.print(f"[yellow]   Trackers measured: {_what_was_measured(result)}.[/yellow]")
     elif outcome is ExitCode.UNVERIFIED:
         out.print(
             "[bold yellow]⚠️  UNVERIFIED — no refusal could be applied, so nothing "
@@ -810,11 +835,20 @@ def batch(
                 console.print(f"  {status}")
                 console.print(f"    [yellow]{escape(reason)}[/yellow]")
             else:
-                console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
+                # A session that never loaded measured nothing, not zero
+                counts = [
+                    f"{label}: not measured" if unreachable(session) else f"{label}: {count} trackers"
+                    for label, session, count in (("pre", result.pre_consent, len(pre)),
+                                                  ("post-reject", result.post_reject, len(rej)))
+                ]
+                console.print(f"  {status} — {', '.join(counts)}")
                 for item in stored_before_choice(result):
                     console.print(f"    [red]stored before any choice: {escape(item)}[/red]")
                 if not result.post_reject.consent_clicked:
-                    console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
+                    # Not "reject button not found" when there was no page to look
+                    # on: the session's error below says why
+                    if not unreachable(result.post_reject):
+                        console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
                 else:
                     _print_violations(console, find_violations(result), "    ")
             for s in _session_errors(result):
