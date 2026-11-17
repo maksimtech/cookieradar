@@ -27,6 +27,50 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **A citation is "verified" only when the reference it cites is in the text downloaded now.** The
+  check looked at the article: with Cellar's page parsed and a point it cites, such as GDPR art.
+  5(1)(a), missed by the parser, the reference fell back to the cache, old SHA-256 and date included,
+  under "verified against Cellar"; with an empty cache the same label stood beside `SHA256: not
+  available`. Every cited reference is now looked up in the text just parsed, and one that is missing
+  makes the act a fetch failure: its citations come from the cache, labelled as such, or have no hash
+  and say so. Ported from mailradar #103, as the five law modules below.
+
+- **A failed download always reaches the EUR-Lex fallback and the cache.** Only `httpx.HTTPError` was
+  a fetch failure. A 303 to `http://xn--/DOC_1` makes httpx raise `idna.core.IDNAError`, a
+  `ValueError`, which skipped the fallback and ended the whole law check. `httpx.InvalidURL` and
+  `ValueError` are now fetch failures too.
+
+- **Redirects stay on the source's host.** Any `Location` was followed, so a text served by another
+  host was labelled "verified against Cellar". Cellar may redirect only to publications.europa.eu,
+  EUR-Lex only to eur-lex.europa.eu and Normattiva only to www.normattiva.it, on the default port; the
+  http:// hop Cellar makes is still taken over HTTPS. The hosts in `docs/nis2-compliance.md` are now
+  the only ones the law check can reach, and the document says so.
+
+- **A page is read up to 32 MiB, and a fetch ends after 120 seconds.** The timeout bounded each read,
+  not the whole, and nothing limited the size of the page. The body is now streamed, refused past
+  `MAX_RESPONSE_BYTES` (32 MiB; the GDPR from Cellar is 823981 bytes) and abandoned past
+  `FETCH_DEADLINE` (120 s, redirects included); either one is a fetch failure, so the fallbacks apply.
+
+- **A change in the law is reported even when the cache cannot be written.** The comparison with the
+  previous text was made by the save, so with a read-only cache a law whose text changed was cited
+  without the warning, and an unchanged wording was dated to the day of the audit. The merge is now
+  `law_cache.merge`, made before the save and kept whether the save succeeds or not.
+
+- **Errors and status lines name the source that was tried.** A missing article always read "not
+  found in the EUR-Lex page", for Normattiva and Cellar pages too, and the report's status line said
+  "EUR-Lex unreachable" whatever had happened — for the GDPR, whose first source is Cellar, even when
+  Cellar had answered. `LawFetchError` carries `source` and `reached`, `ActStatus` carries `tried`
+  and `failure`, and the line says "GDPR: Cellar answered without the text cited" or "GDPR: Cellar
+  and EUR-Lex unreachable".
+
+- **A corrupt law cache is an empty one.** A deeply nested `law_cache.json` made `json.loads` raise
+  `RecursionError`, and the whole law check failed. It is now read as an empty cache.
+
+- **Normattiva's "-bis" paragraphs have a reference of their own.** Paragraph numbers were read as
+  `\d+`, so paragraph 2-bis of art. 122 of the Codice privacy, and 3-bis and 4-bis of art. 21 of the
+  Consumer Code, were part of the article's text and could not be cited; the later Latin numbers
+  (-ter, -quater, ... -decies, -terdecies) are read too.
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.

@@ -10,8 +10,9 @@ answers made up for the occasion.
   anything in clear.
 - An HTTPS server whose every answer redirects to itself, with a certificate made
   here with `cryptography` (a test dependency) and trusted only by the client
-  passed in: the fetch gives up after MAX_REDIRECTS hops instead of following
-  forever.
+  passed in. It used to show the fetch giving up after MAX_REDIRECTS hops; since
+  redirects stay on the source's host, it shows the first redirect refused, and
+  the limit is shown on eur-lex.europa.eu through a transport.
 """
 
 from __future__ import annotations
@@ -95,7 +96,11 @@ def certificate(tmp_path: Path) -> tuple[Path, Path]:
     return cert_path, key_path
 
 
-def test_a_redirect_loop_stops_after_the_limit(certificate):
+def test_a_redirect_off_the_source_host_is_not_followed(certificate):
+    """A real HTTPS server on 127.0.0.1 redirecting to itself. Until redirects
+    were kept on the source's host this was the redirect loop, followed
+    MAX_REDIRECTS times; 127.0.0.1 on a high port is none of the sources'
+    hosts, so the first redirect is now the last request."""
     cert, key = certificate
     served: list[str] = []
 
@@ -119,7 +124,25 @@ def test_a_redirect_loop_stops_after_the_limit(certificate):
         client_context = ssl.create_default_context(cafile=str(cert))
         with (
             httpx.Client(verify=client_context, timeout=5) as client,
-            pytest.raises(LawFetchError, match=f"redirected more than {MAX_REDIRECTS} times"),
+            pytest.raises(LawFetchError, match=f"redirected to 127.0.0.1:{port}, not to eur-lex.europa.eu"),
         ):
             fetch_html(f"https://127.0.0.1:{port}/resource/act", client=client)
-    assert served == ["/resource/act"] * (MAX_REDIRECTS + 1)
+    assert served == ["/resource/act"]
+
+
+def test_a_redirect_loop_on_the_source_host_stops_after_the_limit():
+    """The loop itself, now on the one host a redirect may stay on: answered by
+    a transport, since no local server can be eur-lex.europa.eu on port 443."""
+    served: list[str] = []
+
+    def loop(request: httpx.Request) -> httpx.Response:
+        served.append(str(request.url))
+        return httpx.Response(302, headers={"Location": request.url.path})
+
+    url = "https://eur-lex.europa.eu/resource/act"
+    with (
+        httpx.Client(transport=httpx.MockTransport(loop)) as client,
+        pytest.raises(LawFetchError, match=f"redirected more than {MAX_REDIRECTS} times"),
+    ):
+        fetch_html(url, client=client)
+    assert served == [url] * (MAX_REDIRECTS + 1)

@@ -96,6 +96,55 @@ def test_normattiva_update_marks_and_heading_are_dropped():
         assert "vigore" not in text
 
 
+def test_normattiva_bis_paragraphs_can_be_cited():
+    """Art. 21 of the Consumer Code has paragraphs 3-bis and 4-bis: they were
+    part of the article's text, and could not be cited on their own."""
+    texts = parse_articles(page("normattiva_cdc_art21.html"), ("21",))
+
+    assert texts["21(3-bis)"].startswith("3-bis. ")
+    assert texts["21(4-bis)"].startswith("4-bis. ")
+    assert texts["21"].split("\n") == [
+        texts[f"21({n})"] for n in ("1", "2", "3", "3-bis", "4", "4-bis")
+    ]
+
+
+def test_privacy_code_paragraph_2_bis_can_be_cited():
+    """Art. 122 of the Codice privacy, the article CookieRadar cites, has a 2-bis."""
+    texts = parse_articles(page("normattiva_privacy_art122.html"), ("122",))
+
+    assert texts["122(2-bis)"].startswith("2-bis. ")
+
+
+@pytest.mark.parametrize("suffix", ["ter", "quater", "quinquies", "sexies", "decies", "terdecies"])
+def test_normattiva_later_latin_paragraphs_can_be_cited(suffix):
+    """The same page with paragraph 4-bis renumbered, as later amendments number theirs."""
+    html = page("normattiva_cdc_art21.html").replace(">4-bis. <", f">4-{suffix}. <")
+    assert html != page("normattiva_cdc_art21.html")
+
+    assert parse_articles(html, ("21",))[f"21(4-{suffix})"].startswith(f"4-{suffix}. ")
+
+
+def test_an_article_missing_from_normattiva_names_normattiva(monkeypatch):
+    """"not found in the EUR-Lex page" was said of every page, Normattiva's too."""
+    monkeypatch.setattr(law_fetcher, "fetch_html", lambda url, **kwargs: page("normattiva_privacy_art122.html"))
+    with pytest.raises(LawFetchError) as caught:
+        law_fetcher.fetch_provisions_from(law_fetcher.PRIVACY_CODE, ("999",))
+
+    assert "Normattiva" in str(caught.value)
+    assert "EUR-Lex" not in str(caught.value)
+    assert (caught.value.source, caught.value.reached) == ("Normattiva", True)
+
+
+def test_an_article_missing_from_cellar_names_cellar(monkeypatch):
+    monkeypatch.setattr(law_fetcher, "fetch_html", lambda url, **kwargs: page("gdpr_it_excerpt.html"))
+    with pytest.raises(LawFetchError) as caught:
+        law_fetcher.fetch_provisions_from(GDPR, ("99",))
+
+    assert "Cellar" in str(caught.value)
+    assert "EUR-Lex" not in str(caught.value)
+    assert (caught.value.source, caught.value.reached) == ("Cellar", True)
+
+
 def test_normattiva_articles_21_and_49():
     assert parse_articles(page("normattiva_cdc_art21.html"), ("21",))["21(1)(a)"] == (
         "a) l'esistenza o la natura del prodotto;"
