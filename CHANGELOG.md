@@ -12,6 +12,19 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Changed
+
+- **The 49 exceptions due on 2026-11-30 are reviewed.** Without the review, Security Posture would
+  have failed on its own from 2026-12-01. Each entry was read again on 2026-11-17 against the Debian
+  security tracker and archive, and against the image. 37 move on. libxml2, expat 2.9.0, krb5 and
+  cups are still unfixed in trixie, or fixed only in sid, and move to 2026-12-31; acl, which is
+  no-dsa and waits for a point release, moves to 2027-01-31. 12 go. Two expat CVEs were fixed by
+  DSA-6566-1 and the image has the fix. harfbuzz is not affected in Debian. Four gnutls CVEs are
+  rated unimportant by Debian, and one was rejected by its CNA. The four xorg-server entries cover
+  packages the Dockerfile purges. krb5 CVE-2026-107778 stays: Docker Scout has been quiet on it
+  since 2026-10-11, but the package has not changed. Run against the live alerts, the gate is green
+  on 2026-11-17 and on 2026-12-01.
+
 ### Fixed
 
 - **A release no longer goes red because the index answered the check before it had caught up.** After
@@ -24,6 +37,17 @@ no version in this file has ever matched — 40 is not a month, and
   script, and the same `tests/test_install_from_pypi.py`, in all six Radar. It installs the wheel
   only (`--only-binary :all:`), as apkradar and patchradar already did: the check is about the file
   that was uploaded, not a build of the sdist.
+
+- **Security Posture gives no verdict on a failed Docker Scout scan.** It ran after every Scout run,
+  failed ones included. On 2026-11-16 exeradar's Scout stopped on a 403 before scanning, and the
+  gate went green on the previous scan's alerts. It now runs on a `workflow_run` only when the scan
+  succeeded, as Scout itself does after the image workflow. Push, pull request, schedule and manual
+  runs are unchanged.
+
+- **Dependabot reads `uv.lock` for security updates.** patchradar's `uv.lock` held opentelemetry-api
+  1.45.1 with a Dependabot alert on it from 2026-11-14, and no pull request came, because no entry
+  of the configuration read `uv.lock`. A `uv` entry with `open-pull-requests-limit: 0` stops version
+  updates for uv, so pip's remain the one weekly stream, and leaves security updates to arrive.
 
 ## [2026.47.1] - 2026-11-15
 
