@@ -52,3 +52,14 @@ async def test_the_status_is_the_last_hop_of_a_redirect(browser, site_url):
 
     assert "Timeout" in result.error
     assert result.status == 200
+
+
+@pytest.mark.integration
+async def test_the_session_records_the_host_the_document_came_from(browser, site_url):
+    """What `stored_before_choice` compares a cookie's domain with: the site is
+    where the navigation landed, as for the requests."""
+    ctx = await browser.new_context()
+    result = await _run_session(ctx, f"{site_url}/banner.html", "pre-consent", timeout_ms=5000)
+    await ctx.close()
+
+    assert result.host == "127.0.0.1"

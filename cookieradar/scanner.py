@@ -175,6 +175,9 @@ class SessionResult:
     # is exactly what a compliant site looks like.
     title: str = ""
     text: str = ""
+    # The host the main document came from, after any redirect: the site, for
+    # telling its own cookies from a tracker's. Empty when not recorded.
+    host: str = ""
 
 
 @dataclass
@@ -598,12 +601,17 @@ def stored_before_choice(result: ScanResult) -> list[str]:
     a tracker's host is not counted here — it does not by itself show that
     anything was stored or read.
     """
+    # A cookie counts by its domain only when that domain is not the site's: a
+    # site that is itself on the list (linkedin.com) has its own cookies, and its
+    # own requests were already left out as first-party (`is_same_site`). By its
+    # name it counts wherever it is: `_ga` is always written on the site's domain.
+    site = result.pre_consent.host or _ascii_host(urlparse(result.url).hostname or "")
     found = set()
     for cookie in result.pre_consent.cookies:
         name = cookie.get("name") or ""
         domain = (cookie.get("domain") or "").lstrip(".")
         if (name in TRACKING_COOKIE_NAMES or name.startswith(TRACKING_COOKIE_PREFIXES)
-                or tracker_domain(f"https://{domain}/")):
+                or (tracker_domain(f"https://{domain}/") and not is_same_site(site, domain))):
             found.add(f"cookie {name} ({domain})")
     return sorted(found)
 
@@ -1043,6 +1051,7 @@ async def _run_session(
     except PlaywrightError as e:
         _add_error(result, e)
     finally:
+        result.host = page_host
         try:
             result.cookies = await context.cookies()
         except PlaywrightError as e:

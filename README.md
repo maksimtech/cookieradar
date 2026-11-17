@@ -203,7 +203,9 @@ At the end of the report there is one of three outcomes:
 Session 1 counts in the verdict when it shows **storage**: a tracking cookie
 present before the visitor has chosen anything — Google Analytics' `_ga` or
 `_ga_<id>`, Meta's `_fbp`, Google Ads' `_gcl_au`, or any cookie of a known
-tracker's domain. Art. 122(1) of the Codice privacy allows storing information
+tracker's domain other than the audited site's own (a site that is itself on
+the list, such as linkedin.com, has its own cookies, as it has its own
+requests). Art. 122(1) of the Codice privacy allows storing information
 on the device, or reading it, only with consent, and the report cites it with
 ePrivacy art. 5(3). That is a VIOLATION whatever happened with the refusal, and
 the exit code stays the same. A **request** to a tracker before any choice is

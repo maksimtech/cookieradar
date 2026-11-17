@@ -117,6 +117,14 @@ no version in this file has ever matched — 40 is not a month, and
   request: aranzulla.it's doubleclick.net and googlesyndication.com still are. `Violations` has a
   `not_cited` field; `scanner.not_cited_after_rejection` names them. The README says what the rule is.
 
+- **A listed site's own cookies are not "tracking stored before any choice".** A cookie counted as
+  tracking storage when its domain was on the tracker list, and linkedin.com is on it as a tracker of
+  other sites: audited on its own domain, whose requests were already left out as first-party, its
+  `bcookie` and `lang` made a VIOLATION citing art. 122(1) of the Codice privacy. A cookie now counts
+  by its domain only when that domain is not the site's (`is_same_site` with the host the document
+  came from, recorded as `SessionResult.host`); `_ga`, `_fbp` and the other names still count wherever
+  they are set.
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.
