@@ -170,7 +170,8 @@ notifica ai clienti, procedura di rollback. In sintesi:
   avviato manualmente), e in quel caso il tag di quella versione e `latest` vengono
   ripubblicati: per questo il riferimento stabile è il digest;
 - Dependabot controlla ogni settimana gli aggiornamenti delle dipendenze Python e
-  delle GitHub Actions (`.github/dependabot.yml`) e apre le relative pull request.
+  delle GitHub Actions (`.github/dependabot.yml`) e apre le relative pull request; dal
+  2026-11-17 legge anche `uv.lock`, solo per gli aggiornamenti di sicurezza.
 
 Contatto per le segnalazioni: security@maksimtech.com.
 
