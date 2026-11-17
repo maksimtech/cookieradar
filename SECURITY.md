@@ -17,14 +17,16 @@ a fix ships as the next release, never as a patch to an older one.
 - **CodeQL, Bandit and Trivy** (repository files) run on every pull request, on
   every push to `main` and weekly. Trivy also scans the image built from the
   Dockerfile of the pull request, before it is merged.
-- **Docker Scout** checks the published `latest` image on every push to `main` and
-  weekly. The image is built on `python:3.14-slim-trixie` (Debian Trixie) when a
-  release is cut, with the Debian updates available then; it is not rebuilt between
-  releases, so Debian's security patches reach it with the next release.
+- **Docker Scout** checks the published `latest` image as soon as a new image is
+  pushed to Docker Hub, on every push to `main` and weekly. The image is built on
+  `python:3.14-slim-trixie` (Debian Trixie) when a release is cut, with the Debian
+  updates available then; it is not rebuilt between releases, so Debian's security
+  patches reach it with the next release.
 - **Security Posture** reads the alerts all of the above publish to GitHub code
   scanning and fails when a high or critical finding has no reasoned exception in
-  `SECURITY-EXCEPTIONS.toml`. It also runs weekly, because an exception expires by
-  date and not by commit.
+  `SECURITY-EXCEPTIONS.toml`. It runs on every pull request and push to `main`,
+  after each Docker Scout scan, and weekly, because an exception expires by date
+  and not by commit.
 - GitHub secret scanning, with push protection, is enabled on the repository.
 - Reports sent to the address above.
 
@@ -68,4 +70,4 @@ penetration test; no penetration test has been carried out. What these files are
 and the answers to the questions a customer subject to NIS2 may ask, are in
 [docs/nis2-compliance.md](docs/nis2-compliance.md).
 
-Last reviewed: 2026-10-11
+Last reviewed: 2026-11-17
