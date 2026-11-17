@@ -96,6 +96,13 @@ no version in this file has ever matched — 40 is not a month, and
   subscription, and the English "Reject all and subscribe" (also "Reject", "Decline" or "Refuse" …
   "and subscribe") is recognised beside "Rifiuta e abbonati".
 
+- **A tracker fired right after "Reject" is reported.** The post-reject session waited two seconds
+  after the click and only then emptied its lists before the reload, so every request in those two
+  seconds was thrown away — among them a tag that fires on the consent update whatever the choice,
+  which is the misconfiguration the session exists to find. The lists are now cut where they stood
+  when the refusal was clicked: what the page loaded before it still does not count, what the click
+  set off does.
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.

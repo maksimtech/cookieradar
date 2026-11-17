@@ -896,8 +896,20 @@ async def _run_session(
 
         # Reject all
         elif accept is False:
+            # Where the lists stood when the refusal was clicked. What came
+            # before belongs to the page without a choice; what came after,
+            # from the click on, belongs to the refusal. The lists used to be
+            # emptied after the two seconds' wait that follows the click, and a
+            # tag that fires on the consent update, 300 ms after it, was thrown
+            # away with everything else.
+            marks = [0, 0]
+
+            async def mark_the_click(_control) -> None:
+                marks[:] = [len(result.trackers), len(result.external)]
+
             # Step 1 — try rejecting outright
-            rejected = await _click_consent_button(page, REJECT_SELECTORS, REJECT_LABELS)
+            rejected = await _click_consent_button(page, REJECT_SELECTORS, REJECT_LABELS,
+                                                   before_click=mark_the_click)
             if rejected:
                 await page.wait_for_timeout(2000)
 
@@ -910,6 +922,7 @@ async def _run_session(
                         await page.wait_for_timeout(2000)
                         refuse_btn = await _first_clickable(page, ".ot-pc-refuse-all-handler")
                         if refuse_btn:
+                            await mark_the_click(refuse_btn)
                             await refuse_btn.click()
                             await page.wait_for_timeout(2000)
                             rejected = True
@@ -918,7 +931,8 @@ async def _run_session(
 
             # Step 3 — the platform's close X, which keeps the default
             if not rejected:
-                rejected = await _click_consent_button(page, CLOSE_SELECTORS, [])
+                rejected = await _click_consent_button(page, CLOSE_SELECTORS, [],
+                                                       before_click=mark_the_click)
                 if rejected:
                     await page.wait_for_timeout(2000)
 
@@ -927,13 +941,13 @@ async def _run_session(
 
             if rejected:
                 result.consent_clicked = True
-                # Only requests made after the rejection count for this session.
-                # `external` is cleared together with `trackers`: keeping it
-                # would make every host contacted before the rejection appear
-                # among the post-rejection ones, and the count of unknowns would
-                # be twice the truth.
-                result.trackers.clear()
-                result.external.clear()
+                # Only requests made from the rejection on count for this session.
+                # `external` is cut together with `trackers`: keeping it would
+                # make every host contacted before the rejection appear among
+                # the post-rejection ones, and the count of unknowns would be
+                # twice the truth.
+                del result.trackers[:marks[0]]
+                del result.external[:marks[1]]
                 try:
                     await page.reload(wait_until="networkidle", timeout=timeout_ms)
                 except PlaywrightTimeoutError as e:
