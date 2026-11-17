@@ -411,6 +411,15 @@ def _print_consent_header(out: Console, label: str, style: str, session, not_app
         out.print(f"[yellow]⚠️  {not_applied}[/yellow]")
 
 
+def _not_cited_line(violations: Violations) -> str:
+    """The trackers loaded after the refusal and not cited, and why: the rule the
+    report applies before any choice, after the refusal and narrower."""
+    loaded = ", ".join(f"{domain} ({reason})" for domain, reason in sorted(violations.not_cited.items()))
+    return (f"ℹ️  Loaded after rejection, not cited: {loaded} — a tag manager's library, or a ping "
+            f"that says storage is denied, does not show that anything was stored on the device "
+            f"or read from it.")
+
+
 def _print_violations(out: Console, violations: Violations, indent: str):
     for d in sorted(violations.persistent):
         out.print(f"{indent}[red]→ {escape(d)}[/red] [dim](persists from pre-consent)[/dim]")
@@ -579,8 +588,14 @@ def _render_report(out: Console, url: str, result, law=None):
             out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after "
                       f"rejection:[/bold red]")
             _print_violations(out, violations, "  ")
+    elif violations.not_cited:
+        # Something was loaded after the refusal, and none of it is cited: "no
+        # trackers loaded" would be false, and the line below says what it was
+        out.print("[bold green]✅ Nothing cited after rejection[/bold green]")
     else:
         out.print("[bold green]✅ No trackers loaded after rejection[/bold green]")
+    if violations.not_cited and outcome in (ExitCode.OK, ExitCode.VIOLATION):
+        out.print(Text(_not_cited_line(violations), style="dim"))
 
     if _session_errors(result):
         out.print("[yellow]⚠️  Result may be incomplete: some sessions reported errors[/yellow]")
@@ -850,7 +865,10 @@ def batch(
                     if not unreachable(result.post_reject):
                         console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
                 else:
-                    _print_violations(console, find_violations(result), "    ")
+                    violations = find_violations(result)
+                    _print_violations(console, violations, "    ")
+                    if violations.not_cited:
+                        console.print(Text(f"    {_not_cited_line(violations)}", style="dim"))
             for s in _session_errors(result):
                 console.print(f"    [yellow]⚠️  {s.session}: {escape(s.error)}[/yellow]")
             if output:

@@ -8,7 +8,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import IntEnum
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from playwright.async_api import BrowserContext, Cookie, Page, async_playwright
 from playwright.async_api import Error as PlaywrightError
@@ -197,6 +197,10 @@ class ScanResult:
 class Violations:
     persistent: set[str]  # loaded before consent and still loaded after rejection
     new: set[str]  # loaded only after rejection
+    # Loaded after rejection and not cited, with the reason: every request to
+    # the domain was a tag manager's library or a Consent Mode ping with storage
+    # denied (`not_cited_after_rejection`). Neither in `persistent` nor in `new`.
+    not_cited: dict[str, str] = field(default_factory=dict)
 
     @property
     def all(self) -> set[str]:
@@ -392,10 +396,93 @@ def bot_challenge(result: ScanResult) -> Challenge:
 
 
 def find_violations(result: ScanResult) -> Violations:
-    """Every tracker loaded after rejection is a violation."""
+    """Every tracker loaded after rejection is a violation, but for the requests
+    that show nothing stored or read (`not_cited_after_rejection`)."""
     pre = {t.domain for t in result.pre_consent.trackers}
-    rej = {t.domain for t in result.post_reject.trackers}
-    return Violations(persistent=rej & pre, new=rej - pre)
+    session = result.post_reject
+    rej: set[str] = set()
+    reasons: dict[str, list[str]] = {}
+    for request in session.trackers:
+        reason = _not_cited_reason(request, session.cookies) if session.consent_clicked else None
+        if reason is None:
+            rej.add(request.domain)
+        elif reason not in reasons.setdefault(request.domain, []):
+            reasons[request.domain].append(reason)
+    not_cited = {domain: ", ".join(r) for domain, r in sorted(reasons.items()) if domain not in rej}
+    return Violations(persistent=rej & pre, new=rej - pre, not_cited=not_cited)
+
+
+def not_cited_after_rejection(result: ScanResult) -> dict[str, str]:
+    """The tracker domains loaded after a refusal and not cited, with the reason.
+
+    The rule the report already applied before any choice ("a request alone does
+    not show that anything was stored"), after the refusal and narrower. Two
+    kinds of request, and only when every request to the domain was one of them:
+
+    - a tag manager's own library, fetched as a script (`_tag_manager_library`):
+      code downloaded, nothing stored on the device or read from it. What the
+      code then does is a beacon or a cookie, and those are cited;
+    - a Google Consent Mode ping whose `gcs` is G100: ad_storage and
+      analytics_storage both denied, the cookieless ping a refusal leaves.
+
+    Neither when the session holds a tracking cookie by name (`_ga`, `_fbp`,
+    ...) or a cookie on that domain: something wrote it, and it may have been
+    this code. Measured on 2026-11-17 after a clicked refusal: www.köln.de
+    loaded gtm.js, gtag/js and a G100 collect and nothing else, and
+    www.comune.milano.it nine scripts from assets.adobedtm.com and no Adobe
+    beacon. Both were VIOLATION, cited under four provisions.
+    """
+    return find_violations(result).not_cited
+
+
+# Google's hosts on the list, where a Consent Mode ping goes.
+GOOGLE_DOMAINS = frozenset({"google-analytics.com", "googletagmanager.com", "doubleclick.net",
+                            "googlesyndication.com"})
+
+
+def _tag_manager_library(url: str) -> bool:
+    """A tag manager's own code, by host and path: Google Tag Manager's gtm.js
+    and gtag/js, Adobe Launch (assets.adobedtm.com, the library, its extensions
+    and its rules), Tealium iQ's utag, TagCommander's containers. Its beacons
+    go to other paths and hosts (googletagmanager.com/td, omtrdc.net, ...)."""
+    parts = urlparse(url)
+    host = (parts.hostname or "").rstrip(".").lower()
+    path = parts.path
+    if host in ("www.googletagmanager.com", "googletagmanager.com"):
+        return path in ("/gtm.js", "/gtag/js")
+    if host == "assets.adobedtm.com":
+        return path.endswith(".js")
+    if host == "tags.tiqcdn.com":
+        return path.startswith("/utag/") and path.endswith(".js")
+    if host == "cdn.tagcommander.com":
+        return path.endswith(".js")
+    return False
+
+
+def _storage_denied_ping(request: TrackerRequest) -> bool:
+    """A Google Consent Mode request saying both storages are denied (gcs=G100)."""
+    return request.domain in GOOGLE_DOMAINS and parse_qs(urlparse(request.url).query).get("gcs") == ["G100"]
+
+
+def _cookie_of(domain: str, cookies: list[Cookie]) -> bool:
+    """A tracking cookie by name, or any cookie set on `domain`."""
+    for cookie in cookies:
+        name = cookie.get("name") or ""
+        if name in TRACKING_COOKIE_NAMES or name.startswith(TRACKING_COOKIE_PREFIXES):
+            return True
+        if tracker_domain(f"https://{(cookie.get('domain') or '').lstrip('.')}/") == domain:
+            return True
+    return False
+
+
+def _not_cited_reason(request: TrackerRequest, cookies: list[Cookie]) -> str | None:
+    if _cookie_of(request.domain, cookies):
+        return None
+    if request.resource_type == "script" and _tag_manager_library(request.url):
+        return "tag manager library"
+    if _storage_denied_ping(request):
+        return "Consent Mode ping, storage denied"
+    return None
 
 
 class Verdict(IntEnum):

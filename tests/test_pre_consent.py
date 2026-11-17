@@ -102,7 +102,10 @@ def test_the_codice_privacy_is_read_from_normattiva():
 
 
 def test_it_stands_beside_a_violation_after_the_refusal():
-    found = findings_of(_result([GA], after=[GTM]))
+    # A pixel, not GTM's library: a library alone after the refusal is not
+    # cited (tests/test_after_rejection_not_cited.py)
+    pixel = TrackerRequest("https://ad.doubleclick.net/pixel", "doubleclick.net", "image", 0.0)
+    found = findings_of(_result([GA], after=[pixel]))
 
     assert "pre_consent" in found and "violation" in found
 

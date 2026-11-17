@@ -103,6 +103,20 @@ no version in this file has ever matched — 40 is not a month, and
   when the refusal was clicked: what the page loaded before it still does not count, what the click
   set off does.
 
+- **A tag manager's library and a Consent Mode ping with storage denied are no longer cited after a
+  refusal.** Every tracker host contacted after "Reject" was a violation of GDPR art. 5(1)(a),
+  ePrivacy art. 5(3), art. 7 and the Consumer Code, including the two kinds of request the README
+  already called possibly lawful before any choice. On 2026-11-17, after a refusal that was clicked,
+  www.köln.de loaded `gtm.js`, `gtag/js` and a GA4 collect with `gcs=G100`, and nothing else; it was
+  a VIOLATION with four provisions cited. www.comune.milano.it loaded nine scripts from
+  `assets.adobedtm.com` and no Adobe beacon. A domain whose every request after the refusal was a tag
+  manager's library fetched as a script (Google Tag Manager, Adobe Launch, Tealium, TagCommander) or
+  a Google ping with `gcs=G100` is now reported as "Loaded after rejection, not cited", with the
+  reason, and is not cited — unless the session holds a tracking cookie by name or a cookie on that
+  domain. Beacons, pixels and granted pings stay violations, and so does a domain with any other
+  request: aranzulla.it's doubleclick.net and googlesyndication.com still are. `Violations` has a
+  `not_cited` field; `scanner.not_cited_after_rejection` names them. The README says what the rule is.
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.

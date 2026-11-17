@@ -196,7 +196,7 @@ At the end of the report there is one of three outcomes:
 
 | Verdict | Meaning | What to do |
 |---|---|---|
-| ✅ **OK** — *"No trackers loaded after rejection"* | The "Reject" button was clicked and, after reloading, **none** of the known trackers was contacted. | Nothing, for the trackers CookieRadar knows. Still review session 1 (see below). |
+| ✅ **OK** — *"No trackers loaded after rejection"*, or *"Nothing cited after rejection"* | The "Reject" button was clicked and, after reloading, **none** of the known trackers was contacted, or only in the two ways listed below as not cited. | Nothing, for the trackers CookieRadar knows. Still review session 1 (see below). |
 | 🔴 **VIOLATION** | The "Reject" button was clicked, yet after reloading **at least one** known tracker was contacted; or, before any choice, a **tracking cookie** was already on the device. The list follows, with its cause. | Investigate each listed service with whoever manages the site's tags and consent platform. |
 | ⚠️ **UNVERIFIED** | CookieRadar **could not click "Reject"**: no banner, or a banner it does not recognise. Session 3 then shows the page without any choice made, so **no verdict is given** on it. | Check the site by hand, or with `--no-headless` to see what the banner looks like. |
 
@@ -209,6 +209,22 @@ ePrivacy art. 5(3). That is a VIOLATION whatever happened with the refusal, and
 the exit code stays the same. A **request** to a tracker before any choice is
 listed but not cited: Tag Manager loading, or Consent Mode's pings with storage
 denied, can be lawful, and a request alone does not show anything stored.
+
+After the refusal the same two are listed as *"Loaded after rejection, not
+cited"*, and do not make a VIOLATION by themselves, when **every** request to
+that tracker's domain was one of them:
+
+- a tag manager's own library fetched as a script: Google Tag Manager's
+  `gtm.js` and `gtag/js`, Adobe Launch from `assets.adobedtm.com`, Tealium's
+  `utag` from `tags.tiqcdn.com`, TagCommander from `cdn.tagcommander.com`;
+- a Google Consent Mode ping whose `gcs` is `G100`, ad and analytics storage
+  both denied.
+
+Neither applies when the session holds a tracking cookie (`_ga`, `_ga_<id>`,
+`_fbp`, `_gcl_au`) or a cookie on that domain. Everything else stays cited: a
+beacon such as a Google Analytics collect with storage granted, a pixel, a
+tag manager's own beacon (`googletagmanager.com/td`), any request beside the
+library to the same domain.
 
 If a session hit an error (for example the site took more than 30 seconds
 to load), the report shows it in yellow and adds *"Result may be incomplete:
