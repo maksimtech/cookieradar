@@ -178,6 +178,10 @@ class SessionResult:
     # The host the main document came from, after any redirect: the site, for
     # telling its own cookies from a tracker's. Empty when not recorded.
     host: str = ""
+    # The refusal was clicked and the reload after it failed with anything but
+    # a timeout: the session measured the seconds after the click and not the
+    # page the refusal was meant to change (`verdict`).
+    reload_failed: bool = False
 
 
 @dataclass
@@ -522,7 +526,9 @@ def verdict(result: ScanResult) -> Verdict:
         return Verdict.VIOLATION
     # A clean session 3 says nothing about session 1 if session 1 never loaded:
     # the storage before any choice was not measured, and OK would vouch for it.
-    if unreachable(result.pre_consent) or unreachable(result.post_reject):
+    # Nor about the page after the refusal if the reload after the click failed.
+    if (unreachable(result.pre_consent) or unreachable(result.post_reject)
+            or result.post_reject.reload_failed):
         return Verdict.UNVERIFIED
     return Verdict.OK
 
@@ -1046,7 +1052,15 @@ async def _run_session(
                 try:
                     await page.reload(wait_until="networkidle", timeout=timeout_ms)
                 except PlaywrightTimeoutError as e:
+                    # The page answered and kept loading: measured, if incomplete
                     _add_error(result, e)
+                except PlaywrightError as e:
+                    # Reset, aborted, gone: no page after the refusal at all. The
+                    # status and the click are the first load's, and the session
+                    # used to read as a measured one with nothing in it.
+                    _add_error(result, e)
+                    result.reload_failed = True
+                    return result
                 await page.wait_for_timeout(2000)
     except PlaywrightError as e:
         _add_error(result, e)

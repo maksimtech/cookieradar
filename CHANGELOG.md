@@ -125,6 +125,14 @@ no version in this file has ever matched — 40 is not a month, and
   came from, recorded as `SessionResult.host`); `_ga`, `_fbp` and the other names still count wherever
   they are set.
 
+- **A refusal whose reload failed is no longer a clean session 3.** After the click, session 3
+  reloads the page; a reload that failed with anything but a timeout (connection reset, aborted)
+  ended the session with the first load's status and the click recorded, so it read as a measured
+  one with nothing in it: verdict OK, exit 0, "No trackers loaded after rejection", on a test page
+  that loads doubleclick.net on every load. Such a session is now `reload_failed`: never OK
+  (UNVERIFIED, unless something was already caught after the click), and `audit`, `batch` and the law
+  check say the page could not be reloaded after the refusal.
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.

@@ -103,6 +103,14 @@ CHALLENGED_NOTE = (
     "no provision is cited — there is nothing here to apply one to"
 )
 
+# The refusal was applied and the reload after it failed: nothing was measured
+# after the refusal, and no finding about it was drawn either.
+RELOAD_FAILED_NOTE = (
+    "UNVERIFIED: the refusal was applied but the page could not be reloaded "
+    "after it, so nothing was measured after the refusal and no provision is "
+    "cited for the post-reject session"
+)
+
 # And the third: no session got a page at all. "No cookie banner was
 # recognised" was said of a host that does not resolve.
 UNREACHABLE_NOTE = (
@@ -244,6 +252,8 @@ def notes_of(result) -> list[str]:
         # it about.
         return [not_the_site]
     if _rejected(result):
+        if result.post_reject.reload_failed and not _refusal_findings(result):
+            return [RELOAD_FAILED_NOTE]
         return []
     if result.post_reject.pay_to_refuse:
         return [PAY_TO_REFUSE_NOTE.format(label=result.post_reject.pay_to_refuse)]

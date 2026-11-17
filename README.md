@@ -400,7 +400,9 @@ that hit an error after the page had answered (a timeout while it kept
 loading, say) is shown in yellow, and the verdict follows from what was
 observed. A site whose session 1 or session 3 never loaded while the others
 did is never OK: with nothing cited, it is UNVERIFIED, since what the missing
-session would have shown was not measured.
+session would have shown was not measured. The same goes for a refusal whose
+reload failed (connection reset or aborted): session 3 then measured nothing
+after the refusal, and says so.
 
 Example: fail a CI job only on violations, and warn when a site could not be
 verified:

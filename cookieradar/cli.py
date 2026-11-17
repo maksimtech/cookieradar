@@ -316,6 +316,7 @@ REJECT_NOT_APPLIED = "reject button not found: this session is equivalent to pre
 # after, which is the only thing a reader is looking at that table for.
 NOTHING_ACCEPTED = "nothing was accepted, so nothing was measured after acceptance"
 NOTHING_REJECTED = "nothing was rejected, so nothing was measured after rejection"
+RELOAD_FAILED = "the page could not be reloaded after the refusal, so nothing was measured after it"
 
 
 def _not_served(status: int | None) -> str:
@@ -398,7 +399,9 @@ def _what_was_measured(result) -> str:
         parts = [f"{len(_unique_domains(result.pre_consent))} before consent"]
     if result.post_accept.consent_clicked:
         parts.append(f"{len(_unique_domains(result.post_accept))} after accepting")
-    if result.post_reject.consent_clicked:
+    if result.post_reject.reload_failed and not result.post_reject.trackers:
+        parts.append("none after rejecting (the page could not be reloaded)")
+    elif result.post_reject.consent_clicked:
         parts.append(f"{len(_unique_domains(result.post_reject))} after rejecting")
     return ", ".join(parts)
 
@@ -473,6 +476,7 @@ def _render_report(out: Console, url: str, result, law=None):
     _print_session(
         out, "Post-reject trackers", post_rej,
         _not_served_in(post_rej, *unserved) if unserved
+        else RELOAD_FAILED if post_rej.reload_failed
         else None if post_rej.consent_clicked else NOTHING_REJECTED,
     )
 
@@ -535,12 +539,20 @@ def _render_report(out: Console, url: str, result, law=None):
         out.print(f"[red]   {escape(not_reached(result) or '')}[/red]")
     elif outcome is ExitCode.UNVERIFIED and result.post_reject.consent_clicked:
         # The refusal was applied and nothing was cited after it, but a session
-        # the verdict rests on never loaded: OK would vouch for what it missed.
-        missed = next(s for s in (result.pre_consent, result.post_reject) if unreachable(s))
-        out.print(
-            f"[bold yellow]⚠️  UNVERIFIED — the {missed.session} session never loaded, "
-            "so this audit is incomplete[/bold yellow]"
-        )
+        # the verdict rests on never loaded, or the page after the refusal never
+        # came: OK would vouch for what it missed.
+        missed = next((s for s in (result.pre_consent, result.post_reject) if unreachable(s)), None)
+        if missed is None:
+            missed = result.post_reject
+            out.print(
+                "[bold yellow]⚠️  UNVERIFIED — the post-reject session could not reload the page "
+                "after the refusal, so nothing was measured after it[/bold yellow]"
+            )
+        else:
+            out.print(
+                f"[bold yellow]⚠️  UNVERIFIED — the {missed.session} session never loaded, "
+                "so this audit is incomplete[/bold yellow]"
+            )
         out.print(f"[yellow]   {escape(missed.error or '')}[/yellow]")
         out.print(f"[yellow]   Trackers measured: {_what_was_measured(result)}.[/yellow]")
     elif outcome is ExitCode.UNVERIFIED:
@@ -850,9 +862,12 @@ def batch(
                 console.print(f"  {status}")
                 console.print(f"    [yellow]{escape(reason)}[/yellow]")
             else:
-                # A session that never loaded measured nothing, not zero
+                # A session that never loaded measured nothing, not zero; nor did
+                # a refusal whose reload failed, unless it caught something first
                 counts = [
-                    f"{label}: not measured" if unreachable(session) else f"{label}: {count} trackers"
+                    f"{label}: not measured"
+                    if unreachable(session) or (session.reload_failed and not count)
+                    else f"{label}: {count} trackers"
                     for label, session, count in (("pre", result.pre_consent, len(pre)),
                                                   ("post-reject", result.post_reject, len(rej)))
                 ]
@@ -865,6 +880,9 @@ def batch(
                     if not unreachable(result.post_reject):
                         console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
                 else:
+                    if result.post_reject.reload_failed:
+                        console.print("    [yellow]the page could not be reloaded after the refusal: "
+                                      "nothing was measured after it[/yellow]")
                     violations = find_violations(result)
                     _print_violations(console, violations, "    ")
                     if violations.not_cited:
