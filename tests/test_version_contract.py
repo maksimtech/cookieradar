@@ -184,12 +184,41 @@ def test_a_fix_on_top_of_a_baseline_never_starts_at_zero():
     assert int(parts[2]) >= 1, f"{VERSION} spells a fix that is not a fix"
 
 
+# What the README writes where a version goes. Any real number is out of date
+# by the next release.
+README_VERSION_PLACEHOLDER = "YYYY.N"
+
+
+def readme_version_examples() -> list[str]:
+    """The versions the README shows in `--version`'s output and in an image tag,
+    real numbers and the placeholder alike."""
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    shown = r"(\d[\d.]*\d|" + re.escape(README_VERSION_PLACEHOLDER) + r")"
+    return re.findall(r"CookieRadar " + shown, text) + re.findall(r"cookieradar:v" + shown, text)
+
+
 def test_the_readme_version_examples_use_the_current_scheme():
     """`--version` showed "CookieRadar 2026.09.7" and the Docker tag
-    "v2026.09.7": the YYYY.MM.N form given up on 2026-09-29. Not the exact
-    number, which would age with every release, but the form."""
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
-    shown = re.findall(r"CookieRadar (\d[\d.]*\d)", text) + re.findall(r"cookieradar:v(\d[\d.]*\d)", text)
+    "v2026.09.7": the YYYY.MM.N form given up on 2026-09-29."""
+    shown = readme_version_examples()
 
     assert shown, "the README shows no version any more: the check is empty"
-    assert [v for v in shown if not GENERATION_FORM.match(v)] == []
+    assert [v for v in shown if v != README_VERSION_PLACEHOLDER and not GENERATION_FORM.match(v)] == []
+
+
+def test_the_readme_version_examples_are_not_a_release_that_will_age():
+    """The form was right and the number was not: on 2026-11-16, with 2026.47.1
+    out, the README still showed `CookieRadar 2026.44` and
+    `maksimtech/cookieradar:v2026.44`, three releases behind.
+
+    Requiring the current version instead would not hold either. `release.sh`
+    runs this suite after writing the new version and before committing it, so
+    a README that names the version would stop every release until somebody
+    edited it by hand, as `test_the_readme_states_the_version_it_was_captured_with`
+    stopped apkradar 2026.42 and 2026.43. The placeholder does not age."""
+    concrete = [v for v in readme_version_examples() if v != README_VERSION_PLACEHOLDER]
+
+    assert concrete == [], (
+        f"the README shows {concrete}, which ages with every release: "
+        f"write {README_VERSION_PLACEHOLDER} (current version: {VERSION})"
+    )

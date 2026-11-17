@@ -49,13 +49,25 @@ no version in this file has ever matched — 40 is not a month, and
   of the configuration read `uv.lock`. A `uv` entry with `open-pull-requests-limit: 0` stops version
   updates for uv, so pip's remain the one weekly stream, and leaves security updates to arrive.
 
+- **The documentation describes the release that is out, not 2026.44.** On 2026-11-16, with 2026.47.1
+  published, the README showed `CookieRadar 2026.44` as the output of `--version` and
+  `maksimtech/cookieradar:v2026.44` as the image tag: the form was checked, the number was not. Both
+  now show the placeholder `YYYY.N`, which does not age, and `tests/test_version_contract.py` refuses a
+  real number there; requiring the current version instead would stop `release.sh`, which runs the
+  suite after the bump and before anyone could edit the README. `docs/nis2-compliance.md`, revision 2,
+  describes the image `main` builds: `python:3.14-slim-trixie` with Playwright 1.65.1, whose Chromium
+  is build 1254, Chromium 158.0.8127.18, read from `browsers.json` in the Playwright 1.65.1 wheel on
+  PyPI; revision 1 still named Playwright 1.63.0 and build 1243, the image of 2026.44. `SECURITY.md`
+  says that Docker Scout scans each newly published image and that Security Posture follows the scan,
+  as they have since 2026-10-24.
+
 ## [2026.47.1] - 2026-11-15
 
 ### Changed
 
 - **A change to the image earns a fix version, and only that.** A version ahead of the last tag needed a
-  change under `cookieradar/`, so that no Radar gets a number for nothing. The Playwright fix above is
-  in the Dockerfile alone, and the rule refused the release that puts a fixed image on Docker Hub, where
+  change under `cookieradar/`, so that no Radar gets a number for nothing. The Playwright fix under
+  Security below is in the Dockerfile alone, and the rule refused the release that puts a fixed image on Docker Hub, where
   `latest` is what Docker Scout reads and what people pull. A change to the Dockerfile, what the image
   is built from, now earns the third segment, the one kept for something urgent on what has already
   shipped, and never an ordinary count. The package on PyPI is the same code as 2026.47.

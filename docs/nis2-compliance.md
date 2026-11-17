@@ -1,6 +1,13 @@
 # CookieRadar: risposte alle sette domande NIS2 sul software
 
-Revisione 1 · 2026-10-11 · vale per il ramo `main` e per le release successive alla 2026.44
+Revisione 2 · 2026-11-17 · vale per il ramo `main` e per le release dalla 2026.47.1 in poi
+
+Rispetto alla revisione 1 (2026-10-11, release successive alla 2026.44): il punto 1
+descrive l'immagine che `main` costruisce oggi, su `python:3.14-slim-trixie` con
+Playwright 1.65.1, e il Chromium che quella versione scarica; al punto 4 l'esempio di
+tag Docker non indica più una versione precisa. Le verifiche e le misure su Chromium
+dei punti 2 e 3, datate 2026-10-11, sono state fatte con Playwright 1.63.0 e non
+sono state ripetute con la 1.65.1.
 
 Questo documento risponde alle domande che un cliente soggetto alla direttiva NIS2
 (UE 2022/2555, recepita in Italia con il d.lgs. 138/2024) può porre a un fornitore di
@@ -23,6 +30,9 @@ che il fornitore è in grado di dare, non un attestato di conformità.
   alla stessa versione risolta in `uv.lock` (lo verifica
   `tests/test_docker_playwright.py`). Dal 2026-11-13: il giorno prima la build
   aveva preso Playwright 1.65.1, uscita da un giorno, e non si era conclusa.
+  Dal 2026-11-15 (release 2026.47.1) la versione fissata è proprio la 1.65.1, la
+  prima il cui Node include le correzioni di sicurezza dell'11 novembre; il
+  Dockerfile installa prima `libatomic1`, la libreria che mancava a quel Node.
   Quello che un'immagine contiene davvero è nella sua SBOM (punto 6).
 - Ogni release su GitHub porta in allegato due SBOM in formato CycloneDX 1.5:
   quella dell'immagine Docker, pacchetti di sistema inclusi, e quella dell'ambiente
@@ -31,8 +41,12 @@ che il fornitore è in grado di dare, non un attestato di conformità.
   lo controlla: Playwright lo scarica come archivio, senza i metadati di pacchetto
   che Syft e Trivy leggono (verificato il 2026-10-11 sui file allegati alla
   2026.44). Lo identifica la versione del pacchetto `playwright` elencata nella
-  SBOM, perché ogni versione di Playwright scarica un build di Chromium fisso: la
-  1.63.0, quella dell'immagine 2026.44, il build 1243, Chromium 153.0.8010.12.
+  SBOM, perché ogni versione di Playwright scarica un build di Chromium fisso.
+  L'immagine che `main` costruisce, su `python:3.14-slim-trixie` con Playwright
+  1.65.1 (dalla 2026.47.1), ha il build 1254, Chromium 158.0.8127.18: letti il
+  2026-11-17 in `playwright/driver/package/browsers.json` della wheel Linux x86_64
+  di Playwright 1.65.1 pubblicata su PyPI. L'immagine 2026.44 aveva Playwright
+  1.63.0, con il build 1243, Chromium 153.0.8010.12.
 - Provenienza: le wheel e i sorgenti su PyPI hanno un'attestazione PEP 740 firmata
   con Sigstore dal workflow di pubblicazione (`publish.yml`, verificato sulla 2026.44);
   le immagini su Docker Hub (`maksimtech/cookieradar`) hanno un'attestazione di
@@ -146,7 +160,7 @@ notifica ai clienti, procedura di rollback. In sintesi:
 - le vulnerabilità accettate, con motivazione e data di revisione, sono in
   `SECURITY-EXCEPTIONS.toml`; il 2026-10-11, 20 delle 31 voci riguardavano librerie
   di sistema che Chromium porta nell'immagine;
-- ogni versione ha un tag Docker dedicato (es. `maksimtech/cookieradar:v2026.44`) e un
+- ogni versione ha un tag Docker dedicato (`maksimtech/cookieradar:v<versione>`) e un
   digest SHA256 immutabile; il rollback consiste nel tornare a quel tag o, meglio, a
   quel digest;
 - l'immagine viene costruita quando si pubblica una release, con gli aggiornamenti di
