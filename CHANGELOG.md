@@ -71,6 +71,13 @@ no version in this file has ever matched — 40 is not a month, and
   Consumer Code, were part of the article's text and could not be cited; the later Latin numbers
   (-ter, -quater, ... -decies, -terdecies) are read too.
 
+- **`audit` no longer lists trackers "loaded after rejection" when nothing was rejected.** With a
+  tracking cookie stored before any choice the verdict is VIOLATION whether or not the reject button
+  was found, and the report then printed "N tracker(s) loaded after rejection" for the trackers of a
+  session in which the refusal was never applied: on www.repubblica.it on 2026-11-17, a pay-to-refuse
+  wall, five of them. The list is now printed only when the refusal was clicked, as `batch` and the
+  law check already did.
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.

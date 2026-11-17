@@ -546,7 +546,11 @@ def _render_report(out: Console, url: str, result, law=None):
                       "choice:[/bold red]")
             for item in stored:
                 out.print(f"  [red]• {escape(item)}[/red]")
-        if violations.all:
+        # Only after a refusal that happened: with a cookie before any choice
+        # the verdict is VIOLATION whether or not the reject button was found,
+        # and session 3's trackers then describe a page where nothing was
+        # refused (repubblica.it, 2026-11-17, a pay-to-refuse wall)
+        if violations.all and result.post_reject.consent_clicked:
             out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after "
                       f"rejection:[/bold red]")
             _print_violations(out, violations, "  ")
