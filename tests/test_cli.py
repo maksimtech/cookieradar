@@ -16,6 +16,7 @@ import cookieradar.cli as cli
 import cookieradar.scanner as scanner
 from cookieradar.cli import _report_filename, app, normalize_url
 from cookieradar.scanner import ScanResult, TrackerRequest
+from tests.names import mentions
 
 README = Path(__file__).resolve().parents[1] / "README.md"
 runner = CliRunner()
@@ -184,6 +185,10 @@ def test_batch_shows_session_errors(tmp_path):
     f.write_text("example.com\n", encoding="utf-8")
 
     def build(r):
+        # A timeout after the page had answered: the session is incomplete, not
+        # empty. With no status at all it would be a page that never loaded,
+        # which is never OK (tests/test_verdict_unreachable.py).
+        r.pre_consent.status = 200
         r.pre_consent.error = "Timeout 30000ms exceeded."
 
     res = _invoke(["batch", str(f)], build)
@@ -207,6 +212,39 @@ def test_audit_reject_not_applied_gives_no_verdict():
     assert "No trackers loaded after rejection" not in res.output
     assert "Session 3 — Post-reject NOT APPLIED" in res.output
     assert "reject button not found" in res.output
+
+
+def test_no_trackers_after_rejection_are_claimed_when_nothing_was_rejected():
+    """Measured on www.repubblica.it on 2026-11-17: a pay-to-refuse wall, so the
+    refusal was not applied, and a `_ga` cookie before any choice made the
+    verdict VIOLATION. Under it `audit` printed "1 tracker(s) loaded after
+    rejection" for the trackers of a session in which nothing was rejected;
+    `batch` already printed "reject button not found" there instead."""
+    def build(r):
+        r.pre_consent.trackers = [_tracker("doubleclick.net")]
+        r.pre_consent.cookies = [{"name": "_ga", "domain": ".example.com"}]
+        r.post_reject.trackers = [_tracker("doubleclick.net")]
+        r.post_reject.consent_clicked = False
+        r.post_reject.pay_to_refuse = "RIFIUTA E ABBONATI"
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 1, res.output
+    assert "tracking data stored on the device before any choice" in res.output
+    assert "loaded after rejection" not in res.output
+    assert "persists from pre-consent" not in res.output
+
+
+def test_trackers_after_a_real_rejection_are_still_listed_beside_stored_cookies():
+    def build(r):
+        r.pre_consent.cookies = [{"name": "_ga", "domain": ".example.com"}]
+        r.post_reject.trackers = [_tracker("doubleclick.net")]
+
+    res = _invoke(["audit", "example.com"], build)
+
+    assert res.exit_code == 1, res.output
+    assert "1 tracker(s) loaded after rejection" in res.output
+    assert mentions(res.output.split("loaded after rejection", 1)[1], "doubleclick.net")
 
 
 def test_the_report_weighs_a_banner_that_only_accepts():

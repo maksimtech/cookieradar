@@ -10,12 +10,13 @@ Shared by the Radar tools: only the mapping section is specific to CookieRadar.
 """
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from cookieradar import law_fetcher
-from cookieradar.law_cache import Key, LawCache
+from cookieradar.law_cache import Key, LawCache, merge
 from cookieradar.law_fetcher import (
     CONSUMER_CODE,
     DIGITAL_CONTENT,
@@ -102,6 +103,21 @@ CHALLENGED_NOTE = (
     "no provision is cited — there is nothing here to apply one to"
 )
 
+# The refusal was applied and the reload after it failed: nothing was measured
+# after the refusal, and no finding about it was drawn either.
+RELOAD_FAILED_NOTE = (
+    "UNVERIFIED: the refusal was applied but the page could not be reloaded "
+    "after it, so nothing was measured after the refusal and no provision is "
+    "cited for the post-reject session"
+)
+
+# And the third: no session got a page at all. "No cookie banner was
+# recognised" was said of a host that does not resolve.
+UNREACHABLE_NOTE = (
+    "NOT MEASURED: the site could not be reached in any session, so no "
+    "provision is cited — there is nothing here to apply one to"
+)
+
 NO_REFUSAL_NOTE = (
     "UNVERIFIED: the banner was found and accepted, and no refusal control was "
     "found on it, so no provision is cited for the post-reject session — the "
@@ -163,12 +179,14 @@ def refusal_not_offered(result) -> bool:
 
 def _not_the_site(result) -> str | None:
     """The note that stands for the whole audit when the site was never seen."""
-    from cookieradar.scanner import bot_challenge, page_not_served
+    from cookieradar.scanner import bot_challenge, not_reached, page_not_served
 
     if page_not_served(result):
         return NOT_SERVED_NOTE
     if bot_challenge(result).seen:
         return CHALLENGED_NOTE
+    if not_reached(result):
+        return UNREACHABLE_NOTE
     return None
 
 
@@ -234,6 +252,8 @@ def notes_of(result) -> list[str]:
         # it about.
         return [not_the_site]
     if _rejected(result):
+        if result.post_reject.reload_failed and not _refusal_findings(result):
+            return [RELOAD_FAILED_NOTE]
         return []
     if result.post_reject.pay_to_refuse:
         return [PAY_TO_REFUSE_NOTE.format(label=result.post_reject.pay_to_refuse)]
@@ -263,12 +283,27 @@ class Citation:
 @dataclass(frozen=True)
 class ActStatus:
     act: Act
-    # "verified": downloaded now from the act's source (EUR-Lex or Normattiva);
-    # "cache": source unreachable, cached copy; "unavailable": no text at all
+    # "verified": every reference cited was in the text downloaded now; "cache": the source was
+    # unreachable or its text lacked a reference, cached copy; "unavailable": no text at all
     source: str
     error: str | None = None
     # Where a verified text came from: "Cellar", "EUR-Lex" (the fallback) or "Normattiva"; None otherwise
     origin: str | None = None
+    # When not verified: the source tried last ("Cellar", "EUR-Lex", "Normattiva", "Cellar and
+    # EUR-Lex"; None if unknown), and why it was not used: "unreachable" (no page) or "not_in_text"
+    # (a page, without the text cited)
+    tried: str | None = None
+    failure: str | None = None
+
+    @property
+    def reason(self) -> str | None:
+        """Why the act was not verified, as a report says it: "Cellar and EUR-Lex unreachable"."""
+        if self.source == "verified":
+            return None
+        tried = self.tried or self.act.source
+        if self.failure == "not_in_text":
+            return f"{tried} answered without the text cited"
+        return f"{tried} unreachable"
 
 
 @dataclass
@@ -314,36 +349,52 @@ def check(
     acts = list(dict.fromkeys(act for _, act, _ in cited))
     # Keyed by (celex, article) — the cache's key, not the fetcher's.
     fresh: dict[Key, Provision] = {}
-    errors: dict[Act, str] = {}
+    errors: dict[Act, LawFetchError] = {}
     origins: dict[Act, str] = {}
     for act in acts:
+        refs = list(dict.fromkeys(ref for _, a, ref in cited if a == act))
         # The articles cited ("32(1)(a)" is part of article 32) and ALSO_FETCH
         articles = tuple(dict.fromkeys(
-            [ref.split("(")[0] for _, a, ref in cited if a == act] + list(ALSO_FETCH.get(act, ()))
+            [ref.split("(")[0] for ref in refs] + list(ALSO_FETCH.get(act, ()))
         ))
         try:
-            by_article, origins[act] = law_fetcher.fetch_provisions_from(act, articles, now=now, client=client)
+            by_article, origin = law_fetcher.fetch_provisions_from(act, articles, now=now, client=client)
+            # The article being there is not enough: each reference cited is
+            # checked against the text just parsed. A point the parser missed
+            # used to fall back to the cache, old hash and date included, under
+            # the "verified" label, or to no hash at all.
+            missing = [ref for ref in refs if ref not in by_article]
+            if missing:
+                raise LawFetchError(
+                    f"{act.name} art. {', '.join(missing)} not found in the text from {origin}",
+                    source=origin, reached=True,
+                )
         except LawFetchError as e:
-            errors[act] = str(e)
+            errors[act] = e
         else:
+            origins[act] = origin
             fresh.update({p.key: p for p in by_article.values()})
 
-    changed: dict[Key, str] = {}
-    try:
-        if fresh:
-            provisions, changed = cache.update(fresh, checked_at=law_fetcher.utc_stamp(now))
-        else:
-            provisions = cache.load()
-    except OSError:
-        provisions = {**cache.load(), **fresh}   # the text just downloaded can still be cited
+    # Merged here, not by the save: a cache that cannot be written (read-only,
+    # disk full) must not hide a change in the law, nor date an unchanged
+    # wording to today.
+    provisions, changed = merge(cache.load(), fresh)
+    if fresh:
+        # Unsaved, the text just downloaded can still be cited
+        with contextlib.suppress(OSError):
+            cache.update(fresh, checked_at=law_fetcher.utc_stamp(now))
 
     statuses = []
     for act in acts:
         if act not in errors:
             statuses.append(ActStatus(act, "verified", origin=origins[act]))
         else:
+            error = errors[act]
             cached = any((act.celex, ref) in provisions for _, a, ref in cited if a == act)
-            statuses.append(ActStatus(act, "cache" if cached else "unavailable", errors[act]))
+            statuses.append(ActStatus(
+                act, "cache" if cached else "unavailable", str(error),
+                tried=error.source, failure="not_in_text" if error.reached else "unreachable",
+            ))
 
     citations = []
     for finding, act, ref in cited:

@@ -39,6 +39,35 @@ async def test_non_compliant_site_reports_trackers_after_reject(browser, site_ur
 
 
 @pytest.mark.integration
+async def test_tracker_fired_right_after_reject_is_reported(browser, site_url):
+    """The page fires connect.facebook.net 300 ms after "Reject all", and never
+    again. The session waited two seconds after the click and only then emptied
+    its lists, so the one request the refusal triggered was thrown away and the
+    session came out clean."""
+    ctx = await browser.new_context()
+    await ctx.route(re.compile(r"^https?://[^/]*facebook\.net/"), lambda route: route.fulfill(status=200, body="ok"))
+    result = await _run_session(ctx, f"{site_url}/reject_then_fire.html", "post-reject", accept=False)
+    await ctx.close()
+
+    assert result.consent_clicked is True
+    assert {t.domain for t in result.trackers} == {"facebook.net"}
+    assert {r.host for r in result.external} == {"connect.facebook.net"}
+
+
+@pytest.mark.integration
+async def test_requests_before_the_reject_click_do_not_count(browser, site_url):
+    """The other side of the same line: what the page loaded before the refusal
+    belongs to the page without a choice, not to the refusal. persist.html loads
+    doubleclick.net on every load; facebook.com only once the refusal is stored."""
+    ctx = await _context(browser)
+    result = await _run_session(ctx, f"{site_url}/persist.html", "post-reject", accept=False)
+    await ctx.close()
+
+    # One doubleclick.net request, from the reload; the first load's is not counted
+    assert [t.domain for t in result.trackers].count("doubleclick.net") == 1
+
+
+@pytest.mark.integration
 async def test_never_idle_page_times_out_without_raising(browser, site_url):
     ctx = await _context(browser)
     result = await _run_session(ctx, f"{site_url}/never_idle.html", "pre-consent", timeout_ms=1500)

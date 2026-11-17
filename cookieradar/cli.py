@@ -26,8 +26,10 @@ from cookieradar.scanner import (
     Violations,
     bot_challenge,
     find_violations,
+    not_reached,
     not_served,
     stored_before_choice,
+    unreachable,
     verdict,
 )
 
@@ -314,6 +316,7 @@ REJECT_NOT_APPLIED = "reject button not found: this session is equivalent to pre
 # after, which is the only thing a reader is looking at that table for.
 NOTHING_ACCEPTED = "nothing was accepted, so nothing was measured after acceptance"
 NOTHING_REJECTED = "nothing was rejected, so nothing was measured after rejection"
+RELOAD_FAILED = "the page could not be reloaded after the refusal, so nothing was measured after it"
 
 
 def _not_served(status: int | None) -> str:
@@ -358,7 +361,10 @@ def _why_not_the_site(result) -> str | None:
     if unserved:
         return _not_served_in(result.pre_consent, *unserved)
     challenge = bot_challenge(result)
-    return _challenged(challenge) if challenge.seen else None
+    if challenge.seen:
+        return _challenged(challenge)
+    error = not_reached(result)
+    return f"the site could not be reached: {error}" if error else None
 
 
 def _not_served_in(session, where: str, status: int) -> str:
@@ -386,10 +392,16 @@ def _what_was_measured(result) -> str:
     and a number next to a session that did not take place is the thing this
     whole report is careful not to print.
     """
-    parts = [f"{len(_unique_domains(result.pre_consent))} before consent"]
+    if unreachable(result.pre_consent):
+        # A session that never loaded measured nothing, not zero
+        parts = ["none before consent (the page never loaded)"]
+    else:
+        parts = [f"{len(_unique_domains(result.pre_consent))} before consent"]
     if result.post_accept.consent_clicked:
         parts.append(f"{len(_unique_domains(result.post_accept))} after accepting")
-    if result.post_reject.consent_clicked:
+    if result.post_reject.reload_failed and not result.post_reject.trackers:
+        parts.append("none after rejecting (the page could not be reloaded)")
+    elif result.post_reject.consent_clicked:
         parts.append(f"{len(_unique_domains(result.post_reject))} after rejecting")
     return ", ".join(parts)
 
@@ -400,6 +412,15 @@ def _print_consent_header(out: Console, label: str, style: str, session, not_app
     out.print(f"[bold {style}]{label}{status} ({unique} unique trackers)[/bold {style}]")
     if not session.consent_clicked:
         out.print(f"[yellow]⚠️  {not_applied}[/yellow]")
+
+
+def _not_cited_line(violations: Violations) -> str:
+    """The trackers loaded after the refusal and not cited, and why: the rule the
+    report applies before any choice, after the refusal and narrower."""
+    loaded = ", ".join(f"{domain} ({reason})" for domain, reason in sorted(violations.not_cited.items()))
+    return (f"ℹ️  Loaded after rejection, not cited: {loaded} — a tag manager's library, or a ping "
+            f"that says storage is denied, does not show that anything was stored on the device "
+            f"or read from it.")
 
 
 def _print_violations(out: Console, violations: Violations, indent: str):
@@ -455,6 +476,7 @@ def _render_report(out: Console, url: str, result, law=None):
     _print_session(
         out, "Post-reject trackers", post_rej,
         _not_served_in(post_rej, *unserved) if unserved
+        else RELOAD_FAILED if post_rej.reload_failed
         else None if post_rej.consent_clicked else NOTHING_REJECTED,
     )
 
@@ -509,6 +531,30 @@ def _render_report(out: Console, url: str, result, law=None):
             "like. Unlike a refused address, this one is sometimes served to a "
             "visible browser — try again with --no-headless.[/dim]"
         )
+    elif not_reached(result):
+        out.print(
+            "[bold red]⛔ NOT MEASURED — the site could not be reached in any "
+            "session, so nothing above describes it[/bold red]"
+        )
+        out.print(f"[red]   {escape(not_reached(result) or '')}[/red]")
+    elif outcome is ExitCode.UNVERIFIED and result.post_reject.consent_clicked:
+        # The refusal was applied and nothing was cited after it, but a session
+        # the verdict rests on never loaded, or the page after the refusal never
+        # came: OK would vouch for what it missed.
+        missed = next((s for s in (result.pre_consent, result.post_reject) if unreachable(s)), None)
+        if missed is None:
+            missed = result.post_reject
+            out.print(
+                "[bold yellow]⚠️  UNVERIFIED — the post-reject session could not reload the page "
+                "after the refusal, so nothing was measured after it[/bold yellow]"
+            )
+        else:
+            out.print(
+                f"[bold yellow]⚠️  UNVERIFIED — the {missed.session} session never loaded, "
+                "so this audit is incomplete[/bold yellow]"
+            )
+        out.print(f"[yellow]   {escape(missed.error or '')}[/yellow]")
+        out.print(f"[yellow]   Trackers measured: {_what_was_measured(result)}.[/yellow]")
     elif outcome is ExitCode.UNVERIFIED:
         out.print(
             "[bold yellow]⚠️  UNVERIFIED — no refusal could be applied, so nothing "
@@ -546,12 +592,22 @@ def _render_report(out: Console, url: str, result, law=None):
                       "choice:[/bold red]")
             for item in stored:
                 out.print(f"  [red]• {escape(item)}[/red]")
-        if violations.all:
+        # Only after a refusal that happened: with a cookie before any choice
+        # the verdict is VIOLATION whether or not the reject button was found,
+        # and session 3's trackers then describe a page where nothing was
+        # refused (repubblica.it, 2026-11-17, a pay-to-refuse wall)
+        if violations.all and result.post_reject.consent_clicked:
             out.print(f"[bold red]⚠️  VIOLATION — {len(violations.all)} tracker(s) loaded after "
                       f"rejection:[/bold red]")
             _print_violations(out, violations, "  ")
+    elif violations.not_cited:
+        # Something was loaded after the refusal, and none of it is cited: "no
+        # trackers loaded" would be false, and the line below says what it was
+        out.print("[bold green]✅ Nothing cited after rejection[/bold green]")
     else:
         out.print("[bold green]✅ No trackers loaded after rejection[/bold green]")
+    if violations.not_cited and outcome in (ExitCode.OK, ExitCode.VIOLATION):
+        out.print(Text(_not_cited_line(violations), style="dim"))
 
     if _session_errors(result):
         out.print("[yellow]⚠️  Result may be incomplete: some sessions reported errors[/yellow]")
@@ -641,13 +697,17 @@ def _print_law_check(law, out=None) -> None:
     out.print("[bold]⚖️  Provisions applied[/bold]")
     for status in law.acts:
         act = status.act
-        name, source = escape(act.name), escape(act.source)
+        name = escape(act.name)
+        # Which source was tried, and whether it was unreachable or answered
+        # without the text cited: "EUR-Lex unreachable" whatever happened was
+        # how a reached page with a moved point used to be reported
+        reason = escape(status.reason or "")
         if status.source == "verified":
             origin = escape(status.origin or act.source)
             out.print(f"[dim]{name}: verified against {origin} ({act.id_label} {escape(act.celex)})[/dim]")
         elif status.source == "cache":
             out.print(
-                f"[yellow]{name}: {source} unreachable, "
+                f"[yellow]{name}: {reason}, "
                 "text from the cached copy, not re-verified[/yellow]"
             )
         else:
@@ -656,7 +716,7 @@ def _print_law_check(law, out=None) -> None:
             # for a bug in the hashing. There is no verified text to hash, and
             # printing one anyway would assert a verification never made.
             out.print(
-                f"[yellow]{name}: {source} unreachable and nothing cached, "
+                f"[yellow]{name}: {reason} and nothing cached, "
                 "text not verifiable: the citations below have no SHA-256[/yellow]"
             )
         if act.note:
@@ -802,13 +862,31 @@ def batch(
                 console.print(f"  {status}")
                 console.print(f"    [yellow]{escape(reason)}[/yellow]")
             else:
-                console.print(f"  {status} — pre: {len(pre)} trackers, post-reject: {len(rej)} trackers")
+                # A session that never loaded measured nothing, not zero; nor did
+                # a refusal whose reload failed, unless it caught something first
+                counts = [
+                    f"{label}: not measured"
+                    if unreachable(session) or (session.reload_failed and not count)
+                    else f"{label}: {count} trackers"
+                    for label, session, count in (("pre", result.pre_consent, len(pre)),
+                                                  ("post-reject", result.post_reject, len(rej)))
+                ]
+                console.print(f"  {status} — {', '.join(counts)}")
                 for item in stored_before_choice(result):
                     console.print(f"    [red]stored before any choice: {escape(item)}[/red]")
                 if not result.post_reject.consent_clicked:
-                    console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
+                    # Not "reject button not found" when there was no page to look
+                    # on: the session's error below says why
+                    if not unreachable(result.post_reject):
+                        console.print(f"    [yellow]{REJECT_NOT_APPLIED}[/yellow]")
                 else:
-                    _print_violations(console, find_violations(result), "    ")
+                    if result.post_reject.reload_failed:
+                        console.print("    [yellow]the page could not be reloaded after the refusal: "
+                                      "nothing was measured after it[/yellow]")
+                    violations = find_violations(result)
+                    _print_violations(console, violations, "    ")
+                    if violations.not_cited:
+                        console.print(Text(f"    {_not_cited_line(violations)}", style="dim"))
             for s in _session_errors(result):
                 console.print(f"    [yellow]⚠️  {s.session}: {escape(s.error)}[/yellow]")
             if output:

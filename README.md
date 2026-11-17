@@ -139,9 +139,9 @@ cookieradar batch urls.txt -o reports/
 
 An invalid address or a site that fails to load is reported and skipped;
 the other sites are still audited. A site that answers with an error status
-(e.g. 403) or with a bot-management challenge instead of its own page is
-reported as `⛔ NOT MEASURED`, without tracker counts, and counts as not
-audited for the exit code.
+(e.g. 403) or with a bot-management challenge instead of its own page, or that
+could not be reached in any session, is reported as `⛔ NOT MEASURED`, without
+tracker counts, and counts as not audited for the exit code.
 
 ## Reading the report
 
@@ -196,19 +196,37 @@ At the end of the report there is one of three outcomes:
 
 | Verdict | Meaning | What to do |
 |---|---|---|
-| ✅ **OK** — *"No trackers loaded after rejection"* | The "Reject" button was clicked and, after reloading, **none** of the known trackers was contacted. | Nothing, for the trackers CookieRadar knows. Still review session 1 (see below). |
+| ✅ **OK** — *"No trackers loaded after rejection"*, or *"Nothing cited after rejection"* | The "Reject" button was clicked and, after reloading, **none** of the known trackers was contacted, or only in the two ways listed below as not cited. | Nothing, for the trackers CookieRadar knows. Still review session 1 (see below). |
 | 🔴 **VIOLATION** | The "Reject" button was clicked, yet after reloading **at least one** known tracker was contacted; or, before any choice, a **tracking cookie** was already on the device. The list follows, with its cause. | Investigate each listed service with whoever manages the site's tags and consent platform. |
 | ⚠️ **UNVERIFIED** | CookieRadar **could not click "Reject"**: no banner, or a banner it does not recognise. Session 3 then shows the page without any choice made, so **no verdict is given** on it. | Check the site by hand, or with `--no-headless` to see what the banner looks like. |
 
 Session 1 counts in the verdict when it shows **storage**: a tracking cookie
 present before the visitor has chosen anything — Google Analytics' `_ga` or
 `_ga_<id>`, Meta's `_fbp`, Google Ads' `_gcl_au`, or any cookie of a known
-tracker's domain. Art. 122(1) of the Codice privacy allows storing information
+tracker's domain other than the audited site's own (a site that is itself on
+the list, such as linkedin.com, has its own cookies, as it has its own
+requests). Art. 122(1) of the Codice privacy allows storing information
 on the device, or reading it, only with consent, and the report cites it with
 ePrivacy art. 5(3). That is a VIOLATION whatever happened with the refusal, and
 the exit code stays the same. A **request** to a tracker before any choice is
 listed but not cited: Tag Manager loading, or Consent Mode's pings with storage
 denied, can be lawful, and a request alone does not show anything stored.
+
+After the refusal the same two are listed as *"Loaded after rejection, not
+cited"*, and do not make a VIOLATION by themselves, when **every** request to
+that tracker's domain was one of them:
+
+- a tag manager's own library fetched as a script: Google Tag Manager's
+  `gtm.js` and `gtag/js`, Adobe Launch from `assets.adobedtm.com`, Tealium's
+  `utag` from `tags.tiqcdn.com`, TagCommander from `cdn.tagcommander.com`;
+- a Google Consent Mode ping whose `gcs` is `G100`, ad and analytics storage
+  both denied.
+
+Neither applies when the session holds a tracking cookie (`_ga`, `_ga_<id>`,
+`_fbp`, `_gcl_au`) or a cookie on that domain. Everything else stays cited: a
+beacon such as a Google Analytics collect with storage granted, a pixel, a
+tag manager's own beacon (`googletagmanager.com/td`), any request beside the
+library to the same domain.
 
 If a session hit an error (for example the site took more than 30 seconds
 to load), the report shows it in yellow and adds *"Result may be incomplete:
@@ -251,8 +269,9 @@ spots a quick manual check has. Keep these in mind before relying on a result.
   (iubenda, Didomi, OneTrust, Cookiebot), as the banner's own text often says
   and the Garante's 2021 guidelines describe: closing keeps the default, no
   consent. Only a visible one: a close button the site hides is not clicked.
-- A refusal offered only with a subscription ("Rifiuta e abbonati", as a button
-  or as a link) is reported as such and never clicked. Whether a paid alternative leaves consent free is
+- A refusal offered only with a subscription ("Rifiuta e abbonati", "Reject all
+  and subscribe", as a button, as a link or as the platform's close "×") is
+  reported as such and never clicked. Whether a paid alternative leaves consent free is
   not something an audit of requests can settle, so no provision is cited.
 - "Accept was applied and no refusal control was found", with GDPR art. 4(11),
   is reported only when Accept was the **one** thing on the banner to click. A
@@ -367,17 +386,23 @@ it without reading the output:
 |---|---|---|
 | **0** | OK: no tracker loaded after rejection | Every site is OK |
 | **1** | VIOLATION | At least one site has a VIOLATION |
-| **2** | UNVERIFIED: "Reject" could not be clicked | At least one site is UNVERIFIED, none has a VIOLATION, none failed |
-| **3** | Error: invalid address, browser not starting, report not writable, invalid command-line option | The URL file cannot be read, an invalid command-line option, or at least one site could not be audited (invalid address, scan failed, report not writable) and none has a VIOLATION |
+| **2** | UNVERIFIED: "Reject" could not be clicked, or session 1 or 3 never loaded | At least one site is UNVERIFIED, none has a VIOLATION, none failed |
+| **3** | Error, or NOT MEASURED: invalid address, a site that answered with an error page or a challenge or could not be reached in any session, browser not starting, report not writable, invalid command-line option | The URL file cannot be read, an invalid command-line option, or at least one site could not be audited (invalid address, scan failed, report not writable) and none has a VIOLATION |
 
 A VIOLATION always wins: if one site violates and another fails, `batch`
 exits with 1, and so does `audit` when the verdict is VIOLATION but the
 report file cannot be written. The error is still shown in the output.
 
-A site that times out or cannot be reached is not an error for the exit
-code: the audit runs, the problem is shown in yellow, and the verdict
-follows from what was observed (usually UNVERIFIED, since "Reject" could not
-be clicked).
+A site that cannot be reached at all — no session got a page: the name does
+not resolve, the connection is refused or reset, nothing answered before the
+timeout — is `⛔ NOT MEASURED` and exits with 3, like an error page. A session
+that hit an error after the page had answered (a timeout while it kept
+loading, say) is shown in yellow, and the verdict follows from what was
+observed. A site whose session 1 or session 3 never loaded while the others
+did is never OK: with nothing cited, it is UNVERIFIED, since what the missing
+session would have shown was not measured. The same goes for a refusal whose
+reload failed (connection reset or aborted): session 3 then measured nothing
+after the refusal, and says so.
 
 Example: fail a CI job only on violations, and warn when a site could not be
 verified:

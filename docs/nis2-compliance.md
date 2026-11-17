@@ -129,6 +129,10 @@ risponde alla richiesta HTTPS con un rinvio a un indirizzo `http://`, e CookieRa
 segue quel rinvio sullo stesso indirizzo in `https://`, che serve lo stesso documento
 (misurato il 2026-10-11). Fino a quel giorno lo seguiva così com'era, e il testo
 arrivava senza TLS.
+Un rinvio è seguito solo verso l'host della fonte che lo dà (publications.europa.eu,
+eur-lex.europa.eu o www.normattiva.it, sulla porta predefinita): fino al 2026-11-17
+era seguito verso qualunque host. Una pagina è letta fino a 32 MiB, e uno
+scaricamento, rinvii compresi, termina dopo 120 secondi.
 
 **Su disco** CookieRadar scrive:
 

@@ -83,6 +83,58 @@ def test_a_request_alone_is_not_storage():
     assert stored_before_choice(_result(pre_trackers=[GTM])) == []
 
 
+def _listed_site(cookies, host="www.linkedin.com"):
+    """A site that is itself on the tracker list, audited on its own domain."""
+    return ScanResult(
+        url=f"https://{host}/",
+        pre_consent=SessionResult("pre-consent", cookies=list(cookies), banner_found=True, status=200,
+                                  host=host),
+        post_accept=SessionResult("post-accept", consent_clicked=True, banner_found=True, status=200),
+        post_reject=SessionResult("post-reject", consent_clicked=True, banner_found=True, status=200),
+    )
+
+
+def test_first_party_cookies_of_a_listed_site_are_not_tracking_storage():
+    """linkedin.com is on the list as a tracker of other sites. Audited on its
+    own domain, its requests were already first-party (is_same_site), but its
+    cookies — bcookie, lang — still counted as a tracker's cookies stored before
+    any choice: a VIOLATION citing art. 122(1) for the site's own session."""
+    result = _listed_site([_cookie("bcookie", ".linkedin.com"), _cookie("lang", ".linkedin.com")])
+
+    assert stored_before_choice(result) == []
+    assert _verdict(result) is not ExitCode.VIOLATION
+
+
+def test_the_page_is_where_the_navigation_landed():
+    """A typed address that redirected to www.linkedin.com: the host the
+    document came from decides, as it does for requests."""
+    result = _listed_site([_cookie("bcookie", ".linkedin.com")])
+    result.url = "https://linkedin.example/"
+
+    assert stored_before_choice(result) == []
+
+
+def test_without_a_recorded_host_the_audited_address_decides():
+    result = _listed_site([_cookie("bcookie", ".linkedin.com")])
+    result.pre_consent.host = ""
+
+    assert stored_before_choice(result) == []
+
+
+def test_a_named_tracking_cookie_of_a_listed_site_still_counts():
+    """`_ga` is always written on the site's own domain: being first-party is
+    how it works, not a reason to drop it."""
+    result = _listed_site([_cookie("_ga", ".linkedin.com")])
+
+    assert stored_before_choice(result) == ["cookie _ga (linkedin.com)"]
+
+
+def test_another_tracker_s_cookie_on_a_listed_site_still_counts():
+    result = _listed_site([_cookie("IDE", ".doubleclick.net")])
+
+    assert stored_before_choice(result) == ["cookie IDE (doubleclick.net)"]
+
+
 # ─── the finding and what it cites ───────────────────────────────────────────
 
 def test_storage_before_any_choice_is_a_finding_of_its_own():
@@ -102,7 +154,10 @@ def test_the_codice_privacy_is_read_from_normattiva():
 
 
 def test_it_stands_beside_a_violation_after_the_refusal():
-    found = findings_of(_result([GA], after=[GTM]))
+    # A pixel, not GTM's library: a library alone after the refusal is not
+    # cited (tests/test_after_rejection_not_cited.py)
+    pixel = TrackerRequest("https://ad.doubleclick.net/pixel", "doubleclick.net", "image", 0.0)
+    found = findings_of(_result([GA], after=[pixel]))
 
     assert "pre_consent" in found and "violation" in found
 

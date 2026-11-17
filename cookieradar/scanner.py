@@ -8,7 +8,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import IntEnum
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from playwright.async_api import BrowserContext, Cookie, Page, async_playwright
 from playwright.async_api import Error as PlaywrightError
@@ -175,6 +175,13 @@ class SessionResult:
     # is exactly what a compliant site looks like.
     title: str = ""
     text: str = ""
+    # The host the main document came from, after any redirect: the site, for
+    # telling its own cookies from a tracker's. Empty when not recorded.
+    host: str = ""
+    # The refusal was clicked and the reload after it failed with anything but
+    # a timeout: the session measured the seconds after the click and not the
+    # page the refusal was meant to change (`verdict`).
+    reload_failed: bool = False
 
 
 @dataclass
@@ -197,6 +204,10 @@ class ScanResult:
 class Violations:
     persistent: set[str]  # loaded before consent and still loaded after rejection
     new: set[str]  # loaded only after rejection
+    # Loaded after rejection and not cited, with the reason: every request to
+    # the domain was a tag manager's library or a Consent Mode ping with storage
+    # denied (`not_cited_after_rejection`). Neither in `persistent` nor in `new`.
+    not_cited: dict[str, str] = field(default_factory=dict)
 
     @property
     def all(self) -> set[str]:
@@ -232,6 +243,39 @@ def not_served(result: ScanResult) -> tuple[str, int] | None:
     for session in (result.pre_consent, result.post_accept, result.post_reject):
         if session.status is not None and session.status >= 400:
             return session.session, session.status
+    return None
+
+
+def unreachable(session: SessionResult) -> bool:
+    """The session's page never loaded: the navigation failed before any
+    document answered.
+
+    An error, no status, and nothing a document would have left: no title, no
+    text, no banner, no click, no request, no cookie. That is a name that does
+    not resolve, a connection refused or reset, or a timeout before the first
+    byte. Measured on 2026-11-17: www.gnu.org's pre-consent session got
+    net::ERR_CONNECTION_RESET while the other two loaded, and the verdict was
+    OK, built on a session that had measured nothing.
+
+    A timeout after the page had answered is not this: the status is recorded
+    (`served`), and the session is incomplete, not empty.
+    """
+    return bool(session.error) and session.status is None and not (
+        session.title or session.text or session.banner_found or session.consent_clicked
+        or session.trackers or session.external or session.cookies
+    )
+
+
+def not_reached(result: ScanResult) -> str | None:
+    """The error of a site no session could load, or None.
+
+    Every session unreachable is a site never seen, the same as an error page:
+    NOT MEASURED, not UNVERIFIED. An unresolvable host used to exit with 2 and
+    "reject button not found", a statement about a banner nobody saw.
+    """
+    sessions = (result.pre_consent, result.post_accept, result.post_reject)
+    if all(unreachable(session) for session in sessions):
+        return result.pre_consent.error
     return None
 
 
@@ -359,10 +403,93 @@ def bot_challenge(result: ScanResult) -> Challenge:
 
 
 def find_violations(result: ScanResult) -> Violations:
-    """Every tracker loaded after rejection is a violation."""
+    """Every tracker loaded after rejection is a violation, but for the requests
+    that show nothing stored or read (`not_cited_after_rejection`)."""
     pre = {t.domain for t in result.pre_consent.trackers}
-    rej = {t.domain for t in result.post_reject.trackers}
-    return Violations(persistent=rej & pre, new=rej - pre)
+    session = result.post_reject
+    rej: set[str] = set()
+    reasons: dict[str, list[str]] = {}
+    for request in session.trackers:
+        reason = _not_cited_reason(request, session.cookies) if session.consent_clicked else None
+        if reason is None:
+            rej.add(request.domain)
+        elif reason not in reasons.setdefault(request.domain, []):
+            reasons[request.domain].append(reason)
+    not_cited = {domain: ", ".join(r) for domain, r in sorted(reasons.items()) if domain not in rej}
+    return Violations(persistent=rej & pre, new=rej - pre, not_cited=not_cited)
+
+
+def not_cited_after_rejection(result: ScanResult) -> dict[str, str]:
+    """The tracker domains loaded after a refusal and not cited, with the reason.
+
+    The rule the report already applied before any choice ("a request alone does
+    not show that anything was stored"), after the refusal and narrower. Two
+    kinds of request, and only when every request to the domain was one of them:
+
+    - a tag manager's own library, fetched as a script (`_tag_manager_library`):
+      code downloaded, nothing stored on the device or read from it. What the
+      code then does is a beacon or a cookie, and those are cited;
+    - a Google Consent Mode ping whose `gcs` is G100: ad_storage and
+      analytics_storage both denied, the cookieless ping a refusal leaves.
+
+    Neither when the session holds a tracking cookie by name (`_ga`, `_fbp`,
+    ...) or a cookie on that domain: something wrote it, and it may have been
+    this code. Measured on 2026-11-17 after a clicked refusal: www.köln.de
+    loaded gtm.js, gtag/js and a G100 collect and nothing else, and
+    www.comune.milano.it nine scripts from assets.adobedtm.com and no Adobe
+    beacon. Both were VIOLATION, cited under four provisions.
+    """
+    return find_violations(result).not_cited
+
+
+# Google's hosts on the list, where a Consent Mode ping goes.
+GOOGLE_DOMAINS = frozenset({"google-analytics.com", "googletagmanager.com", "doubleclick.net",
+                            "googlesyndication.com"})
+
+
+def _tag_manager_library(url: str) -> bool:
+    """A tag manager's own code, by host and path: Google Tag Manager's gtm.js
+    and gtag/js, Adobe Launch (assets.adobedtm.com, the library, its extensions
+    and its rules), Tealium iQ's utag, TagCommander's containers. Its beacons
+    go to other paths and hosts (googletagmanager.com/td, omtrdc.net, ...)."""
+    parts = urlparse(url)
+    host = (parts.hostname or "").rstrip(".").lower()
+    path = parts.path
+    if host in ("www.googletagmanager.com", "googletagmanager.com"):
+        return path in ("/gtm.js", "/gtag/js")
+    if host == "assets.adobedtm.com":
+        return path.endswith(".js")
+    if host == "tags.tiqcdn.com":
+        return path.startswith("/utag/") and path.endswith(".js")
+    if host == "cdn.tagcommander.com":
+        return path.endswith(".js")
+    return False
+
+
+def _storage_denied_ping(request: TrackerRequest) -> bool:
+    """A Google Consent Mode request saying both storages are denied (gcs=G100)."""
+    return request.domain in GOOGLE_DOMAINS and parse_qs(urlparse(request.url).query).get("gcs") == ["G100"]
+
+
+def _cookie_of(domain: str, cookies: list[Cookie]) -> bool:
+    """A tracking cookie by name, or any cookie set on `domain`."""
+    for cookie in cookies:
+        name = cookie.get("name") or ""
+        if name in TRACKING_COOKIE_NAMES or name.startswith(TRACKING_COOKIE_PREFIXES):
+            return True
+        if tracker_domain(f"https://{(cookie.get('domain') or '').lstrip('.')}/") == domain:
+            return True
+    return False
+
+
+def _not_cited_reason(request: TrackerRequest, cookies: list[Cookie]) -> str | None:
+    if _cookie_of(request.domain, cookies):
+        return None
+    if request.resource_type == "script" and _tag_manager_library(request.url):
+        return "tag manager library"
+    if _storage_denied_ping(request):
+        return "Consent Mode ping, storage denied"
+    return None
 
 
 class Verdict(IntEnum):
@@ -380,12 +507,13 @@ def verdict(result: ScanResult) -> Verdict:
     `--full` counted only trackers seen both before consent and after rejection,
     and printed "none persist" for the other three ways a site is not OK.
     """
-    if page_not_served(result) or bot_challenge(result).seen:
+    if page_not_served(result) or bot_challenge(result).seen or not_reached(result):
         # Not UNVERIFIED: that means the site was seen and the refusal could
         # not be exercised. Here the site was never seen — either the edge
         # refused it outright, or what came back was a challenge and not the
-        # page. A challenge answering 200 would otherwise reach the checks
-        # below and be reported as a site with no trackers and no banner.
+        # page, or no session got a page at all. A challenge answering 200
+        # would otherwise reach the checks below and be reported as a site
+        # with no trackers and no banner.
         return Verdict.ERROR
     # Before the refusal is considered: tracking stored on the device before any
     # choice is a violation whatever the banner did afterwards (art. 122(1)
@@ -394,7 +522,15 @@ def verdict(result: ScanResult) -> Verdict:
         return Verdict.VIOLATION
     if not result.post_reject.consent_clicked:
         return Verdict.UNVERIFIED
-    return Verdict.VIOLATION if find_violations(result).all else Verdict.OK
+    if find_violations(result).all:
+        return Verdict.VIOLATION
+    # A clean session 3 says nothing about session 1 if session 1 never loaded:
+    # the storage before any choice was not measured, and OK would vouch for it.
+    # Nor about the page after the refusal if the reload after the click failed.
+    if (unreachable(result.pre_consent) or unreachable(result.post_reject)
+            or result.post_reject.reload_failed):
+        return Verdict.UNVERIFIED
+    return Verdict.OK
 
 
 TRACKER_DOMAINS = [
@@ -471,12 +607,17 @@ def stored_before_choice(result: ScanResult) -> list[str]:
     a tracker's host is not counted here — it does not by itself show that
     anything was stored or read.
     """
+    # A cookie counts by its domain only when that domain is not the site's: a
+    # site that is itself on the list (linkedin.com) has its own cookies, and its
+    # own requests were already left out as first-party (`is_same_site`). By its
+    # name it counts wherever it is: `_ga` is always written on the site's domain.
+    site = result.pre_consent.host or _ascii_host(urlparse(result.url).hostname or "")
     found = set()
     for cookie in result.pre_consent.cookies:
         name = cookie.get("name") or ""
         domain = (cookie.get("domain") or "").lstrip(".")
         if (name in TRACKING_COOKIE_NAMES or name.startswith(TRACKING_COOKIE_PREFIXES)
-                or tracker_domain(f"https://{domain}/")):
+                or (tracker_domain(f"https://{domain}/") and not is_same_site(site, domain))):
             found.add(f"cookie {name} ({domain})")
     return sorted(found)
 
@@ -530,8 +671,14 @@ CLOSE_SELECTORS = [
 
 # A refusal that costs a subscription: seen, named in the report, never clicked.
 # Measured on repubblica.it, 2026-10-17 (iubenda, `.iubenda-cs-reject-btn`).
+#
+# Every step that clicks checks a candidate against these first: on ansa.it on
+# 2026-11-17 iubenda's close X, `.iubenda-cs-close-btn`, was labelled "Rifiuta e
+# abbonati", the close step clicked it, and Piano's checkout opened.
 PAY_TO_REFUSE_LABELS = [
     re.compile(r"^\s*rifiuta\s+e\s+abbonati\s*$", re.I),
+    # The same wall in English: "Reject all and subscribe", "Decline and subscribe"
+    re.compile(r"^\s*(reject|decline|refuse)(\s+all)?\s+and\s+subscribe\s*$", re.I),
 ]
 
 # Whole accessible names, case-insensitive: "OK" must not match "Cookie settings",
@@ -573,6 +720,33 @@ async def _first_visible(page: Page, selector: str):
     return None
 
 
+async def _sold_with_a_subscription(control) -> bool:
+    """Whether a control is named as a refusal that costs a subscription.
+
+    Its aria-label, its text, its value and its title: what makes up the name a
+    person or a screen reader is given. A close X can carry the name, as on
+    ansa.it, and a selector cannot tell.
+    """
+    names = []
+    for read in (lambda: control.get_attribute("aria-label"), control.inner_text,
+                 lambda: control.get_attribute("value"), lambda: control.get_attribute("title")):
+        with suppress(PlaywrightError):
+            names.append(await read())
+    return any(
+        label.search(" ".join(name.split()))
+        for name in names if isinstance(name, str)
+        for label in PAY_TO_REFUSE_LABELS
+    )
+
+
+async def _first_clickable(page: Page, selector: str):
+    """First visible match that is not a refusal sold with a subscription."""
+    for element in await page.query_selector_all(selector):
+        if await element.is_visible() and not await _sold_with_a_subscription(element):
+            return element
+    return None
+
+
 async def _click_consent_button(page: Page, selectors: list[str], labels: list[re.Pattern],
                                 before_click=None) -> bool:
     """Click the first visible match: CSS selectors first, then buttons by accessible name.
@@ -582,7 +756,7 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
     """
     for selector in selectors:
         try:
-            btn = await _first_visible(page, selector)
+            btn = await _first_clickable(page, selector)
             if btn:
                 if before_click:
                     await before_click(btn)
@@ -595,7 +769,7 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
             buttons = page.get_by_role("button", name=label)
             for i in range(await buttons.count()):
                 btn = buttons.nth(i)
-                if await btn.is_visible():
+                if await btn.is_visible() and not await _sold_with_a_subscription(btn):
                     if before_click:
                         await before_click(btn)
                     await btn.click()
@@ -823,20 +997,33 @@ async def _run_session(
 
         # Reject all
         elif accept is False:
+            # Where the lists stood when the refusal was clicked. What came
+            # before belongs to the page without a choice; what came after,
+            # from the click on, belongs to the refusal. The lists used to be
+            # emptied after the two seconds' wait that follows the click, and a
+            # tag that fires on the consent update, 300 ms after it, was thrown
+            # away with everything else.
+            marks = [0, 0]
+
+            async def mark_the_click(_control) -> None:
+                marks[:] = [len(result.trackers), len(result.external)]
+
             # Step 1 — try rejecting outright
-            rejected = await _click_consent_button(page, REJECT_SELECTORS, REJECT_LABELS)
+            rejected = await _click_consent_button(page, REJECT_SELECTORS, REJECT_LABELS,
+                                                   before_click=mark_the_click)
             if rejected:
                 await page.wait_for_timeout(2000)
 
             # Step 2 — OneTrust a due step: apri preferenze poi rifiuta
             if not rejected:
                 try:
-                    pc_btn = await _first_visible(page, "#onetrust-pc-btn-handler")
+                    pc_btn = await _first_clickable(page, "#onetrust-pc-btn-handler")
                     if pc_btn:
                         await pc_btn.click()
                         await page.wait_for_timeout(2000)
-                        refuse_btn = await _first_visible(page, ".ot-pc-refuse-all-handler")
+                        refuse_btn = await _first_clickable(page, ".ot-pc-refuse-all-handler")
                         if refuse_btn:
+                            await mark_the_click(refuse_btn)
                             await refuse_btn.click()
                             await page.wait_for_timeout(2000)
                             rejected = True
@@ -845,7 +1032,8 @@ async def _run_session(
 
             # Step 3 — the platform's close X, which keeps the default
             if not rejected:
-                rejected = await _click_consent_button(page, CLOSE_SELECTORS, [])
+                rejected = await _click_consent_button(page, CLOSE_SELECTORS, [],
+                                                       before_click=mark_the_click)
                 if rejected:
                     await page.wait_for_timeout(2000)
 
@@ -854,21 +1042,30 @@ async def _run_session(
 
             if rejected:
                 result.consent_clicked = True
-                # Only requests made after the rejection count for this session.
-                # `external` is cleared together with `trackers`: keeping it
-                # would make every host contacted before the rejection appear
-                # among the post-rejection ones, and the count of unknowns would
-                # be twice the truth.
-                result.trackers.clear()
-                result.external.clear()
+                # Only requests made from the rejection on count for this session.
+                # `external` is cut together with `trackers`: keeping it would
+                # make every host contacted before the rejection appear among
+                # the post-rejection ones, and the count of unknowns would be
+                # twice the truth.
+                del result.trackers[:marks[0]]
+                del result.external[:marks[1]]
                 try:
                     await page.reload(wait_until="networkidle", timeout=timeout_ms)
                 except PlaywrightTimeoutError as e:
+                    # The page answered and kept loading: measured, if incomplete
                     _add_error(result, e)
+                except PlaywrightError as e:
+                    # Reset, aborted, gone: no page after the refusal at all. The
+                    # status and the click are the first load's, and the session
+                    # used to read as a measured one with nothing in it.
+                    _add_error(result, e)
+                    result.reload_failed = True
+                    return result
                 await page.wait_for_timeout(2000)
     except PlaywrightError as e:
         _add_error(result, e)
     finally:
+        result.host = page_host
         try:
             result.cookies = await context.cookies()
         except PlaywrightError as e:

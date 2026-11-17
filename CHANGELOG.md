@@ -27,6 +27,112 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Fixed
 
+- **A citation is "verified" only when the reference it cites is in the text downloaded now.** The
+  check looked at the article: with Cellar's page parsed and a point it cites, such as GDPR art.
+  5(1)(a), missed by the parser, the reference fell back to the cache, old SHA-256 and date included,
+  under "verified against Cellar"; with an empty cache the same label stood beside `SHA256: not
+  available`. Every cited reference is now looked up in the text just parsed, and one that is missing
+  makes the act a fetch failure: its citations come from the cache, labelled as such, or have no hash
+  and say so. Ported from mailradar #103, as the five law modules below.
+
+- **A failed download always reaches the EUR-Lex fallback and the cache.** Only `httpx.HTTPError` was
+  a fetch failure. A 303 to `http://xn--/DOC_1` makes httpx raise `idna.core.IDNAError`, a
+  `ValueError`, which skipped the fallback and ended the whole law check. `httpx.InvalidURL` and
+  `ValueError` are now fetch failures too.
+
+- **Redirects stay on the source's host.** Any `Location` was followed, so a text served by another
+  host was labelled "verified against Cellar". Cellar may redirect only to publications.europa.eu,
+  EUR-Lex only to eur-lex.europa.eu and Normattiva only to www.normattiva.it, on the default port; the
+  http:// hop Cellar makes is still taken over HTTPS. The hosts in `docs/nis2-compliance.md` are now
+  the only ones the law check can reach, and the document says so.
+
+- **A page is read up to 32 MiB, and a fetch ends after 120 seconds.** The timeout bounded each read,
+  not the whole, and nothing limited the size of the page. The body is now streamed, refused past
+  `MAX_RESPONSE_BYTES` (32 MiB; the GDPR from Cellar is 823981 bytes) and abandoned past
+  `FETCH_DEADLINE` (120 s, redirects included); either one is a fetch failure, so the fallbacks apply.
+
+- **A change in the law is reported even when the cache cannot be written.** The comparison with the
+  previous text was made by the save, so with a read-only cache a law whose text changed was cited
+  without the warning, and an unchanged wording was dated to the day of the audit. The merge is now
+  `law_cache.merge`, made before the save and kept whether the save succeeds or not.
+
+- **Errors and status lines name the source that was tried.** A missing article always read "not
+  found in the EUR-Lex page", for Normattiva and Cellar pages too, and the report's status line said
+  "EUR-Lex unreachable" whatever had happened — for the GDPR, whose first source is Cellar, even when
+  Cellar had answered. `LawFetchError` carries `source` and `reached`, `ActStatus` carries `tried`
+  and `failure`, and the line says "GDPR: Cellar answered without the text cited" or "GDPR: Cellar
+  and EUR-Lex unreachable".
+
+- **A corrupt law cache is an empty one.** A deeply nested `law_cache.json` made `json.loads` raise
+  `RecursionError`, and the whole law check failed. It is now read as an empty cache.
+
+- **Normattiva's "-bis" paragraphs have a reference of their own.** Paragraph numbers were read as
+  `\d+`, so paragraph 2-bis of art. 122 of the Codice privacy, and 3-bis and 4-bis of art. 21 of the
+  Consumer Code, were part of the article's text and could not be cited; the later Latin numbers
+  (-ter, -quater, ... -decies, -terdecies) are read too.
+
+- **`audit` no longer lists trackers "loaded after rejection" when nothing was rejected.** With a
+  tracking cookie stored before any choice the verdict is VIOLATION whether or not the reject button
+  was found, and the report then printed "N tracker(s) loaded after rejection" for the trackers of a
+  session in which the refusal was never applied: on www.repubblica.it on 2026-11-17, a pay-to-refuse
+  wall, five of them. The list is now printed only when the refusal was clicked, as `batch` and the
+  law check already did.
+
+- **A site that never loaded is no longer reported as measured.** `verdict` ignored a session's error
+  when there was no status: a navigation that failed outright (name not resolved, connection refused
+  or reset, nothing before the timeout) left a session with no trackers and no cookie, which read as a
+  clean one. On 2026-11-17 www.gnu.org's pre-consent session got `net::ERR_CONNECTION_RESET` while the
+  other two loaded, and the verdict was OK; an unresolvable host exited with 2 and "reject button not
+  found". A session with an error, no status and nothing from a document is now unreachable
+  (`scanner.unreachable`). Every session unreachable is `⛔ NOT MEASURED`, exit 3, in `audit`, `batch`
+  and the law check; session 1 or 3 unreachable is never OK, and UNVERIFIED says which session never
+  loaded. The README's exit codes say so.
+
+- **A close "×" that subscribes is no longer clicked as a refusal.** The close step ran before the
+  check for a refusal sold with a subscription, and chose by selector alone. On www.ansa.it on
+  2026-11-17 iubenda's `.iubenda-cs-close-btn` was labelled "Rifiuta e abbonati": it was clicked,
+  Piano's checkout opened, and the session was measured as a refusal and cited. Every step that
+  clicks now skips a control whose aria-label, text, value or title is a refusal sold with a
+  subscription, and the English "Reject all and subscribe" (also "Reject", "Decline" or "Refuse" …
+  "and subscribe") is recognised beside "Rifiuta e abbonati".
+
+- **A tracker fired right after "Reject" is reported.** The post-reject session waited two seconds
+  after the click and only then emptied its lists before the reload, so every request in those two
+  seconds was thrown away — among them a tag that fires on the consent update whatever the choice,
+  which is the misconfiguration the session exists to find. The lists are now cut where they stood
+  when the refusal was clicked: what the page loaded before it still does not count, what the click
+  set off does.
+
+- **A tag manager's library and a Consent Mode ping with storage denied are no longer cited after a
+  refusal.** Every tracker host contacted after "Reject" was a violation of GDPR art. 5(1)(a),
+  ePrivacy art. 5(3), art. 7 and the Consumer Code, including the two kinds of request the README
+  already called possibly lawful before any choice. On 2026-11-17, after a refusal that was clicked,
+  www.köln.de loaded `gtm.js`, `gtag/js` and a GA4 collect with `gcs=G100`, and nothing else; it was
+  a VIOLATION with four provisions cited. www.comune.milano.it loaded nine scripts from
+  `assets.adobedtm.com` and no Adobe beacon. A domain whose every request after the refusal was a tag
+  manager's library fetched as a script (Google Tag Manager, Adobe Launch, Tealium, TagCommander) or
+  a Google ping with `gcs=G100` is now reported as "Loaded after rejection, not cited", with the
+  reason, and is not cited — unless the session holds a tracking cookie by name or a cookie on that
+  domain. Beacons, pixels and granted pings stay violations, and so does a domain with any other
+  request: aranzulla.it's doubleclick.net and googlesyndication.com still are. `Violations` has a
+  `not_cited` field; `scanner.not_cited_after_rejection` names them. The README says what the rule is.
+
+- **A listed site's own cookies are not "tracking stored before any choice".** A cookie counted as
+  tracking storage when its domain was on the tracker list, and linkedin.com is on it as a tracker of
+  other sites: audited on its own domain, whose requests were already left out as first-party, its
+  `bcookie` and `lang` made a VIOLATION citing art. 122(1) of the Codice privacy. A cookie now counts
+  by its domain only when that domain is not the site's (`is_same_site` with the host the document
+  came from, recorded as `SessionResult.host`); `_ga`, `_fbp` and the other names still count wherever
+  they are set.
+
+- **A refusal whose reload failed is no longer a clean session 3.** After the click, session 3
+  reloads the page; a reload that failed with anything but a timeout (connection reset, aborted)
+  ended the session with the first load's status and the click recorded, so it read as a measured
+  one with nothing in it: verdict OK, exit 0, "No trackers loaded after rejection", on a test page
+  that loads doubleclick.net on every load. Such a session is now `reload_failed`: never OK
+  (UNVERIFIED, unless something was already caught after the click), and `audit`, `batch` and the law
+  check say the page could not be reloaded after the refusal.
+
 - **A release no longer goes red because the index answered the check before it had caught up.** After
   the upload, *Publish to PyPI* installs the new version into a fresh venv to prove it installs.
   That was a single `pip install`, given no retry on the ground that the job has one resolver.

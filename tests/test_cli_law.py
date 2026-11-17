@@ -1,5 +1,6 @@
 """Tests for the law check that `cookieradar audit` runs."""
 import hashlib
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -149,3 +150,40 @@ def test_law_check_failure_does_not_change_verdict(monkeypatch):
 
     assert out.exit_code == 1
     assert "unexpected" in out.output
+
+
+def _flat(output: str) -> str:
+    """The output without colours and on one line: Rich wraps at the terminal's
+    width, and on GitHub Actions it colours what it prints."""
+    return " ".join(re.sub(r"\x1b\[[0-9;]*m", "", output).split())
+
+
+def test_a_source_that_answered_without_the_text_is_not_called_unreachable(monkeypatch):
+    """Cellar served the GDPR, and the parser did not find 5(1)(a) in it: the
+    status line said "EUR-Lex unreachable", naming a source that was not even
+    the one tried first, and a failure that did not happen."""
+    page = GDPR_PAGE.read_text(encoding="utf-8").replace(
+        '<p class="oj-normal">a)</p>', '<p class="oj-normal">a.</p>', 1
+    )
+
+    def fetch_html(url, **kwargs):
+        if "publications.europa.eu" in url and "32016R0679" in url:
+            return page
+        raise law_fetcher.LawFetchError("network disabled in tests")
+
+    monkeypatch.setattr(law_fetcher, "fetch_html", fetch_html)
+    out = _audit(scan_result(rejected=["doubleclick.net"]))
+    text = _flat(out.output)
+
+    assert out.exit_code == 1, out.output
+    assert "GDPR: Cellar answered without the text cited and nothing cached" in text
+    assert "GDPR: EUR-Lex unreachable" not in text
+    assert "not found in the text from Cellar" in text
+
+
+def test_an_unreachable_source_names_the_sources_tried():
+    # conftest makes every download fail: Cellar first, then EUR-Lex
+    text = _flat(_audit(scan_result(rejected=["doubleclick.net"])).output)
+
+    assert "GDPR: Cellar and EUR-Lex unreachable and nothing cached" in text
+    assert "Codice del Consumo D.Lgs. 206/2005: Normattiva unreachable and nothing cached" in text

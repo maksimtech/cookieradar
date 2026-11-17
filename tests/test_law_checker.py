@@ -1,6 +1,8 @@
 """Tests for mapping CookieRadar findings to GDPR and ePrivacy provisions."""
 from datetime import UTC, datetime
+from pathlib import Path
 
+import httpx
 import pytest
 
 from cookieradar import law_fetcher
@@ -27,6 +29,7 @@ from cookieradar.scanner import ScanResult, SessionResult, TrackerRequest
 
 DAY1 = datetime(2026, 9, 19, 14, 0, tzinfo=UTC)
 DAY2 = datetime(2026, 10, 1, 9, 30, tzinfo=UTC)
+REAL_FETCH_HTML = law_fetcher.fetch_html
 
 
 def _session(name, domains, clicked=True):
@@ -64,7 +67,9 @@ def _fake_fetch(suffix=""):
 
 @pytest.fixture
 def cache(tmp_path):
-    return LawCache(tmp_path / "law_cache.json")
+    # In a folder of its own, so that read_only_cache freezes that folder and
+    # not pytest's tmp_path.
+    return LawCache(tmp_path / "law-cache" / "law_cache.json")
 
 
 @pytest.fixture
@@ -305,3 +310,182 @@ def test_changed_eprivacy_text_is_reported_by_act(cache, monkeypatch):
 def test_default_cache_location(tmp_path, online):
     check(scan_result(rejected=["doubleclick.net"]), now=DAY1)
     assert (tmp_path / "cookieradar-home" / "law_cache.json").is_file()
+
+
+# ─── a cited reference must be in the text downloaded now ────────────────────
+
+def _whole_articles_only(act, articles, now=None, **kwargs):
+    """A source that answered, and a text in which the parser found the
+    articles and none of their paragraphs or points."""
+    stamp = law_fetcher.utc_stamp(now)
+    return {a: Provision.from_text(a, f"{act.name} {a}", stamp, act.celex) for a in articles}, "Cellar"
+
+
+def _status(law, act):
+    return next(status for status in law.acts if status.act == act)
+
+
+def _citation(law, article):
+    return next(citation for citation in law.citations if citation.article == article)
+
+
+def test_a_reference_missing_from_the_fresh_text_is_not_verified(cache, monkeypatch):
+    """Cellar answered and article 5 parsed, but 5(1)(a) was not in it: the act
+    was "verified against Cellar" beside "SHA256: not available"."""
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _whole_articles_only)
+    law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
+
+    status = _status(law, GDPR)
+    assert status.source == "unavailable", status
+    assert "5(1)(a)" in (status.error or "")
+    assert _citation(law, "5(1)(a)").sha256 is None
+
+
+def test_a_cached_reference_is_not_served_as_verified(cache, monkeypatch):
+    """The same, with the point cached by an earlier audit: its old SHA-256 and
+    date came back under the "verified" label."""
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _fake_fetch())
+    first = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _whole_articles_only)
+    law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY2)
+
+    assert _status(law, GDPR).source == "cache"
+    assert _citation(law, "5(1)(a)").sha256 == _citation(first, "5(1)(a)").sha256
+    assert _citation(law, "5(1)(a)").version_date == "2026-09-19"
+
+
+GDPR_PAGE = (Path(__file__).parent / "fixtures" / "gdpr_it_excerpt.html").read_text(encoding="utf-8")
+# Derived from the recorded page: point a) of art. 5(1) labelled "a." instead of
+# "a)", so the parser finds article 5 and 5(1), and not the reference 5(1)(a)
+GDPR_PAGE_POINT_A_UNLABELLED = GDPR_PAGE.replace('<p class="oj-normal">a)</p>', '<p class="oj-normal">a.</p>', 1)
+
+
+def _cellar(page):
+    """Cellar serving `page` for the GDPR; every other act and source is down."""
+    def answer(request):
+        if request.url.host == "publications.europa.eu" and "32016R0679" in request.url.path:
+            return httpx.Response(200, text=page)
+        return httpx.Response(503)
+
+    return httpx.Client(transport=httpx.MockTransport(answer))
+
+
+@pytest.fixture
+def real_fetch(monkeypatch):
+    """conftest disables fetch_html so that no test reaches the network; the
+    clients these tests pass answer only from the recorded page."""
+    monkeypatch.setattr(law_fetcher, "fetch_html", REAL_FETCH_HTML)
+
+
+def test_the_derived_page_lacks_only_the_point():
+    assert GDPR_PAGE_POINT_A_UNLABELLED != GDPR_PAGE
+    texts = law_fetcher.parse_articles(GDPR_PAGE_POINT_A_UNLABELLED, ("5", "7"))
+    assert "5(1)" in texts and "5(1)(b)" in texts
+    assert "5(1)(a)" not in texts
+
+
+def test_end_to_end_a_point_the_parser_missed_is_not_verified(cache, real_fetch):
+    law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1,
+                client=_cellar(GDPR_PAGE_POINT_A_UNLABELLED))
+
+    status = _status(law, GDPR)
+    assert (status.source, status.origin) == ("unavailable", None)
+    assert (status.tried, status.failure) == ("Cellar", "not_in_text")
+    assert _citation(law, "5(1)(a)").sha256 is None
+
+
+def test_end_to_end_the_recorded_page_is_verified(cache, real_fetch):
+    law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1, client=_cellar(GDPR_PAGE))
+
+    status = _status(law, GDPR)
+    assert (status.source, status.origin) == ("verified", "Cellar")
+    assert (status.tried, status.failure, status.reason) == (None, None, None)
+    assert _citation(law, "5(1)(a)").sha256 is not None
+
+
+# ─── statuses name the source that was tried ─────────────────────────────────
+
+def test_a_status_says_the_source_answered_without_the_text(cache, monkeypatch):
+    """The CLI printed "EUR-Lex unreachable" for this: Cellar was reached, and
+    only the reference cited was missing from its page."""
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _fake_fetch())
+    check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _whole_articles_only)
+    status = _status(check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY2), GDPR)
+
+    assert (status.source, status.tried, status.failure) == ("cache", "Cellar", "not_in_text")
+    assert status.reason == "Cellar answered without the text cited"
+
+
+def test_a_status_names_both_sources_when_neither_answered(cache, monkeypatch):
+    def down(act, articles, now=None, **kwargs):
+        raise LawFetchError("Cellar answered HTTP 503; and EUR-Lex answered HTTP 202", source="Cellar and EUR-Lex")
+
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", down)
+    status = _status(check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1), GDPR)
+
+    assert (status.source, status.tried, status.failure) == ("unavailable", "Cellar and EUR-Lex", "unreachable")
+    assert status.reason == "Cellar and EUR-Lex unreachable"
+
+
+def test_a_status_without_a_named_source_falls_back_to_the_act_source(cache, monkeypatch):
+    def down(act, articles, now=None, **kwargs):
+        raise LawFetchError("offline")
+
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", down)
+    law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
+
+    assert _status(law, GDPR).reason == f"{GDPR.source} unreachable"
+    assert _status(law, CONSUMER_CODE).reason == "Normattiva unreachable"
+
+
+# ─── a cache that cannot be written ──────────────────────────────────────────
+
+@pytest.fixture
+def read_only_cache(cache):
+    """Call it after a first audit: it makes `cache` read-only, the file (what
+    stops os.replace on Windows) and its folder (what stops it on POSIX)."""
+    import os
+    import stat
+
+    def freeze():
+        cache.path.chmod(stat.S_IREAD)
+        cache.path.parent.chmod(stat.S_IREAD | stat.S_IEXEC)
+        try:
+            cache.update({}, checked_at="2026-10-01T09:30:00Z")
+        except OSError:
+            return
+        pytest.skip("this user can write a read-only file (root?)")
+
+    yield freeze
+    os.chmod(cache.path.parent, stat.S_IRWXU)
+    if cache.path.exists():
+        os.chmod(cache.path, stat.S_IREAD | stat.S_IWRITE)
+
+
+def test_a_changed_text_is_reported_when_the_cache_cannot_be_written(cache, read_only_cache, monkeypatch):
+    """The change used to be computed only by a successful save: with the cache
+    read-only, a law whose text changed was cited with no warning."""
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _fake_fetch())
+    first = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
+    read_only_cache()
+
+    monkeypatch.setattr(law_fetcher, "fetch_provisions_from", _fake_fetch(" (modificato)"))
+    law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY2)
+
+    assert law.changed["GDPR art. 5(1)(a)"] == _citation(first, "5(1)(a)").sha256
+    assert _citation(law, "5(1)(a)").sha256 != _citation(first, "5(1)(a)").sha256
+    assert _citation(law, "5(1)(a)").version_date == "2026-10-01"
+
+
+def test_an_unchanged_text_keeps_its_version_date_when_the_cache_cannot_be_written(
+    cache, read_only_cache, online
+):
+    """The date of a wording is its first download, saved or not."""
+    check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY1)
+    read_only_cache()
+
+    law = check(scan_result(rejected=["doubleclick.net"]), cache=cache, now=DAY2)
+
+    assert law.changed == {}
+    assert _citation(law, "5(1)(a)").version_date == "2026-09-19"

@@ -528,23 +528,27 @@ def test_every_request_of_the_package_carries_the_user_agent_it_claims(doc):
         for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef)
         and any(
-            isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute) and call.func.attr == "get"
+            isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+            and call.func.attr in {"get", "send", "request", "stream"}
             and isinstance(call.func.value, ast.Name) and call.func.value.id in {"client", "own_client"}
             for call in ast.walk(node)
         )
     }
     # Since 2026-10-11 the requests go out of _get_over_https, which follows
-    # redirects by hand over HTTPS and sends the headers fetch_html gives it.
+    # redirects by hand over HTTPS and sends the headers fetch_html gives it;
+    # since 2026-11-17 it sends them streamed, so that the body can be capped.
     assert callers == {"_get_over_https"}
     # Read from the file, not from the function: conftest replaces fetch_html in
     # every test so that none reaches the network.
     law = (PACKAGE / "law_fetcher.py").read_text(encoding="utf-8")
     source = ast.get_source_segment(law, function(PACKAGE / "law_fetcher.py", "fetch_html"))
     assert 'headers = {"User-Agent": USER_AGENT, **(headers or {})}' in source
-    assert "_get_over_https(own_client, url, headers, source)" in source
-    assert "_get_over_https(client, url, headers, source)" in source
+    assert "_download(own_client, url, headers, source)" in source
+    assert "_download(client, url, headers, source)" in source
+    download = ast.get_source_segment(law, function(PACKAGE / "law_fetcher.py", "_download"))
+    assert "_get_over_https(client, url, headers, source, deadline)" in download
     helper = ast.get_source_segment(law, function(PACKAGE / "law_fetcher.py", "_get_over_https"))
-    assert "client.get(target, headers=headers, follow_redirects=False)" in helper
+    assert 'client.build_request("GET", target, headers=headers)' in helper
     for path in sorted(PACKAGE.rglob("*.py")):
         if path.name != "law_fetcher.py":
             assert not runtime_imports_of("httpx", path), path.name

@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+  A tag that fires on the consent-update event whatever the choice: the refusal
+  itself sends the request, 300 ms after the click. After the reload the stored
+  refusal is honoured, so the request is made once, right after "Reject all".
+
+  CookieRadar waited two seconds after the click and then emptied the lists of
+  requests before the reload: everything sent in those two seconds, this one
+  included, was thrown away, and the session came out clean.
+
+  The request goes to connect.facebook.net; the tests answer it with
+  `context.route`, so nothing leaves the machine.
+-->
+<html lang="en">
+<head><meta charset="utf-8"><title>Reject then fire</title></head>
+<body>
+<div id="cookie-banner">
+  <p>We use cookies.</p>
+  <button id="reject"
+          onclick="document.cookie='consent=no; path=/';
+                   setTimeout(() => { new Image().src = 'https://connect.facebook.net/tr?ev=consent_update'; }, 300)">Reject all</button>
+</div>
+</body>
+</html>
