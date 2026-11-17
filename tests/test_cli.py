@@ -16,6 +16,7 @@ import cookieradar.cli as cli
 import cookieradar.scanner as scanner
 from cookieradar.cli import _report_filename, app, normalize_url
 from cookieradar.scanner import ScanResult, TrackerRequest
+from tests.names import mentions
 
 README = Path(__file__).resolve().parents[1] / "README.md"
 runner = CliRunner()
@@ -243,7 +244,7 @@ def test_trackers_after_a_real_rejection_are_still_listed_beside_stored_cookies(
 
     assert res.exit_code == 1, res.output
     assert "1 tracker(s) loaded after rejection" in res.output
-    assert "doubleclick.net" in res.output.split("loaded after rejection", 1)[1]
+    assert mentions(res.output.split("loaded after rejection", 1)[1], "doubleclick.net")
 
 
 def test_the_report_weighs_a_banner_that_only_accepts():
