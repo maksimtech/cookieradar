@@ -12,7 +12,18 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+## [2026.48] - 2026-11-18
+
 ### Changed
+
+- **Four OpenSSL issues of 2026-11-10 are accepted until Debian ships 3.5.10.** At the first scan of
+  main on 2026-11-17 Docker Scout reported CVE-2026-95691, CVE-2026-95692, CVE-2026-88823 and
+  CVE-2026-107496 as high against the base image's openssl 3.5.7-1~deb13u3, and Security Posture
+  failed. OpenSSL rates all four Low and fixes them in 3.5.10; Debian has no trixie package with the
+  fix yet. None is reachable here: they need the OpenSSL QUIC client, AES-GCM-SIV through EVP, or
+  `CMS_encrypt()`, and Python's ssl exposes none of them, while the audited sites go through
+  Chromium's own BoringSSL. The entries are reviewed on 2026-12-15; the rebuild that brings the DSA
+  will make them fail the gate as unused.
 
 - **The 49 exceptions due on 2026-11-30 are reviewed.** Without the review, Security Posture would
   have failed on its own from 2026-12-01. Each entry was read again on 2026-11-17 against the Debian
@@ -1268,7 +1279,8 @@ the wrong consent button, and the published Docker image did not work.
   releases, PyPI publishing and Docker build/push on version tags
 - SonarCloud analysis and CodSpeed benchmarks
 
-[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.47.1...HEAD
+[Unreleased]: https://github.com/maksimtech/cookieradar/compare/v2026.48...HEAD
+[2026.48]: https://github.com/maksimtech/cookieradar/compare/v2026.47.1...v2026.48
 [2026.47.1]: https://github.com/maksimtech/cookieradar/compare/v2026.47...v2026.47.1
 [2026.47]: https://github.com/maksimtech/cookieradar/compare/v2026.46...v2026.47
 [2026.46]: https://github.com/maksimtech/cookieradar/compare/v2026.45...v2026.46
