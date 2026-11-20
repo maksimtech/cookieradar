@@ -12,6 +12,18 @@ no version in this file has ever matched — 40 is not a month, and
 
 ## [Unreleased]
 
+### Security
+
+- **The image no longer carries the X server's font libraries, and CVE-2026-109908 with them.** On
+  2026-11-20 Trivy reported it as high against libfontenc1 1:1.1.8-1+b2 (font file parsing), with no
+  fix in trixie. Chromium does not link libfontenc or libXfont2; in the image only mkfontscale and
+  fonttosfnt did, from xfonts-utils, which builds X font indexes and which nothing runs. They came with
+  `playwright install-deps chromium`, like the X server removed in 2026.47, and leave with it:
+  xfonts-scalable, xfonts-utils, libxfont2 and libfontenc1, four packages of 197. The eight Type1 faces
+  xfonts-scalable added to fontconfig (Bitstream Charter, Courier 10 Pitch) go too; 42 fonts remain,
+  and an audit takes no screenshot. dpkg removes them, not apt: if anything else comes to depend on
+  them, the build fails instead of losing it (`tests/test_docker_xserver.py`).
+
 ## [2026.48] - 2026-11-18
 
 ### Changed
