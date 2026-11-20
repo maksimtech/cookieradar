@@ -21,6 +21,7 @@ permissions:
 jobs:
   docker:
     runs-on: ubuntu-26.04
+    timeout-minutes: 35
     steps:
       # The tag being built, not the default branch. The image is built from this
       # checkout now, so where the job stands decides what ships. `version` is a
