@@ -1624,3 +1624,86 @@ When the release of 2026-12-07 publishes the new image, this entry stops \
 matching and fails the build as unused: delete it then.
 """
 review_by = "2026-12-08"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Two glibc issues Debian has already fixed in trixie (2.41-12+deb13u5), reported
+# by Docker Scout on 2026-11-21 against the published image, which was built for
+# 2026.48 on deb13u4 (maksimtech/apkradar#121). The image built from main runs
+# `apt-get upgrade` and has the fix; Trivy, which reads that one, does not report
+# them. Review on 2026-12-08, the day after the release that rebuilds the
+# published image.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-19499"
+source = "Docker Scout"
+where = "glibc 2.41-12+deb13u4 (libc6), python:3.14-slim-trixie base image, published image 2026.48"
+why = """
+strfmon() and strfmon_l() may write past the caller's buffer when a conversion \
+pads to a width (Debian security tracker; GLIBC-SA-2026-0017). Debian fixed it \
+for trixie in glibc 2.41-12+deb13u5 (`patchradar debian`, 2026-11-21). Docker \
+Scout reports it as high against the image published for 2026.48, built on \
+deb13u4 before that update.
+
+The image built from this source runs `apt-get upgrade` and carries deb13u5. \
+Nothing in cookieradar formats money: Python's locale.currency() is written in \
+Python and does not call strfmon, and Chromium does not use it either.
+
+When the release of 2026-12-07 publishes the new image, this entry stops \
+matching and fails the build as unused: delete it then.
+"""
+review_by = "2026-12-08"
+
+[[exception]]
+id = "CVE-2026-5435"
+source = "Docker Scout"
+where = "glibc 2.41-12+deb13u4 (libc6), python:3.14-slim-trixie base image, published image 2026.48"
+why = """
+The deprecated resolver printing functions ns_printrrf(), ns_printrr() and \
+fp_nquery() ignore the buffer length they are given and may write past it when \
+printing TSIG records (Debian security tracker; GLIBC-SA-2026-0011). Debian \
+fixed it for trixie in glibc 2.41-12+deb13u5 (`patchradar debian`, 2026-11-21). \
+Docker Scout reports it as high against the image published for 2026.48, built \
+on deb13u4 before that update.
+
+The image built from this source runs `apt-get upgrade` and carries deb13u5. \
+cookieradar fetches the law texts over httpx, resolving through getaddrinfo(), \
+and Chromium resolves with its own resolver; nothing prints a DNS record or calls \
+these debugging functions.
+
+When the release of 2026-12-07 publishes the new image, this entry stops \
+matching and fails the build as unused: delete it then.
+"""
+review_by = "2026-12-08"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CVE-2026-121482 (OpenSSL, CRL distribution points; no advisory yet), reported
+# by Docker Scout on main on 2026-11-21 against the trixie openssl of the base
+# image (maksimtech/apkradar#124). Review on 2026-12-15, with the other OpenSSL
+# entries.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-121482"
+source = "Docker Scout"
+where = "openssl 3.5.7-1~deb13u3 (openssl, libssl3t64), python:3.14-slim-trixie base image"
+why = """
+crl_crldp_check() rebuilds the name of every CRL distribution point of a \
+certificate on each CRL check, so a certificate with very many of them, verified \
+with CRL checking enabled, costs CPU time quadratic in their number \
+(openssl/openssl#33546, merged upstream on 2026-11-18). No OpenSSL advisory or \
+released version yet; Debian lists trixie and sid as vulnerable, \
+3.5.9-1~deb13u1 included, with no fix (`patchradar debian`, 2026-11-21). Docker \
+Scout reports it as high. `apt-get upgrade` runs at build time, and the image is \
+rebuilt at every release: the DSA arrives here without anyone chasing it, and \
+this entry then fails the build as unused.
+
+It is reached only when a certificate is verified with CRL checking enabled. \
+Python's ssl does not enable it: ssl.create_default_context() sets \
+VERIFY_X509_STRICT, VERIFY_X509_TRUSTED_FIRST and VERIFY_X509_PARTIAL_CHAIN and \
+no VERIFY_CRL_CHECK flag, and cookieradar sets none (checked in its code). \
+cookieradar's own TLS is Python's ssl module over TCP (httpx, for the law texts); \
+the audited sites are fetched by Playwright's Chromium, which carries its own \
+BoringSSL and does not load the image's libssl.
+"""
+review_by = "2026-12-15"
