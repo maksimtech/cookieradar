@@ -48,6 +48,21 @@ no version in this file has ever matched — 40 is not a month, and
   source no longer has it, and Trivy, which reads that one, does not report it. The entry is reviewed
   on 2026-12-08 and fails the build as unused once the new image is out.
 
+- **Two glibc issues Debian has already fixed are accepted for Docker Scout until this release is
+  published.** On 2026-11-21 Docker Scout reported CVE-2026-19499 (`strfmon()`) and CVE-2026-5435 (the
+  deprecated resolver printing functions) as high against glibc 2.41-12+deb13u4 in the image published
+  for 2026.48. Debian fixed both for trixie in 2.41-12+deb13u5, which the image built from this source
+  has (`apt-get upgrade`), and Trivy, which reads that image, does not report them. Neither is reached:
+  nothing formats money, and nothing prints a DNS record. The entries are reviewed on 2026-12-08 and
+  fail the build as unused once the new image is out (maksimtech/apkradar#121).
+
+- **CVE-2026-121482 (OpenSSL, CRL distribution points) is accepted until Debian ships a fix.** Docker
+  Scout reported it on 2026-11-21: a certificate with very many CRL distribution points, verified with
+  CRL checking enabled, costs CPU time quadratic in their number (openssl/openssl#33546; no advisory
+  yet, no fixed Debian package). It is not reachable here: Python's ssl enables no CRL checking and
+  cookieradar sets none, and Chromium carries its own BoringSSL. Reviewed on 2026-12-15 with the other
+  OpenSSL entries (maksimtech/apkradar#124).
+
 ## [2026.48] - 2026-11-18
 
 ### Changed
