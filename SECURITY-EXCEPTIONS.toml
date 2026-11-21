@@ -1565,3 +1565,62 @@ the audited sites are fetched by Playwright's Chromium, which carries its own \
 BoringSSL and does not load the image's libssl.
 """
 review_by = "2026-12-15"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CVE-2026-84786 (OpenSSL, DANE; no advisory yet), reported by Docker Scout on
+# main on 2026-11-21 against the trixie libssl3t64 of the base image
+# (maksimtech/apkradar#116). Review on 2026-12-15, with the other OpenSSL entries.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-84786"
+source = "Docker Scout"
+where = "openssl 3.5.7-1~deb13u3 (libssl3t64), python:3.14-slim-trixie base image"
+why = """
+A DANE-enabled TLS client may dereference a NULL pointer on an unusual pair of \
+certificate and TLSA records (Debian security tracker). No OpenSSL advisory yet; \
+the fix is openssl/openssl#33634, open on 2026-11-20 and marked for the 3.5 \
+branch. Debian lists trixie and sid as vulnerable, with no fixed version. Docker \
+Scout reports it as high. `apt-get upgrade` runs at build time, and the image is \
+rebuilt at every release: the DSA arrives here without anyone chasing it, and \
+this entry then fails the build as unused.
+
+It is reached only by a TLS client that enables DANE (SSL_dane_enable) and checks \
+TLSA records. Python's ssl module exposes no DANE at all, and cookieradar reads \
+no TLSA record. cookieradar's own TLS is Python's ssl module over TCP (httpx, for \
+the law texts); the audited sites are fetched by Playwright's Chromium, which \
+carries its own BoringSSL and does not load the image's libssl.
+"""
+review_by = "2026-12-15"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CVE-2026-109908 (libfontenc1), already fixed in this repository and still in
+# the published image. Docker Scout reads the image on Docker Hub, which is the
+# one built for 2026.48; Trivy reads the image built from main, and stopped
+# reporting it there once #99 removed the package. Review on 2026-12-08, the day
+# after the release that rebuilds the published image.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-109908"
+source = "Docker Scout"
+where = "libfontenc 1:1.1.8-1 (libfontenc1), Chromium dependency, published image 2026.48"
+why = """
+libfontenc fails to validate font files it parses (Debian security tracker). \
+Debian: open in every suite, no fix, urgency not yet assigned; evidence goes on \
+Debian bug 1154283 (`patchradar debian`, 2026-11-21). Docker Scout and Trivy \
+report it as high.
+
+It is removed from the image, not accepted in it: #99 purges libfontenc1 with \
+the three packages that needed it (xfonts-scalable, xfonts-utils, libxfont2), \
+none of which Chromium links (tests/test_docker_xserver.py), and Trivy does not \
+report it on the image built from main. Docker Scout reads the image published \
+on Docker Hub, built for 2026.48 before that change, and goes on reporting it \
+until the next release rebuilds that image. Nothing in the published image \
+parses a font file with libfontenc: only mkfontscale and fonttosfnt link it, \
+and nothing runs them.
+
+When the release of 2026-12-07 publishes the new image, this entry stops \
+matching and fails the build as unused: delete it then.
+"""
+review_by = "2026-12-08"

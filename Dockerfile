@@ -25,11 +25,14 @@ RUN pip install --no-cache-dir --root-user-action=ignore "playwright==1.65.1"
 # libatomic1 comes first. install-deps also brings an X server (xvfb,
 # xserver-common) for headed browsers without a display, which nothing here
 # starts: it goes in the same layer, and only those two packages
-# (tests/test_docker_xserver.py).
+# (tests/test_docker_xserver.py). So do the X font libraries, which Chromium
+# does not link (CVE-2026-109908, libfontenc1), with dpkg: it refuses to remove a
+# package something else still needs, where apt would take that along too.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libatomic1 && \
     playwright install-deps chromium && \
-    apt-get purge -y xvfb xserver-common
+    apt-get purge -y xvfb xserver-common && \
+    dpkg --purge xfonts-scalable xfonts-utils libxfont2 libfontenc1
 # A non-root user to run as
 RUN useradd -m -u 1000 cookieradar
 # Chromium installed as cookieradar, into ~/.cache/ms-playwright
