@@ -24,6 +24,19 @@ no version in this file has ever matched — 40 is not a month, and
   and an audit takes no screenshot. dpkg removes them, not apt: if anything else comes to depend on
   them, the build fails instead of losing it (`tests/test_docker_xserver.py`).
 
+- **CVE-2026-84786 (OpenSSL, DANE) is accepted until Debian ships a fix.** Docker Scout started
+  reporting it on main on 2026-11-21 against the base image's openssl 3.5.7-1~deb13u3, and Security
+  Posture failed. A DANE-enabled TLS client may dereference a NULL pointer on unusual certificate and
+  TLSA records; there is no OpenSSL advisory yet, the fix is openssl/openssl#33634, and Debian has no
+  fixed trixie package. It is not reachable here: Python's ssl exposes no DANE, cookieradar reads no
+  TLSA record, and Chromium carries its own BoringSSL. Reviewed on 2026-12-15 with the other OpenSSL
+  entries (maksimtech/apkradar#116).
+
+- **CVE-2026-109908 stays accepted for Docker Scout until this release is published.** Scout reads
+  the image on Docker Hub, built for 2026.48 with libfontenc1 still in it; the image built from this
+  source no longer has it, and Trivy, which reads that one, does not report it. The entry is reviewed
+  on 2026-12-08 and fails the build as unused once the new image is out.
+
 ## [2026.48] - 2026-11-18
 
 ### Changed
