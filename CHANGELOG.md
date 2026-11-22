@@ -36,6 +36,13 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Security
 
+- **CVE-2026-124709 (OpenSSL, QUIC) stays accepted now that Trivy reports it too.** Debian moved trixie
+  to openssl 3.5.9-1~deb13u1, which a fresh build installs, and Trivy reports the issue against it; the
+  entry was written for Docker Scout alone, and Security Posture failed on #102. 3.5.9 does not fix it
+  (fixed upstream in 3.5.10; Debian has no fixed trixie package), and it is still not reachable:
+  Python's ssl exposes no QUIC, and Chromium carries its own BoringSSL. The entry now holds for any
+  scanner. Reviewed on 2026-12-15 with the other OpenSSL entries.
+
 - **The image no longer carries the X server's font libraries, and CVE-2026-109908 with them.** On
   2026-11-20 Trivy reported it as high against libfontenc1 1:1.1.8-1+b2 (font file parsing), with no
   fix in trixie. Chromium does not link libfontenc or libXfont2; in the image only mkfontscale and
