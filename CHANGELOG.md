@@ -34,6 +34,15 @@ no version in this file has ever matched — 40 is not a month, and
   is now pinned to the commit of v1.29.0, as in apkradar and mailradar (`tests/test_scout_binary.py`).
   Sources: [docker/scout-action#116](https://github.com/docker/scout-action/issues/116).
 
+- **Coverage reaches this repository's Codecov project again.** The upload authenticated with a
+  `CODECOV_TOKEN` secret, and Codecov files an upload under the project its token belongs to: the
+  secret here held exeradar's token, so the coverage reports went to exeradar's project. The upload
+  now uses OIDC (`use_oidc: true`, `id-token: write` on the test job): GitHub tells Codecov which
+  repository the job runs in, and there is no secret left to mix up. The test that required the token
+  now requires OIDC and forbids the secret (`tests/test_codecov_contract.py`). The action, on the
+  moving `@v7`, is pinned to the commit of v7.1.1, as in apkradar and mailradar. Same as
+  maksimtech/mailradar#135, tried on main there.
+
 ### Security
 
 - **CVE-2026-124709 (OpenSSL, QUIC) stays accepted now that Trivy reports it too.** Debian moved trixie
