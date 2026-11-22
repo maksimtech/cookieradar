@@ -18,7 +18,10 @@ no version in this file has ever matched — 40 is not a month, and
   it moves from the experimental `3.15-dev` row to the stable matrix and to the classifiers, and
   `3.16-dev` takes its place as the one row with `continue-on-error`, as in apkradar. Main's ruleset
   will require each stable row, `Tests (Python 3.11)` … `Tests (Python 3.15)`, by name
-  (`tests/test_ci_scripts.py`).
+  (`tests/test_ci_scripts.py`). On 3.15 every dependency installs from a published wheel; nothing is
+  built from source but CookieRadar itself. The `3.16-dev` row is red today, as it may be: cffi
+  2.1.1 has no 3.16 wheel and its source does not compile there (`Py_FileSystemDefaultEncoding` is
+  gone from 3.16's C API).
 - **Every job has a time limit, so a hung job no longer holds a pull request for six hours.** No job
   but mutmut set `timeout-minutes`, and GitHub's default is 360 minutes; on a required check the pull
   request waited that long. Each limit is about three times the job's longest run in its last 40 (ten
