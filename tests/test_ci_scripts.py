@@ -398,11 +398,12 @@ def test_tests_run_on_every_supported_python():
 def test_the_next_python_runs_as_an_experimental_row():
     """The release after the last supported one runs too, and may fail.
 
-    3.15.0 final is due 2026-10-09 (PEP 790); `actions/setup-python` resolves
-    `3.15-dev` to the newest pre-release today and to the final tomorrow, so the
+    3.16.0 final is due in October 2027 (PEP 602's yearly cadence);
+    `actions/setup-python` resolves `3.16-dev` to the newest pre-release, so the
     suite meets the new interpreter before the classifier promises it. The row is
     an `include`, not a member of `python-version`: that list is the classifiers
-    (test above) and the ruleset needs only the "Tests" summary. `continue-on-error`
+    (test above), and the ruleset requires each of those rows by name, never the
+    experimental one. `continue-on-error`
     taken from the matrix keeps a red experimental row from failing the run —
     and from failing `summary`, which sees the job as succeeded.
     """
