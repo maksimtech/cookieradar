@@ -17,11 +17,17 @@ no version in this file has ever matched — 40 is not a month, and
 - **Python 3.15 is supported, and 3.16 is the row allowed to fail.** 3.15.0 went final on 2026-10-09;
   it moves from the experimental `3.15-dev` row to the stable matrix and to the classifiers, and
   `3.16-dev` takes its place as the one row with `continue-on-error`, as in apkradar. Main's ruleset
-  will require each stable row, `Tests (Python 3.11)` … `Tests (Python 3.15)`, by name
+  now requires each stable row, `Tests (Python 3.11)` … `Tests (Python 3.15)`, by name
   (`tests/test_ci_scripts.py`). On 3.15 every dependency installs from a published wheel; nothing is
   built from source but CookieRadar itself. The `3.16-dev` row is red today, as it may be: cffi
-  2.1.1 has no 3.16 wheel and its source does not compile there (`Py_FileSystemDefaultEncoding` is
-  gone from 3.16's C API).
+  2.1.1 has no 3.16 wheel and its source does not compile there, since python/cpython#158020 removed
+  `Py_FileSystemDefaultEncoding` from the headers. The fix, python-cffi/cffi#287, is merged but not
+  yet released.
+- **Every job runs on ubuntu-26.04, CodSpeed's too.** The benchmarks stayed on ubuntu-24.04 when the
+  other jobs moved on 2026-10-02, because CodSpeed's action failed on 26.04 with "Unsupported system".
+  CodSpeed's runner and action v5.5.0 (2026-10-14) support it. `tests/test_runners.py`, as in
+  apkradar, now fails if any job runs on another image or on `ubuntu-latest`, whose image changes on
+  GitHub's schedule. A job that calls a reusable workflow has no runner of its own and is left out.
 - **Every job has a time limit, so a hung job no longer holds a pull request for six hours.** No job
   but mutmut set `timeout-minutes`, and GitHub's default is 360 minutes; on a required check the pull
   request waited that long. Each limit is about three times the job's longest run in its last 40 (ten
