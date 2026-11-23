@@ -59,6 +59,18 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Security
 
+- **CVE-2026-107494 (OpenSSL, QUIC) is accepted until Debian ships a fix.** Trivy reports it since
+  2026-11-23 against openssl 3.5.9-1~deb13u1 in the image. The fix for CVE-2026-84784 (OpenSSL
+  advisory of 2026-09-29, rated Low) was incomplete, and a malicious QUIC peer can still exhaust the
+  QUIC stack's memory with retransmitted NEW_CONNECTION_ID frames. There is no OpenSSL advisory yet
+  and no fixed Debian package. It is not reachable here, as checked with `ldd` in the v2026.48 image:
+  - the image's libssl is loaded only by Python's `_ssl`, apt and the `openssl` binary, and Python's
+    ssl exposes no QUIC;
+  - Chromium, which does speak QUIC, runs it on its own BoringSSL and links no OpenSSL;
+  - Playwright's Node driver carries its own OpenSSL.
+
+  The entry has no `source`, since Docker Scout reads the same package. Review by 2026-12-15, with the
+  other OpenSSL entries (maksimtech/apkradar#134).
 - **CVE-2026-124709 (OpenSSL, QUIC) stays accepted now that Trivy reports it too.** Debian moved trixie
   to openssl 3.5.9-1~deb13u1, which a fresh build installs, and Trivy reports the issue against it; the
   entry was written for Docker Scout alone, and Security Posture failed on #102. 3.5.9 does not fix it
