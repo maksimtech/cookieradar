@@ -37,7 +37,7 @@ jobs:
       - name: Build package
         run: python -m build
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           verify-metadata: false
       # That the file on PyPI can be installed used to be proved by accident, by the
