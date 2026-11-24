@@ -62,8 +62,10 @@ no version in this file has ever matched — 40 is not a month, and
 - **CVE-2026-107494 (OpenSSL, QUIC) is accepted until Debian ships a fix.** Trivy reports it since
   2026-11-23 against openssl 3.5.9-1~deb13u1 in the image. The fix for CVE-2026-84784 (OpenSSL
   advisory of 2026-09-29, rated Low) was incomplete, and a malicious QUIC peer can still exhaust the
-  QUIC stack's memory with retransmitted NEW_CONNECTION_ID frames. There is no OpenSSL advisory yet
-  and no fixed Debian package. It is not reachable here, as checked with `ldd` in the v2026.48 image:
+  QUIC stack's memory with retransmitted NEW_CONNECTION_ID frames. OpenSSL's advisory of 2026-11-24
+  rates it Low and names 3.5.10 as the fix, scheduled for 2026-12-01; until then no release contains
+  it, and Debian has no fixed package. It is not reachable here, as checked with `ldd` in the v2026.48
+  image:
   - the image's libssl is loaded only by Python's `_ssl`, apt and the `openssl` binary, and Python's
     ssl exposes no QUIC;
   - Chromium, which does speak QUIC, runs it on its own BoringSSL and links no OpenSSL;
