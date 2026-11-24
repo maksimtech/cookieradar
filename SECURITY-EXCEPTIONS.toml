@@ -1569,6 +1569,44 @@ BoringSSL and does not load the image's libssl.
 review_by = "2026-12-15"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CVE-2026-107494 (OpenSSL, QUIC; incomplete fix of CVE-2026-84784), reported by
+# Trivy on 2026-11-23 against the base image's openssl 3.5.9-1~deb13u1
+# (maksimtech/apkradar#134). Fixed upstream in 3.5.10, due 2026-12-01. Review by
+# 2026-12-15, with the other OpenSSL entries.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[exception]]
+id = "CVE-2026-107494"
+where = "openssl 3.5.9-1~deb13u1 (libssl3t64, openssl, openssl-provider-legacy), python:3.14-slim-trixie base image"
+why = """
+The fix for CVE-2026-84784 (OpenSSL advisory of 2026-09-29, rated Low, fixed in \
+3.5.9) was incomplete: OpenSSL's QUIC stack still queues a RETIRE_CONNECTION_ID \
+frame for every retransmitted NEW_CONNECTION_ID frame, without limit, so a \
+malicious QUIC peer can exhaust memory. Trivy reports it as high, from \
+CISA-ADP's CVSS 7.5; OpenSSL rates it Low. The fix was committed to the 3.5 \
+branch on 2026-11-22 (openssl/openssl#33544, closed as applied by hand), and \
+OpenSSL's advisory of 2026-11-24 (secadv/20261124.txt) names 3.5.10 as the fixed \
+version, scheduled for release on 2026-12-01: until then no OpenSSL release \
+contains it. Debian marks trixie, trixie-security and sid vulnerable with no \
+fixed package (security-tracker.debian.org, 2026-11-24), so there is nothing to \
+upgrade to. `apt-get upgrade` runs at build time, and the image is rebuilt at \
+every release: the DSA arrives here without anyone chasing it, and this entry \
+then fails the build as unused. No `source`: Docker Scout reads the same \
+package, and the reason below holds whichever scanner reports it.
+
+It is reached only through OpenSSL's QUIC stack. Python's ssl module exposes no \
+QUIC, client or server, and nothing in this image speaks it.
+cookieradar's own TLS is Python's ssl module over TCP (httpx, for the law texts). \
+The audited sites are fetched by Playwright's Chromium, whose QUIC (HTTP/3) runs \
+on its own BoringSSL: in the v2026.48 image `chrome` links neither libssl nor \
+libcrypto, and Playwright's Node driver carries its own statically linked \
+OpenSSL and talks to the browser over a local pipe. The image's libssl is loaded \
+only by Python's `_ssl`, apt's http method and the `openssl` binary (`ldd`, \
+2026-11-23).
+"""
+review_by = "2026-12-15"
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CVE-2026-84786 (OpenSSL, DANE; no advisory yet), reported by Docker Scout on
 # main on 2026-11-21 against the trixie libssl3t64 of the base image
 # (maksimtech/apkradar#116). Review on 2026-12-15, with the other OpenSSL entries.
