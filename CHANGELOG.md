@@ -14,6 +14,14 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Changed
 
+- **Every action is pinned to a commit, with its full version.** 19 uses in 11 workflows named moving
+  refs (`@v4`, `@v5`, `@v7`, `@v8`, and `@release/v1` in the job that holds the PyPI token). The
+  owners of those refs could change what these jobs run without a pull request here. Each is now
+  pinned to the commit its ref pointed at on 2026-11-23, with the release beside it, so nothing that
+  runs changes: codeql-action v4.39.4, CodSpeed v5.8.0, setup-buildx v4.4.1, build-push v7.4.0,
+  setup-qemu v4.4.0, upload-artifact v7.0.2, gh-action-pypi-publish v1.14.3, sonarqube-scan-action
+  v8.5.1. Each commit was checked against its tag. `tests/test_actions_pinned.py`, mailradar's,
+  keeps it so.
 - **Python 3.15 is supported, and 3.16 is the row allowed to fail.** 3.15.0 went final on 2026-10-09;
   it moves from the experimental `3.15-dev` row to the stable matrix and to the classifiers, and
   `3.16-dev` takes its place as the one row with `continue-on-error`, as in apkradar. Main's ruleset

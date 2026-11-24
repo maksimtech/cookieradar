@@ -36,7 +36,7 @@ jobs:
       # the only way to find out is to open sonarcloud.io by hand. With it, a red
       # gate is a red job.
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v8
+        uses: SonarSource/sonarqube-scan-action@70bad232163b09d998ea0707ee80c0ec80798c16 # v8.5.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
