@@ -173,9 +173,13 @@ notifica ai clienti, procedura di rollback. In sintesi:
   manutentore può ricostruire a mano una versione già pubblicata (`docker.yml`
   avviato manualmente), e in quel caso il tag di quella versione e `latest` vengono
   ripubblicati: per questo il riferimento stabile è il digest;
-- Dependabot controlla ogni settimana gli aggiornamenti delle dipendenze Python e
-  delle GitHub Actions (`.github/dependabot.yml`) e apre le relative pull request; dal
-  2026-11-17 legge anche `uv.lock`, solo per gli aggiornamenti di sicurezza.
+- dal 2026-11-26 gli aggiornamenti delle dipendenze li chiede Renovate
+  (`.github/renovate.json`), come in apkradar, al posto di Dependabot
+  (`.github/dependabot.yml`, tolto quel giorno): ogni giovedì le dipendenze Python,
+  `uv.lock` e le GitHub Actions, prese almeno 14 giorni dopo l'uscita (la regola è anche
+  in `uv`, `[tool.uv] exclude-newer`); gli aggiornamenti per una vulnerabilità nota
+  arrivano subito, senza attesa. Playwright, l'unica dipendenza che l'immagine fissa,
+  cambia nel Dockerfile e in `uv.lock` nella stessa pull request.
 
 Contatto per le segnalazioni: security@maksimtech.com.
 
