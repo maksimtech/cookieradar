@@ -3,17 +3,21 @@ on:
   push:
     tags:
       - 'v*'
+  # From a branch this is a dry run: build runs; publish, verify and docker are
+  # skipped, so nothing reaches PyPI or Docker Hub.
   workflow_dispatch:
+
+# Each job asks for its own; only publish holds the token PyPI trusts
+# (tests/test_publish_contract.py).
+permissions: {}
+
 jobs:
-  build-and-publish:
-    name: Build and publish to PyPI
+  build:
+    name: Build the distributions
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
-    environment:
-      name: pypi
-      url: https://pypi.org/p/cookieradar
+    timeout-minutes: 15
     permissions:
-      id-token: write
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -23,23 +27,77 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
+      # hatchling reads the version from cookieradar/__init__.py, so a tag that
+      # disagrees with it would publish under the wrong number. A branch is not
+      # published (publish, verify and docker run on a v* tag only): it builds, as
+      # the dry run, and says so.
       - name: Read package version
         id: version
         run: |
           VERSION=$(python -c "from cookieradar import __version__; print(__version__)")
-          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "::notice::$GITHUB_REF_NAME is a $GITHUB_REF_TYPE: dry run, nothing is published"
+            echo "Building $VERSION from $GITHUB_REF_NAME as a dry run"
+          elif [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match package version $VERSION"
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      # build, hatchling and their dependencies, each pinned with its hashes and
+      # compiled under the 14-day rule; Renovate keeps the file
+      # (tests/test_publish_contract.py, tests/test_renovate_config.py).
       - name: Install build dependencies
-        run: pip install --upgrade build hatchling  # NOSONAR
+        run: pip install --require-hashes -r .github/requirements-build.txt
+      # Without isolation: python -m build would fetch an unpinned hatchling into
+      # an environment of its own. The step above installed the pinned one.
       - name: Build package
-        run: python -m build
+        run: python -m build --no-isolation
+      - name: Keep the distributions for publish
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # The one job PyPI trusts: no checkout, no Python, no command of its own.
+  publish:
+    name: Publish to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cookieradar
+    permissions:
+      id-token: write
+    steps:
+      - name: Fetch the distributions build made
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           verify-metadata: false
+
+  verify:
+    name: Check the release installs from PyPI
+    needs: [build, publish]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
       # That the file on PyPI can be installed used to be proved by accident, by the
       # image installing it. The image now builds from the tag's source and never asks
       # the index, so the check is made here, on purpose, and after the upload — where
@@ -53,25 +111,28 @@ jobs:
       # releaseradar lost on v2026.4 with 45 s.
       - name: Wait for the index to catch up
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: bash .github/scripts/wait_for_pypi.sh cookieradar "$VERSION" 30 20 0
 
       - name: Check the published wheel installs and runs
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           python -m venv "${RUNNER_TEMP}/verify"
           bash .github/scripts/install_from_pypi.sh "${RUNNER_TEMP}/verify" cookieradar "$VERSION" 10 30
           "${RUNNER_TEMP}/verify/bin/cookieradar" --version
+
   docker:
     name: Docker image
     # Runs only after the package is on PyPI. The image no longer installs it from
     # there — it is built from the tag's source — but the version handed to it is the
-    # one this job published, so the order still means something.
-    needs: build-and-publish
+    # one build checked against the tag and publish uploaded, so the order still means
+    # something.
+    needs: [build, publish]
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
     uses: ./.github/workflows/docker.yml
     with:
-      version: v${{ needs.build-and-publish.outputs.version }}
+      version: v${{ needs.build.outputs.version }}
     secrets: inherit
