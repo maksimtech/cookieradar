@@ -14,6 +14,13 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Changed
 
+- **The CHANGELOG no longer reports a review that has not happened.** The Security entries gave
+  the date an accepted finding is looked at again in the past tense, as if the review were done;
+  it is the deadline, the same date as `review_by` in `SECURITY-EXCEPTIONS.toml`. 8 phrases (3 of them in released sections, which are corrected too: a CHANGELOG is read long after its release)
+  now read "Review by DATE", or "due for review by DATE". `tests/test_changelog_dates.py` holds it:
+  no review dated after today in `[Unreleased]` or after its release in a released section, and
+  every "review by" in `[Unreleased]` equal to the `review_by` of the CVE it names. Wrapped
+  phrases are found too, and `today` is a parameter (#106, maksimtech/apkradar#130).
 - **Renovate replaces Dependabot's version updates, as in apkradar.** `.github/dependabot.yml` and
   the test that held it, `tests/test_dependabot_config.py`, are removed. `.github/renovate.json` is
   apkradar's, less its exemption for the mailradar and cookieradar packages, which is apkradar's
@@ -142,7 +149,7 @@ no version in this file has ever matched — 40 is not a month, and
   entry was written for Docker Scout alone, and Security Posture failed on #102. 3.5.9 does not fix it
   (fixed upstream in 3.5.10; Debian has no fixed trixie package), and it is still not reachable:
   Python's ssl exposes no QUIC, and Chromium carries its own BoringSSL. The entry now holds for any
-  scanner. Reviewed on 2026-12-15 with the other OpenSSL entries.
+  scanner. Review by 2026-12-15 with the other OpenSSL entries.
 
 - **The image no longer carries the X server's font libraries, and CVE-2026-109908 with them.** On
   2026-11-20 Trivy reported it as high against libfontenc1 1:1.1.8-1+b2 (font file parsing), with no
@@ -159,27 +166,27 @@ no version in this file has ever matched — 40 is not a month, and
   Posture failed. A DANE-enabled TLS client may dereference a NULL pointer on unusual certificate and
   TLSA records; there is no OpenSSL advisory yet, the fix is openssl/openssl#33634, and Debian has no
   fixed trixie package. It is not reachable here: Python's ssl exposes no DANE, cookieradar reads no
-  TLSA record, and Chromium carries its own BoringSSL. Reviewed on 2026-12-15 with the other OpenSSL
+  TLSA record, and Chromium carries its own BoringSSL. Review by 2026-12-15 with the other OpenSSL
   entries (maksimtech/apkradar#116).
 
 - **CVE-2026-109908 stays accepted for Docker Scout until this release is published.** Scout reads
   the image on Docker Hub, built for 2026.48 with libfontenc1 still in it; the image built from this
-  source no longer has it, and Trivy, which reads that one, does not report it. The entry is reviewed
-  on 2026-12-08 and fails the build as unused once the new image is out.
+  source no longer has it, and Trivy, which reads that one, does not report it. The entry is due for review
+  by 2026-12-08 and fails the build as unused once the new image is out.
 
 - **Two glibc issues Debian has already fixed are accepted for Docker Scout until this release is
   published.** On 2026-11-21 Docker Scout reported CVE-2026-19499 (`strfmon()`) and CVE-2026-5435 (the
   deprecated resolver printing functions) as high against glibc 2.41-12+deb13u4 in the image published
   for 2026.48. Debian fixed both for trixie in 2.41-12+deb13u5, which the image built from this source
   has (`apt-get upgrade`), and Trivy, which reads that image, does not report them. Neither is reached:
-  nothing formats money, and nothing prints a DNS record. The entries are reviewed on 2026-12-08 and
+  nothing formats money, and nothing prints a DNS record. The entries are due for review by 2026-12-08 and
   fail the build as unused once the new image is out (maksimtech/apkradar#121).
 
 - **CVE-2026-121482 (OpenSSL, CRL distribution points) is accepted until Debian ships a fix.** Docker
   Scout reported it on 2026-11-21: a certificate with very many CRL distribution points, verified with
   CRL checking enabled, costs CPU time quadratic in their number (openssl/openssl#33546; no advisory
   yet, no fixed Debian package). It is not reachable here: Python's ssl enables no CRL checking and
-  cookieradar sets none, and Chromium carries its own BoringSSL. Reviewed on 2026-12-15 with the other
+  cookieradar sets none, and Chromium carries its own BoringSSL. Review by 2026-12-15 with the other
   OpenSSL entries (maksimtech/apkradar#124).
 
 ## [2026.48] - 2026-11-18
@@ -192,7 +199,7 @@ no version in this file has ever matched — 40 is not a month, and
   as vulnerable, with no fix. Neither is reachable here: one needs an application passing its own
   stack to `PEM_X509_INFO_read_bio_ex()`, which OpenSSL and Python's ssl never do, the other a QUIC
   server. The advisory's third issue, CVE-2026-35190, is not reported by any scanner yet and has no
-  entry, since an unused one fails the gate. Reviewed on 2026-12-15 with the four of 2026-11-10 below.
+  entry, since an unused one fails the gate. Review by 2026-12-15 with the four of 2026-11-10 below.
 
 - **Four OpenSSL issues of 2026-11-10 are accepted until Debian ships 3.5.10.** At the first scan of
   main on 2026-11-17 Docker Scout reported CVE-2026-95691, CVE-2026-95692, CVE-2026-88823 and
@@ -200,7 +207,7 @@ no version in this file has ever matched — 40 is not a month, and
   failed. OpenSSL rates all four Low and fixes them in 3.5.10; Debian has no trixie package with the
   fix yet. None is reachable here: they need the OpenSSL QUIC client, AES-GCM-SIV through EVP, or
   `CMS_encrypt()`, and Python's ssl exposes none of them, while the audited sites go through
-  Chromium's own BoringSSL. The entries are reviewed on 2026-12-15; the rebuild that brings the DSA
+  Chromium's own BoringSSL. The entries are due for review by 2026-12-15; the rebuild that brings the DSA
   will make them fail the gate as unused.
 
 - **The 49 exceptions due on 2026-11-30 are reviewed.** Without the review, Security Posture would
@@ -662,7 +669,7 @@ no version in this file has ever matched — 40 is not a month, and
 - **CVE-2026-88647 in gnutls28 recorded in `SECURITY-EXCEPTIONS.toml`.** A hostname \
   verification bypass with no fix in any Debian suite, found by the scan of the 2026.44 \
   image; same chain as the five gnutls/krb5 entries of 2026-10-09 (libcups2t64, not \
-  loaded by the headless shell), reviewed on 2026-11-30.
+  loaded by the headless shell), due for review by 2026-11-30.
 - **The gnutls28 and krb5 entries now say what was checked, not only what was read.** The \
   six gnutls CVEs of 2026-10-08 were reproduced with the public PoC certificates against \
   Debian's own packages (trixie 3.8.9-3+deb13u4, sid 3.8.13-1) and had no upstream issue \
