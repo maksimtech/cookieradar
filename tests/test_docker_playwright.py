@@ -7,10 +7,11 @@ ship, `playwright install-deps chromium` stopped with exit code 127, and the
 image could not be built, on main as for a release. The build of 2026-11-09,
 on the same base image digest, had taken 1.64.1. Neither was the 1.63.0 that
 uv.lock resolves, and 1.65.1 was thirteen days short of the age the Radar wait
-for before taking a release (tests/test_dependabot_config.py).
+for before taking a release (tests/test_dependency_age.py).
 
 Pinning the image to the locked version makes what ships the version the lock
-records, which Dependabot only moves 14 days after a release; a lock update
+records, which Renovate only moves 14 days after a release, the Dockerfile line
+and the lock in one pull request (tests/test_renovate_config.py); a lock update
 that leaves the Dockerfile behind fails here, naming both.
 """
 from __future__ import annotations

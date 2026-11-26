@@ -14,6 +14,37 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Changed
 
+- **Renovate replaces Dependabot's version updates, as in apkradar.** `.github/dependabot.yml` and
+  the test that held it, `tests/test_dependabot_config.py`, are removed. `.github/renovate.json` is
+  apkradar's, less its exemption for the mailradar and cookieradar packages, which is apkradar's
+  own:
+  - one batch every Thursday, at any hour (`* * * * 4`, Europe/Rome), and releases taken only once
+    they are 14 days old;
+  - a known vulnerability is updated at once, any day;
+  - minor, patch and digest updates merge on their own once the required checks pass, and a major
+    waits for a person;
+  - the Actions arrive as one pull request, kept pinned to a commit with its full version;
+  - the lower bounds in `pyproject.toml` are raised by hand, and the Python of the image and of the
+    matrix is not Renovate's to move.
+
+  **Playwright moves in one pull request, in the Dockerfile and in `uv.lock` together.** The image
+  installs `playwright==` at the version the lock holds (`tests/test_docker_playwright.py`), a line
+  no Renovate manager reads. A regex `customManagers` entry reads it, and a package rule puts both
+  updates in the same "Playwright" group, so the image and the lock cannot part.
+
+  The 14-day rule is also in uv (`[tool.uv] exclude-newer = "14 days"`), because Renovate's wait does
+  not reach the `uv lock --upgrade-package` it runs (apkradar#81). The lock written under it changes
+  no version: playwright stays at 1.65.1, taken for the Node it bundles and 14 days old since
+  2026-11-25. The required **Renovate gate** job (`tools/renovate_gate.py`) fails a Renovate pull
+  request whose own statuses are not green, since GitHub's auto-merge waits only for required
+  checks. Tests: `tests/test_renovate_config.py`, `tests/test_renovate_gate.py`,
+  `tests/test_dependency_age.py`. Alignment to apkradar, step 4 (#89).
+
+  **Three pins of the entry below go back to releases at least 14 days old.** They were taken as
+  if this repository were exempt from the wait, and it is not: codeql-action v4.39.4 → v4.39.3,
+  CodSpeed v5.8.0 → v5.6.3, sonarqube-scan-action v8.5.1 → v8.4.1, each pinned to the commit of its
+  tag, as in apkradar.
+
 - **Every action is pinned to a commit, with its full version.** 19 uses in 11 workflows named moving
   refs (`@v4`, `@v5`, `@v7`, `@v8`, and `@release/v1` in the job that holds the PyPI token). The
   owners of those refs could change what these jobs run without a pull request here. Each is now
