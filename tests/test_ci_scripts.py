@@ -195,14 +195,16 @@ def test_docker_workflow_is_not_triggered_by_tags_directly():
 
 
 def test_publish_runs_docker_after_pypi_upload():
+    """After publish, with the version build checked against the tag
+    (tests/test_publish_contract.py)."""
     jobs = _workflow("publish.yml")["jobs"]
     docker = jobs["docker"]
 
-    assert docker["needs"] == "build-and-publish"
+    assert "publish" in docker["needs"]
     assert docker["uses"] == "./.github/workflows/docker.yml"
     assert docker["secrets"] == "inherit"
-    assert "needs.build-and-publish.outputs.version" in docker["with"]["version"]
-    assert "version" in jobs["build-and-publish"]["outputs"]
+    assert "needs.build.outputs.version" in docker["with"]["version"]
+    assert "version" in jobs["build"]["outputs"]
 
 
 def test_the_release_image_is_built_from_the_tag_and_not_from_the_index():
@@ -250,7 +252,11 @@ def test_the_published_file_is_still_checked_where_it_was_published():
     accident: that what lands on PyPI can be installed. publish.yml says it on
     purpose now, after the upload, where a slow index delays a check instead of
     failing a build that had nothing to do with it."""
-    steps = _workflow("publish.yml")["jobs"]["build-and-publish"]["steps"]
+    # publish uploads and verify checks; verify waits for publish. Read as one
+    # sequence of steps (tests/test_publish_contract.py).
+    jobs = _workflow("publish.yml")["jobs"]
+    assert "publish" in jobs["verify"]["needs"]
+    steps = jobs["publish"]["steps"] + jobs["verify"]["steps"]
     names = [s.get("name", s.get("uses", "")) for s in steps]
 
     upload = next(i for i, s in enumerate(steps) if "gh-action-pypi-publish" in s.get("uses", ""))

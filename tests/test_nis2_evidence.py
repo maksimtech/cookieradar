@@ -344,7 +344,7 @@ def test_the_provenance_the_document_names_is_not_turned_off():
     both checked on the 2026.44 artefacts on 2026-10-11. Turning either off in
     the workflows would make section 1 false for the next release."""
     publish = _workflow(WORKFLOWS / "publish.yml")
-    job = publish["jobs"]["build-and-publish"]
+    job = publish["jobs"]["publish"]
     assert job["permissions"]["id-token"] == "write"
     step = next(s for s in job["steps"] if "gh-action-pypi-publish" in s.get("uses", ""))
     assert str((step.get("with") or {}).get("attestations", "true")).lower() != "false"

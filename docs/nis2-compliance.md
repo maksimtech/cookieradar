@@ -51,7 +51,10 @@ che il fornitore è in grado di dare, non un attestato di conformità.
   con Sigstore dal workflow di pubblicazione (`publish.yml`, verificato sulla 2026.44);
   le immagini su Docker Hub (`maksimtech/cookieradar`) hanno un'attestazione di
   provenienza SLSA generata da BuildKit al momento del push (presente in
-  `maksimtech/cookieradar:v2026.44`), che non è firmata.
+  `maksimtech/cookieradar:v2026.44`), che non è firmata. Dalle release successive al
+  2026-11-26 il pacchetto è costruito in un job senza il token di PyPI, con strumenti
+  di build fissati per hash, e caricato da un job che non installa né esegue nulla:
+  l'unico che può ottenere quel token (`tests/test_publish_contract.py`).
 - Licenze: il workflow License Check fallisce se una dipendenza Python è sotto GPL,
   AGPL o LGPL. Il controllo non riguarda i pacchetti Debian né il Chromium contenuti
   nell'immagine. CookieRadar non distribuisce i dati di Ghostery (`ghostery/trackerdb`,

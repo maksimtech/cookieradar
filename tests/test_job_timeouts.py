@@ -72,7 +72,8 @@ def test_publishing_outlives_its_waits_for_pypi():
     # attempts x interval, then a grace) and then installs it, asking again while a cache
     # lags (install_from_pypi.sh: attempts x interval). A limit under those would end the
     # job before either could say the version is not there.
-    job = dict(jobs())["publish.yml:build-and-publish"]
+    # Since the split (tests/test_publish_contract.py) the waits are in verify, after publish.
+    job = dict(jobs())["publish.yml:verify"]
     run = script(job)
     wait = re.search(r'wait_for_pypi\.sh \S+ "\$VERSION" (\d+) (\d+)(?: (\d+))?', run)
     install = re.search(r'install_from_pypi\.sh \S+ \S+ "\$VERSION" (\d+) (\d+)', run)
