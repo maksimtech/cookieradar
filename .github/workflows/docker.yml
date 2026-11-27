@@ -30,6 +30,22 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.version }}
+      # A step output, an image tag and a pip version: a release tag, or nothing. A
+      # newline in the input would have added outputs and image tags of its own.
+      # Decided before the Docker Hub login, so a refused value never meets the
+      # credentials (#125).
+      - name: Extract version
+        id: version
+        env:
+          RAW: ${{ inputs.version }}
+        run: |
+          VERSION="v${RAW#v}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+(\.[0-9]+)+$ ]]; then
+            printf '::error::not a release tag: %q\n' "$RAW"
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "PIP_VERSION=${VERSION#v}" >> "$GITHUB_OUTPUT"
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -43,13 +59,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Extract version
-        id: version
-        env:
-          RAW: ${{ inputs.version }}
-        run: |
-          echo "VERSION=v${RAW#v}" >> "$GITHUB_OUTPUT"
-          echo "PIP_VERSION=${RAW#v}" >> "$GITHUB_OUTPUT"
       - name: Build image for smoke test
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
