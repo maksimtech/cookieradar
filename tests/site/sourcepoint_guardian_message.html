@@ -1,0 +1,18 @@
+<!doctype html>
+<!--
+  Inside the Sourcepoint iframe of sourcepoint_guardian.html, as measured on
+  theguardian.com on 2026-11-27: a link to the cookie policy, "Accept all", and
+  "Reject all and subscribe" — a refusal that costs a subscription, to be named in
+  the report and never clicked. Each button records which one was clicked in a
+  cookie, as the other fixtures do.
+-->
+<html lang="en">
+<head><meta charset="utf-8"><title>SP Consent Message</title></head>
+<body>
+<div class="message-container">
+  <p>We use cookies and similar technologies. Read our <a href="https://www.theguardian.com/info/cookies">cookie policy</a>.</p>
+  <button class="message-component message-button" onclick="document.cookie='clicked=accept-all'">Accept all</button>
+  <button class="message-component message-button" onclick="document.cookie='clicked=reject-and-subscribe'">Reject all and subscribe</button>
+</div>
+</body>
+</html>

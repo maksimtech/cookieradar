@@ -1,0 +1,21 @@
+<!doctype html>
+<!--
+  The page of https://www.theguardian.com/ as it served its consent message on
+  2026-11-27 to the scanner's Chromium (locale it-IT): Sourcepoint renders it in an
+  iframe, `#sp_message_iframe_1533641` titled "SP Consent Message", and nothing of
+  it is in the page's own document (#96). There the iframe came from
+  sourcepoint.theguardian.com; here it is the same server, which makes it another
+  frame all the same: what the scanner has to do is look into frames at all.
+  The buttons inside are sourcepoint_guardian_message.html.
+-->
+<html lang="en">
+<head><meta charset="utf-8"><title>News, sport and opinion from the Guardian's global edition</title></head>
+<body>
+<h1>The Guardian</h1>
+<p><a href="/info/cookies">Cookie policy</a></p>
+<div id="sp_message_container_1533641" class="sp-message-open" style="position: fixed; inset: 0;">
+  <iframe id="sp_message_iframe_1533641" title="SP Consent Message"
+          src="sourcepoint_guardian_message.html" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+</body>
+</html>
