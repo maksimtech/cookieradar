@@ -357,3 +357,30 @@ async def test_no_refusal_is_still_cited_against_a_banner_with_only_accept(brows
     result = await scan(f"{site_url}/accept_only.html")
 
     assert "no_refusal" in findings_of(result)
+
+
+# ─── measured on 2026-11-27 (#97) ────────────────────────────────────────────
+
+@pytest.mark.parametrize("page", ["fundingchoices_ilmeteo.html", "fundingchoices_non_acconsento.html"])
+@pytest.mark.integration
+async def test_funding_choices_refusal_is_clicked_whatever_its_words(browser, site_url, page):
+    """ilmeteo.it says "continua senza accettare", which a label reads; "Non acconsento"
+    no label reads, and the class `fc-cta-do-not-consent` reaches both."""
+    result, clicked = await _session(browser, f"{site_url}/{page}", accept=False)
+    assert clicked == "do-not-consent"
+    assert result.consent_clicked is True
+
+
+@pytest.mark.parametrize("page", ["fundingchoices_ilmeteo.html", "fundingchoices_non_acconsento.html"])
+@pytest.mark.integration
+async def test_funding_choices_acceptance_is_clicked_whatever_its_words(browser, site_url, page):
+    _, clicked = await _session(browser, f"{site_url}/{page}", accept=True)
+    assert clicked == "consent"
+
+
+@pytest.mark.integration
+async def test_inps_rifiuta_i_cookie_non_tecnici_is_the_refusal(browser, site_url):
+    """No known id: the label is the only way to the refusal, and it was not known."""
+    result, clicked = await _session(browser, f"{site_url}/inps_rifiuta_non_tecnici.html", accept=False)
+    assert clicked == "refuse-analytics"
+    assert result.consent_clicked is True
