@@ -29,6 +29,10 @@ def make_mock_context(page=None):
     no_buttons = MagicMock()
     no_buttons.count = AsyncMock(return_value=0)
     page.get_by_role = MagicMock(return_value=no_buttons)
+    # The page is its own and only frame: the scanner searches every frame (#96),
+    # and what a test sets on the page is what the main frame answers.
+    page.main_frame = page
+    page.frames = [page]
     context = AsyncMock()
     context.new_page = AsyncMock(return_value=page)
     context.cookies = AsyncMock(return_value=[])

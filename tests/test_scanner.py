@@ -588,3 +588,79 @@ def test_a_host_the_idna_codec_refuses_is_kept_as_written(host):
         host.encode("idna")
 
     assert _ascii_host(host) == host
+
+
+# ─── #96: every frame is searched, and one that detaches stops nothing ──────
+
+def _frames_with_a_detached_one(page, child):
+    """The page, a frame that detaches while it is read (an ad's iframe being
+    replaced), and a child frame after it: the main frame first, as Playwright lists them."""
+    detached = MagicMock()
+    detached.query_selector_all = AsyncMock(side_effect=PlaywrightError("Frame was detached"))
+    detached.get_by_role = MagicMock(side_effect=PlaywrightError("Frame was detached"))
+    page.frames = [page, detached, child]
+    return detached
+
+
+async def test_a_refusal_found_by_selector_in_a_frame_after_a_detached_one():
+    context, page = make_mock_context()
+    child = MagicMock()
+    btn = _visible_button()
+    child.query_selector_all = AsyncMock(side_effect=lambda sel: [btn] if sel == "#onetrust-reject-all-handler" else [])
+    _frames_with_a_detached_one(page, child)
+
+    result = await _run_session(context, "https://example.com", "post-reject", accept=False)
+
+    assert result.consent_clicked is True
+    btn.click.assert_awaited_once()
+
+
+async def test_a_refusal_found_by_label_in_a_frame_after_a_detached_one():
+    context, page = make_mock_context()
+    child = MagicMock()
+    child.query_selector_all = AsyncMock(return_value=[])
+    btn = _visible_button()
+    found, nothing = MagicMock(), MagicMock()
+    found.count, found.nth = AsyncMock(return_value=1), MagicMock(return_value=btn)
+    nothing.count = AsyncMock(return_value=0)
+    child.get_by_role = MagicMock(side_effect=lambda role, name: found if name.search("Reject all") else nothing)
+    _frames_with_a_detached_one(page, child)
+
+    result = await _run_session(context, "https://example.com", "post-reject", accept=False)
+
+    assert result.consent_clicked is True
+    btn.click.assert_awaited_once()
+
+
+async def test_a_banner_found_in_a_frame_after_a_detached_one():
+    context, page = make_mock_context()
+    child = MagicMock()
+    banner = _visible_button()
+    child.query_selector_all = AsyncMock(side_effect=lambda sel: [banner] if sel == "[id*='consent' i]" else [])
+    _frames_with_a_detached_one(page, child)
+
+    result = await _run_session(context, "https://example.com", "pre-consent", accept=None)
+
+    assert result.banner_found is True
+
+
+async def test_a_paywall_found_in_a_frame_after_a_detached_one():
+    """No refusal to click anywhere, and "Rifiuta e abbonati" as a link in the
+    child frame: named, not clicked."""
+    context, page = make_mock_context()
+    child = MagicMock()
+    child.query_selector_all = AsyncMock(return_value=[])
+    wall = _visible_button()
+    wall.inner_text = AsyncMock(return_value="Rifiuta e abbonati")
+    found, nothing = MagicMock(), MagicMock()
+    found.count, found.nth = AsyncMock(return_value=1), MagicMock(return_value=wall)
+    nothing.count = AsyncMock(return_value=0)
+    child.get_by_role = MagicMock(
+        side_effect=lambda role, name: found if role == "link" and name.search("Rifiuta e abbonati") else nothing)
+    _frames_with_a_detached_one(page, child)
+
+    result = await _run_session(context, "https://example.com", "post-reject", accept=False)
+
+    assert result.pay_to_refuse == "Rifiuta e abbonati"
+    assert result.consent_clicked is False
+    wall.click.assert_not_awaited()

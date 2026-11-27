@@ -728,11 +728,27 @@ REJECT_LABELS = [
 ]
 
 
+def _scopes(page: Page) -> list:
+    """Where a banner can be: the page's main frame first, then every frame in it.
+
+    Sourcepoint renders its message in an iframe (theguardian.com, bbc.co.uk,
+    2026-11-27), and a search of the main frame alone saw no banner, no refusal and
+    no paywall there (#96). A Frame answers query_selector_all and get_by_role as
+    the page does."""
+    main = page.main_frame
+    return [main, *(frame for frame in page.frames if frame is not main)]
+
+
 async def _first_visible(page: Page, selector: str):
-    """First visible element matching selector (the first match may be hidden)."""
-    for element in await page.query_selector_all(selector):
-        if await element.is_visible():
-            return element
+    """First visible element matching selector (the first match may be hidden), in any frame."""
+    for scope in _scopes(page):
+        try:
+            for element in await scope.query_selector_all(selector):
+                if await element.is_visible():
+                    return element
+        except PlaywrightError:
+            # A frame that detached while it was read: the others still count
+            continue
     return None
 
 
@@ -756,10 +772,14 @@ async def _sold_with_a_subscription(control) -> bool:
 
 
 async def _first_clickable(page: Page, selector: str):
-    """First visible match that is not a refusal sold with a subscription."""
-    for element in await page.query_selector_all(selector):
-        if await element.is_visible() and not await _sold_with_a_subscription(element):
-            return element
+    """First visible match, in any frame, that is not a refusal sold with a subscription."""
+    for scope in _scopes(page):
+        try:
+            for element in await scope.query_selector_all(selector):
+                if await element.is_visible() and not await _sold_with_a_subscription(element):
+                    return element
+        except PlaywrightError:
+            continue
     return None
 
 
@@ -781,17 +801,18 @@ async def _click_consent_button(page: Page, selectors: list[str], labels: list[r
         except PlaywrightError:
             pass
     for label in labels:
-        try:
-            buttons = page.get_by_role("button", name=label)
-            for i in range(await buttons.count()):
-                btn = buttons.nth(i)
-                if await btn.is_visible() and not await _sold_with_a_subscription(btn):
-                    if before_click:
-                        await before_click(btn)
-                    await btn.click()
-                    return True
-        except PlaywrightError:
-            pass
+        for scope in _scopes(page):
+            try:
+                buttons = scope.get_by_role("button", name=label)
+                for i in range(await buttons.count()):
+                    btn = buttons.nth(i)
+                    if await btn.is_visible() and not await _sold_with_a_subscription(btn):
+                        if before_click:
+                            await before_click(btn)
+                        await btn.click()
+                        return True
+            except PlaywrightError:
+                pass
     return False
 
 
@@ -802,15 +823,16 @@ async def _visible_label(page: Page, labels: list[re.Pattern]) -> str:
     and among buttons alone that wall showed no refusal of any kind.
     """
     for label in labels:
-        for role in ("button", "link"):
-            try:
-                controls = page.get_by_role(role, name=label)
-                for i in range(await controls.count()):
-                    control = controls.nth(i)
-                    if await control.is_visible():
-                        return " ".join((await control.inner_text()).split())
-            except PlaywrightError:
-                pass
+        for scope in _scopes(page):
+            for role in ("button", "link"):
+                try:
+                    controls = scope.get_by_role(role, name=label)
+                    for i in range(await controls.count()):
+                        control = controls.nth(i)
+                        if await control.is_visible():
+                            return " ".join((await control.inner_text()).split())
+                except PlaywrightError:
+                    pass
     return ""
 
 
@@ -992,6 +1014,10 @@ async def _run_session(
             "[id*='gdpr' i]", "[class*='gdpr' i]",
             "[id*='banner' i]", "[class*='banner' i]",
             "[id^='didomi-']",
+            # Sourcepoint's iframe, whose container is `sp_message_container_<n>`
+            # and names none of the words above (theguardian.com, bbc.co.uk,
+            # 2026-11-27: `#sp_message_iframe_1533641`, "SP Consent Message").
+            "iframe[id^='sp_message_iframe']",
         ]
         for selector in banner_selectors:
             try:

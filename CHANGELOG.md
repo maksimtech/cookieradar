@@ -126,6 +126,13 @@ no version in this file has ever matched — 40 is not a month, and
     read, and elsewhere it is "Non acconsento", which none did.
   - "Reject non-essential cookies", also named in #97, was seen on no site that day and is not
     added: a label goes in with the site that uses it.
+- **A consent banner inside an iframe is found, and its buttons are read (#96).** Sourcepoint
+  renders its message in an iframe (theguardian.com and bbc.co.uk, 2026-11-27:
+  `#sp_message_iframe_<n>`, "SP Consent Message"), and the scanner searched the page's main frame
+  only. On theguardian.com it saw no banner, no refusal and no "Reject all and subscribe", and the
+  run ended UNVERIFIED. The banner, the refusal, the acceptance, the close X and the paywall are now
+  looked for in every frame, the main one first. The iframe itself counts as a banner, and the
+  report names "Reject all and subscribe" without clicking it.
 
 ### Security
 
