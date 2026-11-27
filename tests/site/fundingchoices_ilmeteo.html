@@ -1,0 +1,30 @@
+<!doctype html>
+<!--
+  Google Funding Choices as https://www.ilmeteo.it/ served it on 2026-11-27 to the
+  scanner's Chromium (locale it-IT): a dialog with three buttons, role=button, the
+  classes Funding Choices gives them, and aria-labels equal to their text, as this
+  publisher chose them — "accetta", "continua senza accettare", "personalizza".
+  The labels reach these already; the page holds that. Each button records which
+  one was clicked in a cookie, as the other fixtures do.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>ilmeteo.it</title></head>
+<body>
+<h1>Meteo</h1>
+<div class="fc-consent-root">
+  <div class="fc-dialog-container">
+    <div class="fc-dialog fc-choice-dialog" role="dialog" aria-label="Accetta la Privacy: NON raccogliamo dati privati">
+      <h1 class="fc-dialog-headline">Accetta la Privacy: NON raccogliamo dati privati</h1>
+      <div class="fc-footer-buttons">
+        <button class="fc-button fc-cta-consent fc-primary-button" role="button" aria-label="accetta" tabindex="0"
+                onclick="document.cookie='clicked=consent'"><div class="fc-button-background"></div><p class="fc-button-label">accetta</p></button>
+        <button class="fc-button fc-cta-do-not-consent fc-secondary-button" role="button" aria-label="continua senza accettare" tabindex="0"
+                onclick="document.cookie='clicked=do-not-consent'"><div class="fc-button-background"></div><p class="fc-button-label">continua senza accettare</p></button>
+        <button class="fc-button fc-cta-manage-options" role="button" aria-label="personalizza" tabindex="0"
+                onclick="document.cookie='clicked=manage-options'"><p class="fc-manage-options-third-button-label">personalizza</p></button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

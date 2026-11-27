@@ -113,6 +113,20 @@ no version in this file has ever matched — 40 is not a month, and
   moving `@v7`, is pinned to the commit of v7.1.1, as in apkradar and mailradar. Same as
   maksimtech/mailradar#135, tried on main there.
 
+### Fixed
+
+- **Refusals and acceptances measured on 2026-11-27 are recognised (#97).** On sites whose
+  refusal had a label no rule read, the refusal was never tested and the run ended UNVERIFIED.
+  Each one was read off the page with the scanner's Chromium that day:
+  - refusals: "Rifiuta i cookie non tecnici" (inps.it) and "Reject additional cookies" (gov.uk);
+  - acceptances: "Accetta e chiudi" (giallozafferano.it, iubenda), "Accept additional cookies"
+    (gov.uk) and "TILLAD ALLE" (dr.dk), so the post-accept session clicks them;
+  - Google Funding Choices by its classes, `.fc-cta-do-not-consent` and `.fc-cta-consent`. The
+    publisher picks the words: ilmeteo.it says "continua senza accettare", which a label already
+    read, and elsewhere it is "Non acconsento", which none did.
+  - "Reject non-essential cookies", also named in #97, was seen on no site that day and is not
+    added: a label goes in with the site that uses it.
+
 ### Security
 
 - **The job PyPI trusts installs and runs nothing, as in the other five Radar.** `publish.yml`'s

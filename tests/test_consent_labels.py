@@ -60,3 +60,43 @@ def test_a_refusal_sold_with_a_subscription_is_named_as_such(name):
 @pytest.mark.parametrize("name", ["Reject all", "Subscribe", "Accept and subscribe", "Rifiuta", "Abbonati"])
 def test_a_plain_refusal_or_a_plain_subscription_is_not_pay_to_refuse(name):
     assert not _matches(PAY_TO_REFUSE_LABELS, name)
+
+
+# ─── measured on 2026-11-27 (#97), the scanner's Chromium, locale it-IT ─────
+
+@pytest.mark.parametrize("name", [
+    "Rifiuta i cookie non tecnici",   # inps.it, #refuseAnalyticsBtn
+    "Reject additional cookies",      # gov.uk
+])
+def test_the_refusals_measured_on_2026_11_27_are_refusals(name):
+    assert _matches(REJECT_LABELS, name)
+    assert not _matches(ACCEPT_LABELS, name)
+
+
+@pytest.mark.parametrize("name", [
+    "Accept additional cookies",      # gov.uk
+    "Accetta e chiudi",               # giallozafferano.it, iubenda
+    "TILLAD ALLE",                    # dr.dk, Danish for "allow all"
+])
+def test_the_acceptances_measured_on_2026_11_27_are_acceptances(name):
+    assert _matches(ACCEPT_LABELS, name)
+    assert not _matches(REJECT_LABELS, name)
+
+
+@pytest.mark.parametrize("name", ["TILLAD UDVALGTE", "Rifiuta i cookie tecnici", "Accetta e abbonati"])
+def test_what_they_must_not_be_taken_for(name):
+    """dr.dk's "allow selected" is Cookiebot's "Allow selection" again: neither. The
+    technical cookies need no consent, so refusing them is not a label anyone uses.
+    And an acceptance that subscribes is not a plain acceptance."""
+    assert not _matches(REJECT_LABELS, name)
+    assert not _matches(ACCEPT_LABELS, name)
+
+
+def test_google_funding_choices_is_reached_by_its_classes():
+    """ilmeteo.it, 2026-11-27: Funding Choices labels its buttons as the publisher
+    chooses ("accetta", "continua senza accettare"; "Non acconsento" elsewhere), and
+    the classes `fc-cta-consent` and `fc-cta-do-not-consent` stay the same."""
+    from cookieradar.scanner import ACCEPT_SELECTORS, REJECT_SELECTORS
+
+    assert any("fc-cta-do-not-consent" in selector for selector in REJECT_SELECTORS)
+    assert any("fc-cta-consent" in selector and "do-not" not in selector for selector in ACCEPT_SELECTORS)

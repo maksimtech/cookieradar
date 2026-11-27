@@ -637,6 +637,9 @@ ACCEPT_SELECTORS = [
     # Cookiebot's ids do not change with the language: "Allow all" in English,
     # "Accetta tutti" in Italian (cookiebot.com, 2026-10-17).
     "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
+    # Google Funding Choices: the publisher picks the words, the class stays
+    # (ilmeteo.it, 2026-11-27: "accetta").
+    ".fc-cta-consent",
 ]
 REJECT_SELECTORS = [
     "#onetrust-reject-all-handler",
@@ -653,6 +656,10 @@ REJECT_SELECTORS = [
     "[data-testid='uc-deny-all-button']",
     # Cookiebot's "Deny" / "Rifiuta", same id in both (cookiebot.com, 2026-10-17).
     "#CybotCookiebotDialogBodyButtonDecline",
+    # Google Funding Choices' refusal, whatever the publisher calls it:
+    # "continua senza accettare" on ilmeteo.it (2026-11-27), "Non acconsento"
+    # elsewhere (#97).
+    ".fc-cta-do-not-consent",
 ]
 
 # The close "×" of a consent platform, tried only after every explicit refusal.
@@ -692,9 +699,18 @@ ACCEPT_LABELS = [
     # fresh visit it accepts what the switches say, the necessary only.
     re.compile(r"^\s*allow\s+all\s*$", re.I),
     re.compile(r"^\s*accetta\s+e\s+continua\s*$", re.I),
+    # Measured on 2026-11-27 (#97): "Accetta e chiudi" (giallozafferano.it,
+    # iubenda), "Accept additional cookies" (gov.uk), "TILLAD ALLE" (dr.dk,
+    # Danish for "allow all"; its "Tillad udvalgte" is "Allow selection" again).
+    re.compile(r"^\s*accetta\s+e\s+chiudi\s*$", re.I),
+    re.compile(r"^\s*accept\s+additional\s+cookies\s*$", re.I),
+    re.compile(r"^\s*tillad\s+alle\s*$", re.I),
 ]
 REJECT_LABELS = [
-    re.compile(r"^\s*rifiuta(\s+tutt[oi])?(\s+i\s+cookie)?\s*$", re.I),
+    # "Rifiuta i cookie non tecnici": inps.it, #refuseAnalyticsBtn, 2026-11-27 (#97)
+    re.compile(r"^\s*rifiuta(\s+tutt[oi])?(\s+i\s+cookie(\s+non\s+tecnici)?)?\s*$", re.I),
+    # gov.uk, 2026-11-27 (#97)
+    re.compile(r"^\s*reject\s+additional\s+cookies\s*$", re.I),
     re.compile(r"^\s*reject(\s+all)?(\s+cookies)?\s*$", re.I),
     re.compile(r"^\s*decline(\s+all)?\s*$", re.I),
     # Cookiebot's refusal in English (cookiebot.com, 2026-10-17).

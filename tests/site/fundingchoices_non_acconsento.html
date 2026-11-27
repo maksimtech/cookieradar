@@ -1,0 +1,30 @@
+<!doctype html>
+<!--
+  Derived from fundingchoices_ilmeteo.html (ilmeteo.it, 2026-11-27): the same
+  Funding Choices dialog, with the words Google's own Italian defaults give the two
+  choices — "Acconsento" and "Non acconsento", the refusal #97 recorded — in the
+  text and in the aria-labels. No label rule reads either, so only the classes
+  `fc-cta-consent` and `fc-cta-do-not-consent` can reach them: this page is what
+  tells whether they do. Each button records which one was clicked in a cookie.
+-->
+<html lang="it">
+<head><meta charset="utf-8"><title>Funding Choices</title></head>
+<body>
+<h1>Notizie</h1>
+<div class="fc-consent-root">
+  <div class="fc-dialog-container">
+    <div class="fc-dialog fc-choice-dialog" role="dialog" aria-label="Questo sito chiede il consenso">
+      <h1 class="fc-dialog-headline">Questo sito chiede il consenso all'uso dei tuoi dati</h1>
+      <div class="fc-footer-buttons">
+        <button class="fc-button fc-cta-consent fc-primary-button" role="button" aria-label="Acconsento" tabindex="0"
+                onclick="document.cookie='clicked=consent'"><div class="fc-button-background"></div><p class="fc-button-label">Acconsento</p></button>
+        <button class="fc-button fc-cta-do-not-consent fc-secondary-button" role="button" aria-label="Non acconsento" tabindex="0"
+                onclick="document.cookie='clicked=do-not-consent'"><div class="fc-button-background"></div><p class="fc-button-label">Non acconsento</p></button>
+        <button class="fc-button fc-cta-manage-options" role="button" aria-label="Gestisci opzioni" tabindex="0"
+                onclick="document.cookie='clicked=manage-options'"><p class="fc-manage-options-third-button-label">Gestisci opzioni</p></button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
