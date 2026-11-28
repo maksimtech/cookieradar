@@ -114,6 +114,33 @@ the Debian tracker; fixed only in sid (2.10.0-1).
 review_by = "2026-12-31"
 
 [[exception]]
+id = "CVE-2026-137992"
+source = "Docker Scout"
+where = "expat 2.9.0-1~deb13u1 (libexpat1), Chromium dependency"
+why = """
+libexpat through 2.11.0: defineAttribute() does not detect repeated non-ID \
+#IMPLIED or #REQUIRED attribute declarations, so a document with many \
+repeated ATTLIST declarations in its internal DTD subset makes storeAtts() \
+spend quadratic CPU (NVD, CWE-407; availability only). Reported by Docker \
+Scout on 2026-11-27 (alert #360). There is no fix to take: Debian lists it as \
+vulnerable in bookworm, trixie and sid (2.11.0-1), on Debian bug 1155562, and \
+the upstream fix, libexpat/libexpat#1537, is not merged.
+
+Measured in maksimtech/cookieradar:latest (sha256:90d9903e2755) on \
+2026-11-28. Playwright's chromium-1254 `chrome` and the \
+`chrome-headless-shell` a headless scan runs both link libexpat.so.1 \
+directly, importing XML_GetBuffer, XML_ParserFree, XML_SetElementHandler, \
+XML_SetEntityDeclHandler, XML_SetHashSalt and XML_StopParser. fontconfig and \
+Mesa load it too. No Python package in the image imports an XML parser, and \
+cookieradar parses no XML. Which inputs Chromium hands to libexpat was not \
+traced: the XML of web pages goes to Chromium's own libxml2, but a page \
+reaching libexpat is not ruled out, so this entry rests on the flaw rather \
+than on the reach. At worst it is CPU spent in one scan's browser, which the \
+scan's own timeouts end. The short date is for the upstream fix.
+"""
+review_by = "2026-12-15"
+
+[[exception]]
 id = "CVE-2026-117610"
 source = "Docker Scout"
 where = "expat 2.9.0-1~deb13u1, Chromium dependency"

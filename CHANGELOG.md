@@ -136,6 +136,15 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Security
 
+- **expat CVE-2026-137992 is accepted, with no fix to take, and with what reaches it measured.**
+  Docker Scout reported it on 2026-11-27 (alert #360), and Security Posture went red on `main`.
+  libexpat through 2.11.0 spends quadratic CPU on repeated `ATTLIST` declarations in a document's
+  internal DTD subset (availability only). Debian lists it as vulnerable in every suite, sid
+  included (bug 1155562), and the upstream fix is not merged. In the image of 2026-11-18,
+  Chromium's `chrome` and `chrome-headless-shell` link libexpat directly, while no Python package
+  and none of cookieradar's code parses XML. Which inputs Chromium hands to libexpat was not
+  traced, so the entry rests on the flaw and not on the reach: at worst, CPU spent in one scan's
+  browser until the scan's own timeouts. Review by 2026-12-15, for the upstream fix.
 - **A version from the dispatch form is checked to be a release tag before it is written, and before
   the Docker Hub login (#125, maksimtech/apkradar#151).** `docker.yml` wrote the input, `v` added,
   straight to the step outputs, after the login: a newline in it would have added outputs and image
