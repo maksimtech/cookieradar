@@ -3,9 +3,15 @@
 ## Reporting a vulnerability
 
 Write to <security@maksimtech.com>; the GPG key for that address is on
-keys.openpgp.org. Please do not open a public issue for a vulnerability.
+keys.openpgp.org. GitHub's private vulnerability reporting is also open on this
+repository: <https://github.com/maksimtech/cookieradar/security/advisories/new>.
+Please do not open a public issue for a vulnerability.
 
-CookieRadar has a single maintainer, Massimo Moretti, who reads that address.
+Reports are acknowledged within 7 days, and a vulnerability is disclosed in
+coordination with the reporter, who is credited in the advisory and the
+CHANGELOG if they wish.
+
+CookieRadar has a single maintainer, Massimo Moretti, who reads both.
 
 ## Supported versions
 
@@ -28,7 +34,7 @@ a fix ships as the next release, never as a patch to an older one.
   after each Docker Scout scan, and weekly, because an exception expires by date
   and not by commit.
 - GitHub secret scanning, with push protection, is enabled on the repository.
-- Reports sent to the address above.
+- Reports sent through either channel above.
 
 ## Response times
 

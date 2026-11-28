@@ -136,6 +136,13 @@ no version in this file has ever matched — 40 is not a month, and
 
 ### Security
 
+- **One private reporting channel on GitHub, the same in every Radar (#128, maksimtech/apkradar#153).** GitHub's private vulnerability reporting is open on this repository since 2026-11-28, next to
+  <security@maksimtech.com> with its GPG key, and `SECURITY.md` links it
+  (`https://github.com/maksimtech/cookieradar/security/advisories/new`).
+  Reports are acknowledged within 7 days, and a vulnerability is disclosed in coordination with the
+  reporter, who is credited in the advisory and the CHANGELOG if they wish.
+  `tests/test_security_policy.py`, the same in all six, holds the two channels, that line, and a
+  report link that names this repository and no other.
 - **expat CVE-2026-137992 is accepted, with no fix to take, and with what reaches it measured.**
   Docker Scout reported it on 2026-11-27 (alert #360), and Security Posture went red on `main`.
   libexpat through 2.11.0 spends quadratic CPU on repeated `ATTLIST` declarations in a document's
